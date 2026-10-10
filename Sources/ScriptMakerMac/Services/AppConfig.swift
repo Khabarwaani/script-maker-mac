@@ -33,8 +33,12 @@ final class AppConfig: ObservableObject {
     // MARK: - Normalization
 
     static func normalize(raw: String) throws -> String {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw ConfigError.emptyURL }
+        // Read like http: assume http:// when the user types a bare host.
+        if !trimmed.contains("://") {
+            trimmed = "http://" + trimmed
+        }
         let withoutSlash = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
         guard let schemeRange = withoutSlash.range(of: "://") else {
             throw ConfigError.missingScheme(withoutSlash)

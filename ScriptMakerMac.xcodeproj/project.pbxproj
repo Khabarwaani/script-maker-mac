@@ -20,6 +20,8 @@
 		F013 /* CharactersStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R015 /* CharactersStageView.swift */; };
 		F014 /* DialogueStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R016 /* DialogueStageView.swift */; };
 		F015 /* ScenesStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R017 /* ScenesStageView.swift */; };
+		F016 /* ServerAddressBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R018 /* ServerAddressBarViewModel.swift */; };
+		F017 /* ServerAddressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = R019 /* ServerAddressBar.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
 		/* File references */
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
@@ -36,6 +38,8 @@
 		R015 /* CharactersStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharactersStageView.swift; sourceTree = "<group>"; };
 		R016 /* DialogueStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogueStageView.swift; sourceTree = "<group>"; };
 		R017 /* ScenesStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenesStageView.swift; sourceTree = "<group>"; };
+		R018 /* ServerAddressBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAddressBarViewModel.swift; sourceTree = "<group>"; };
+		R019 /* ServerAddressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAddressBar.swift; sourceTree = "<group>"; };
 		R011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		R012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		R013 /* ScriptMakerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScriptMakerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -94,6 +98,7 @@
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
 				R007 /* GenerateViewModel.swift */,
+				R018 /* ServerAddressBarViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -108,6 +113,7 @@
 				R015 /* CharactersStageView.swift */,
 				R016 /* DialogueStageView.swift */,
 				R017 /* ScenesStageView.swift */,
+				R019 /* ServerAddressBar.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -164,6 +170,8 @@
 				F013 /* CharactersStageView.swift in Sources */,
 				F014 /* DialogueStageView.swift in Sources */,
 				F015 /* ScenesStageView.swift in Sources */,
+				F016 /* ServerAddressBarViewModel.swift in Sources */,
+				F017 /* ServerAddressBar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
