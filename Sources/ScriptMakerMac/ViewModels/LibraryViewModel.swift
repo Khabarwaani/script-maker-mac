@@ -5,14 +5,16 @@ import Foundation
 @MainActor
 final class LibraryViewModel: ObservableObject {
     private let config: AppConfig
+    private let repository: any StoryRepository
 
     @Published var stories: [[String: Any]] = []
     @Published var selectedStoryID: String?
     @Published var isLoading = false
     @Published var notice: String?
 
-    init(config: AppConfig) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
         self.config = config
+        self.repository = repository
     }
 
     var selectedStory: [String: Any]? {
@@ -29,7 +31,7 @@ final class LibraryViewModel: ObservableObject {
             let api = try PipelineService(config: config)
             stories = try await api.listStories()
             // Merge in locally saved stories (from completed generations).
-            stories = SavedStoriesStore.shared.all() + stories
+            stories = await repository.all() + stories
             if selectedStoryID == nil {
                 selectedStoryID = stories.first?["id"] as? String
             }
@@ -40,16 +42,16 @@ final class LibraryViewModel: ObservableObject {
             default:
                 notice = e.localizedDescription
             }
-            stories = SavedStoriesStore.shared.all()
+            stories = await repository.all()
         } catch {
             notice = error.localizedDescription
-            stories = SavedStoriesStore.shared.all()
+            stories = await repository.all()
         }
     }
 
     /// Delete a story (from local store; server deletion when API supports it).
     func deleteStory(id: String) async {
-        SavedStoriesStore.shared.remove(id: id)
+        await repository.remove(id: id)
         stories.removeAll { ($0["id"] as? String) == id }
         if selectedStoryID == id {
             selectedStoryID = stories.first?["id"] as? String
@@ -74,25 +76,3 @@ final class LibraryViewModel: ObservableObject {
     }
 }
 
-/// In-memory store for stories saved from completed generations.
-/// Persists for the app session; server is the source of truth when live.
-final class SavedStoriesStore {
-    static let shared = SavedStoriesStore()
-    private var saved: [[String: Any]] = []
-    private init() {}
-
-    func save(_ story: [String: Any]) {
-        let id = story["id"] as? String ?? UUID().uuidString
-        var s = story
-        s["id"] = id
-        // Replace if already saved, else prepend (newest first).
-        saved.removeAll { ($0["id"] as? String) == id }
-        saved.insert(s, at: 0)
-    }
-
-    func all() -> [[String: Any]] { saved }
-
-    func remove(id: String) {
-        saved.removeAll { ($0["id"] as? String) == id }
-    }
-}

@@ -7,6 +7,7 @@ import Foundation
 @MainActor
 final class GenerateViewModel: ObservableObject {
     private let config: AppConfig
+    private let repository: any StoryRepository
     private var eventTask: Task<Void, Never>?
 
     @Published var topic: String = ""
@@ -61,8 +62,9 @@ final class GenerateViewModel: ObservableObject {
     @Published var instructionText: String = ""
     @Published var isRefreshingHeadlines = false
 
-    init(config: AppConfig) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
         self.config = config
+        self.repository = repository
         loadSampleLists()
     }
 
@@ -248,7 +250,7 @@ final class GenerateViewModel: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Save the completed generation to the Library.
+    /// Save the completed generation to the Library via the repository.
     private func saveToLibrary() {
         let story: [String: Any] = [
             "id": sessionID ?? UUID().uuidString,
@@ -260,7 +262,7 @@ final class GenerateViewModel: ObservableObject {
             "emotion": selectedEmotion,
             "format": selectedFormat,
         ]
-        SavedStoriesStore.shared.save(story)
+        Task { await repository.save(story) }
     }
 
     private func nextStage(after stage: PipelineStage?) -> PipelineStage? {
