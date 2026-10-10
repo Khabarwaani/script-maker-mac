@@ -77,6 +77,10 @@
 		R027 /* OfflineWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWebClient.swift; sourceTree = "<group>"; };
 		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
+		R032 /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
+		R033 /* StoryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDataSource.swift; sourceTree = "<group>"; };
+		R034 /* ImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageService.swift; sourceTree = "<group>"; };
+		R035 /* ThumbnailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailViewModel.swift; sourceTree = "<group>"; };
 		R029 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		R028 /* PipelineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineService.swift; sourceTree = "<group>"; };
 		R024 /* ScriptMakerMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ScriptMakerMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
