@@ -28,7 +28,7 @@ struct ContentView: View {
         TabView(selection: $viewModel.selectedTab) {
             GenerateView(viewModel: generateViewModel)
                 .tabItem { Label("Studio", systemImage: "wand.and.stars") }
-                .tag(ContentViewModel.Tab.generate)
+                .tag(ContentViewModel.Tab.studio)
             LibraryView(config: viewModel.config)
                 .tabItem { Label("Library", systemImage: "books.vertical") }
                 .tag(ContentViewModel.Tab.library)
