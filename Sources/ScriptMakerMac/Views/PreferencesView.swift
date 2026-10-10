@@ -7,20 +7,23 @@ struct PreferencesView: View {
 
     var body: some View {
         Form {
-            Section("Local server (\(AppConfig.localserverName))") {
-                TextField("Server URL", text: $viewModel.draftURL)
-                    .textFieldStyle(.roundedBorder)
-                Text("Default is this Mac (localhost:8501). IPv6 addresses are accepted, e.g. http://[::1]:8501. Update the URL here to point at your server.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Picker("Data source", selection: $viewModel.dataSource) {
+            Section("Data source") {
+                Picker("Source", selection: $viewModel.dataSource) {
                     ForEach(DataSource.allCases) { source in
                         Text(source.label).tag(source)
                     }
                 }
-                .pickerStyle(.segmented)
-                Text("When on, the app runs against bundled sample JSON — full UX without a server.")
+                .pickerStyle(.radioGroup)
+                Text("Server: connect to a live pipeline server. Offline Data: bundled sample JSON, full UX without a server.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Local server (\(AppConfig.localserverName))") {
+                TextField("Server URL", text: $viewModel.draftURL)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(viewModel.dataSource == .offline)
+                Text("Default is this Mac (localhost:8501). IPv6 addresses are accepted, e.g. http://[::1]:8501.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
