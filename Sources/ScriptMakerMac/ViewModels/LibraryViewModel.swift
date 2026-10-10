@@ -24,7 +24,7 @@ final class LibraryViewModel: ObservableObject {
         defer { isLoading = false }
         notice = nil
         do {
-            let api = try PipelineAPI(baseURL: config.baseURL(), sampleMode: config.useSampleData)
+            let api = try PipelineService(config: config)
             stories = try await api.listStories()
             if selectedStoryID == nil {
                 selectedStoryID = stories.first?["id"] as? String

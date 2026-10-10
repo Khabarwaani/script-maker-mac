@@ -7,7 +7,7 @@ struct ServerAddressBar: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            if viewModel.useSampleData {
+            if viewModel.dataSource == .offline {
                 // Sample mode: show dummy indicator instead of URL field.
                 Label("Sample Data", systemImage: "testtube.2")
                     .font(.callout)

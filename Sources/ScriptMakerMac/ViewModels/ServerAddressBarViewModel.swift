@@ -12,12 +12,12 @@ final class ServerAddressBarViewModel: ObservableObject {
     @Published var draftURL: String
     @Published var isConnected = false
     @Published var isChecking = false
-    @Published var useSampleData: Bool
+    @Published var dataSource: DataSource
 
     init(config: AppConfig) {
         self.config = config
         self.draftURL = config.serverURL
-        self.useSampleData = config.useSampleData
+        self.dataSource = config.dataSource
         // Stay in sync when Preferences changes the URL or sample mode.
         config.objectWillChange
             .receive(on: DispatchQueue.main)
@@ -26,8 +26,8 @@ final class ServerAddressBarViewModel: ObservableObject {
                 if self.draftURL != self.config.serverURL {
                     self.draftURL = self.config.serverURL
                 }
-                if self.useSampleData != self.config.useSampleData {
-                    self.useSampleData = self.config.useSampleData
+                if self.dataSource != self.config.dataSource {
+                    self.dataSource = self.config.dataSource
                 }
             }
             .store(in: &cancellables)
@@ -45,11 +45,17 @@ final class ServerAddressBarViewModel: ObservableObject {
         Task { await refreshStatus() }
     }
 
+    /// Switch between Server and Offline Data.
+    func setDataSource(_ source: DataSource) {
+        config.dataSource = source
+        Task { await refreshStatus() }
+    }
+
     func refreshStatus() async {
         isChecking = true
         defer { isChecking = false }
         do {
-            let api = PipelineAPI(baseURL: try config.baseURL(), sampleMode: config.useSampleData)
+            let api = try PipelineService(config: config)
             isConnected = await api.ping()
         } catch {
             isConnected = false

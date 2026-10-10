@@ -14,7 +14,12 @@ struct PreferencesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Toggle("Use sample data (offline demo)", isOn: $viewModel.useSampleData)
+                Picker("Data source", selection: $viewModel.dataSource) {
+                    ForEach(DataSource.allCases) { source in
+                        Text(source.label).tag(source)
+                    }
+                }
+                .pickerStyle(.segmented)
                 Text("When on, the app runs against bundled sample JSON — full UX without a server.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
