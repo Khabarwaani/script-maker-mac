@@ -95,6 +95,6 @@ struct GenerateView: View {
         let current = viewModel.currentStage == stage
         return Label(stage.title, systemImage: done ? "checkmark.circle.fill" : "circle")
             .font(.caption)
-            .foregroundStyle(current ? .accentColor : done ? .green : .secondary)
+            .foregroundStyle(current ? Color.accentColor : done ? Color.green : Color.secondary)
     }
 }
