@@ -19,8 +19,11 @@ struct GenerateView: View {
             configSidebar
                 .navigationTitle("Configuration")
         } detail: {
-            // Detail: stage flow results.
+            // Detail: stage flow results (Preview column like Streamlit).
             VStack(alignment: .leading, spacing: 12) {
+                Text("Preview")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
                 if viewModel.sessionID == nil {
                     emptyDetail
                 } else {
@@ -45,6 +48,19 @@ struct GenerateView: View {
     private var configSidebar: some View {
         Form {
             Section("Story & Topic") {
+                HStack {
+                    Text("Story & Topic")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        Task { await viewModel.refreshHeadlines() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("Refresh headlines")
+                    .disabled(viewModel.isRefreshingHeadlines)
+                }
+
                 Picker("Source", selection: $viewModel.selectedStorySource) {
                     ForEach(viewModel.storySources, id: \.self) { source in
                         Text(source).tag(source)
@@ -69,6 +85,19 @@ struct GenerateView: View {
                     }
                     .onChange(of: viewModel.selectedHeadline) { _, new in
                         viewModel.topic = new
+                        viewModel.selectedTopic = new
+                    }
+                }
+
+                // Topic dropdown.
+                if !viewModel.topics.isEmpty {
+                    Picker("Topic", selection: $viewModel.selectedTopic) {
+                        ForEach(viewModel.topics, id: \.self) { topic in
+                            Text(topic).tag(topic)
+                        }
+                    }
+                    .onChange(of: viewModel.selectedTopic) { _, new in
+                        viewModel.topic = new
                     }
                 }
 
@@ -85,27 +114,48 @@ struct GenerateView: View {
                 Picker("AI Source", selection: $viewModel.selectedAISource) {
                     ForEach(viewModel.aiSources, id: \.self) { Text($0).tag($0) }
                 }
+                .onChange(of: viewModel.selectedAISource) { _, _ in viewModel.updateInstruction() }
                 Picker("AI Model", selection: $viewModel.selectedAIModel) {
                     ForEach(viewModel.aiModels, id: \.self) { Text($0).tag($0) }
                 }
+                .onChange(of: viewModel.selectedAIModel) { _, _ in viewModel.updateInstruction() }
                 Picker("AI Power", selection: $viewModel.selectedAIPower) {
                     ForEach(viewModel.aiPowers, id: \.self) { Text($0).tag($0) }
                 }
+                .onChange(of: viewModel.selectedAIPower) { _, _ in viewModel.updateInstruction() }
                 Stepper("Duration: \(viewModel.duration)s", value: $viewModel.duration, in: 5...60, step: 5)
+                    .onChange(of: viewModel.duration) { _, _ in viewModel.updateInstruction() }
                 Picker("Emotion", selection: $viewModel.selectedEmotion) {
                     ForEach(viewModel.emotions, id: \.self) { Text($0).tag($0) }
                 }
+                .onChange(of: viewModel.selectedEmotion) { _, _ in viewModel.updateInstruction() }
                 Stepper("Scripts: \(viewModel.scriptCount)", value: $viewModel.scriptCount, in: 1...5)
                 Stepper("Retries: \(viewModel.maxRetries)", value: $viewModel.maxRetries, in: 0...10)
                 Stepper("Characters: \(viewModel.characterCount)", value: $viewModel.characterCount, in: 1...10)
+                    .onChange(of: viewModel.characterCount) { _, _ in viewModel.updateInstruction() }
                 Picker("Character Kind", selection: $viewModel.selectedCharacterKind) {
                     ForEach(viewModel.characterKinds, id: \.self) { Text($0).tag($0) }
                 }
+                .onChange(of: viewModel.selectedCharacterKind) { _, _ in viewModel.updateInstruction() }
                 TextField("Kind Detail", text: $viewModel.characterKindDetail)
                     .textFieldStyle(.roundedBorder)
                 Picker("Format", selection: $viewModel.selectedFormat) {
                     ForEach(viewModel.formats, id: \.self) { Text($0).tag($0) }
                 }
+                .onChange(of: viewModel.selectedFormat) { _, _ in viewModel.updateInstruction() }
+            }
+
+            Section("Instruction") {
+                TextEditor(text: $viewModel.instructionText)
+                    .frame(minHeight: 100)
+                    .font(.callout)
+                Text("Master instruction combining emotion, format, character count, duration, and sample story directives.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Refresh instruction") {
+                    viewModel.updateInstruction()
+                }
+                .help("Regenerate instruction from current config")
             }
 
             Section("Generation Mode") {

@@ -60,6 +60,10 @@ final class GenerateViewModel: ObservableObject {
     }
     @Published var workflowMode: WorkflowMode = .continuous
 
+    // Instruction: master instruction combining emotion, format, character directives.
+    @Published var instructionText: String = ""
+    @Published var isRefreshingHeadlines = false
+
     init(config: AppConfig) {
         self.config = config
         loadSampleLists()
@@ -70,6 +74,9 @@ final class GenerateViewModel: ObservableObject {
         if let h = SampleData.json(for: "headlines")?["headlines"] as? [String] {
             headlines = h
             if selectedHeadline.isEmpty { selectedHeadline = h.first ?? "" }
+            // Topics mirror headlines for the dropdown.
+            topics = h
+            if selectedTopic.isEmpty { selectedTopic = h.first ?? "" }
         }
         if let s = SampleData.json(for: "servers")?["servers"] as? [[String: String]] {
             servers = s
@@ -77,6 +84,26 @@ final class GenerateViewModel: ObservableObject {
                 selectedServerName = first["name"] ?? AppConfig.localserverName
             }
         }
+        updateInstruction()
+    }
+
+    /// Refresh headlines (re-load from sample data / server).
+    func refreshHeadlines() async {
+        isRefreshingHeadlines = true
+        defer { isRefreshingHeadlines = false }
+        // Simulate refresh delay; in server mode this would fetch fresh headlines.
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        loadSampleLists()
+    }
+
+    /// Update the master instruction from current config.
+    func updateInstruction() {
+        instructionText = """
+        Generate a \(selectedFormat) video with \(characterCount) character(s) \
+        (\(selectedCharacterKind)), emotion: \(selectedEmotion). \
+        Duration: \(duration)s. AI: \(selectedAISource) \(selectedAIModel) (\(selectedAIPower)). \
+        Sample story guides dialogue and scenes.
+        """
     }
 
     private func api() throws -> PipelineService {
