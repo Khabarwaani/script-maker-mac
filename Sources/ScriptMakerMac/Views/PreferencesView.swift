@@ -7,10 +7,15 @@ struct PreferencesView: View {
 
     var body: some View {
         Form {
-            Section("Pipeline server") {
+            Section("Local server (\(AppConfig.localserverName))") {
                 TextField("Server URL", text: $viewModel.draftURL)
                     .textFieldStyle(.roundedBorder)
-                Text("Default is this Mac (localhost). IPv6 addresses are accepted, e.g. http://[::1]:8000.")
+                Text("Default is this Mac (localhost:8501). IPv6 addresses are accepted, e.g. http://[::1]:8501. Update the URL here to point at your server.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Use sample data (offline demo)", isOn: $viewModel.useSampleData)
+                Text("When on, the app runs against bundled sample JSON — full UX without a server.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

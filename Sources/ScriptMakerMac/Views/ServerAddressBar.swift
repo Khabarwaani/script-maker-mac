@@ -11,7 +11,7 @@ struct ServerAddressBar: View {
                 .foregroundStyle(viewModel.isConnected ? Color.green : Color.secondary)
                 .help(viewModel.isConnected ? "Server connected" : "Server not connected")
 
-            TextField("localhost:8000", text: $viewModel.draftURL)
+            TextField("localhost:8501", text: $viewModel.draftURL)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 260, idealWidth: 340)
                 .onSubmit { viewModel.commit() }

@@ -24,7 +24,7 @@ final class ContentViewModel: ObservableObject {
     }
 
     var api: PipelineAPI? {
-        try? PipelineAPI(baseURL: config.baseURL())
+        try? PipelineAPI(baseURL: config.baseURL(), sampleMode: config.useSampleData)
     }
 
     /// Refresh connectivity without throwing — status indicator only.

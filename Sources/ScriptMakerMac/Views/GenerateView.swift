@@ -115,6 +115,12 @@ struct GenerateView: View {
             ScenesStageView(payload: payload) {
                 Task { await viewModel.select([:]) }
             }
+        case .storyboard:
+            StoryboardStageView(payload: payload) {
+                Task { await viewModel.select([:]) }
+            }
+        case .render:
+            RenderStageView(payload: payload, viewModel: viewModel)
         default:
             EmptyView()
         }
