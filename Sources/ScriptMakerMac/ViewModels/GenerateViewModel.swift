@@ -18,11 +18,9 @@ final class GenerateViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var jobProgress: Double?
 
-    // Headlines and servers from sample data (or server when live).
+    // Headlines from sample data (or server when live).
     @Published var headlines: [String] = []
     @Published var selectedHeadline: String = ""
-    @Published var servers: [[String: String]] = []
-    @Published var selectedServerName: String = AppConfig.localserverName
 
     // Story & Topic (mirrors Streamlit settings panel).
     @Published var storySources: [String] = ["Manual", "India News", "Trending Hashtags"]
@@ -69,7 +67,7 @@ final class GenerateViewModel: ObservableObject {
         loadSampleLists()
     }
 
-    /// Load headline/server dropdowns from sample data.
+    /// Load headline dropdowns from sample data.
     func loadSampleLists() {
         if let h = SampleData.json(for: "headlines")?["headlines"] as? [String] {
             headlines = h
@@ -77,12 +75,6 @@ final class GenerateViewModel: ObservableObject {
             // Topics mirror headlines for the dropdown.
             topics = h
             if selectedTopic.isEmpty { selectedTopic = h.first ?? "" }
-        }
-        if let s = SampleData.json(for: "servers")?["servers"] as? [[String: String]] {
-            servers = s
-            if let first = s.first, selectedServerName.isEmpty {
-                selectedServerName = first["name"] ?? AppConfig.localserverName
-            }
         }
         updateInstruction()
     }

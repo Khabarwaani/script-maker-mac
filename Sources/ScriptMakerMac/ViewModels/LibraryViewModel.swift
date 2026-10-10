@@ -54,6 +54,22 @@ final class LibraryViewModel: ObservableObject {
         }
         // TODO: server-side delete when the API provides it.
     }
+
+    /// Merge the default closing clip at the end of the story's video.
+    /// Server-side when live; not available in offline mode.
+    func mergeClip(storyID: String) async {
+        guard config.dataSource == .server else {
+            notice = "Video merging needs a server connection."
+            return
+        }
+        do {
+            let api = try PipelineService(config: config)
+            _ = try await api.select(sessionID: storyID, selection: ["action": "merge_clip"])
+            await refresh()
+        } catch {
+            notice = error.localizedDescription
+        }
+    }
 }
 
 /// In-memory store for stories saved from completed generations.

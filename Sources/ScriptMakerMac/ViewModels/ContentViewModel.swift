@@ -17,23 +17,8 @@ final class ContentViewModel: ObservableObject {
     let config: AppConfig
 
     @Published var selectedTab: Tab = .studio
-    @Published var connection: ConnectionState = .unknown
 
     init(config: AppConfig) {
         self.config = config
-    }
-
-    var api: PipelineService? {
-        try? PipelineService(config: config)
-    }
-
-    /// Refresh connectivity without throwing — status indicator only.
-    func refreshConnection() async {
-        connection = .checking
-        guard let api else {
-            connection = .unreachable("Bad server URL")
-            return
-        }
-        connection = await api.ping() ? .connected : .unreachable(api.baseURL.absoluteString)
     }
 }
