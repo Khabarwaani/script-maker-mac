@@ -253,8 +253,8 @@
 		C002 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B003 /* Debug */,
-				B004 /* Release */,
+				B005 /* Debug */,
+				B006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -348,7 +348,7 @@
 			};
 			name = Release;
 		};
-		B003 /* Debug */ = {
+		B005 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				GENERATE_INFOPLIST_FILE = YES;
@@ -357,7 +357,7 @@
 			};
 			name = Debug;
 		};
-		B004 /* Release */ = {
+		B006 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				GENERATE_INFOPLIST_FILE = YES;
