@@ -60,6 +60,7 @@
 		R020 /* StoryboardStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryboardStageView.swift; sourceTree = "<group>"; };
 		R021 /* RenderStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderStageView.swift; sourceTree = "<group>"; };
 		R022 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		R024 /* ScriptMakerMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ScriptMakerMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		R023 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
 		Jverify /* verify.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = verify.json; sourceTree = "<group>"; };
 		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
@@ -180,6 +181,28 @@
 			path = Samples;
 			sourceTree = "<group>";
 		};
+		D001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T001 /* ScriptMakerMac */;
+			targetProxy = X001 /* PBXContainerItemProxy */;
+		};
+		X001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = P000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T001;
+			remoteInfo = ScriptMakerMac;
+		};
+		G012 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				E001 /* AppConfigTests.swift */,
+				E002 /* SampleDataTests.swift */,
+				E003 /* SampleAPITests.swift */,
+			);
+			path = Tests/ScriptMakerMacTests;
+			sourceTree = "<group>";
+		};
 		/* Target */
 		T001 /* ScriptMakerMac */ = {
 			isa = PBXNativeTarget;
@@ -196,11 +219,36 @@
 			productReference = R013 /* ScriptMakerMac.app */;
 			productType = "com.apple.product-type.application";
 		};
+		T002 /* ScriptMakerMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C002 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */;
+			buildPhases = (
+				P004 /* Sources */,
+				P005 /* Frameworks */,
+			);
+			buildRules = ( );
+			dependencies = (
+				D001 /* PBXTargetDependency */,
+			);
+			name = ScriptMakerMacTests;
+			productName = ScriptMakerMacTests;
+			productReference = R024 /* ScriptMakerMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		C001 /* Build configuration list for PBXNativeTarget "ScriptMakerMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B001 /* Debug */,
 				B002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C002 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B003 /* Debug */,
+				B004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -233,6 +281,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ( );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E011 /* AppConfigTests.swift in Sources */,
+				E012 /* SampleDataTests.swift in Sources */,
+				E013 /* SampleAPITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = ( );
@@ -273,6 +337,22 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		B003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		B004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
@@ -333,7 +413,7 @@
 			productRefGroup = G003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = ( T001 /* ScriptMakerMac */, );
+			targets = ( T001 /* ScriptMakerMac */, T002 /* ScriptMakerMacTests */, );
 		};
 	};
 	rootObject = PRJ001 /* Project object */;
