@@ -68,7 +68,7 @@ struct PipelineAPI: Sendable {
         if sampleMode {
             return SampleData.json(for: "stories")?["stories"] as? [[String: Any]] ?? []
         }
-        let data = try await request(path: "stories")
+        let data = try await perform(path: "stories", method: "GET")
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let stories = json["stories"] as? [[String: Any]] else {
             throw APIError.malformed("stories list")
@@ -125,8 +125,8 @@ struct PipelineAPI: Sendable {
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error> {
         if sampleMode {
             return AsyncThrowingStream { continuation in
-                continuation.yield(SubstepEvent(stage: "verify", status: "running", message: "Sample: verifying facts…"))
-                continuation.yield(SubstepEvent(stage: "verify", status: "done", message: "Sample: 4 facts verified."))
+                continuation.yield(SubstepEvent(name: "verify", stage: "verify", label: "Verifying", status: "running", detail: "Sample: verifying facts…"))
+                continuation.yield(SubstepEvent(name: "verify", stage: "verify", label: "Verifying", status: "done", detail: "Sample: 4 facts verified."))
                 continuation.finish()
             }
         }
