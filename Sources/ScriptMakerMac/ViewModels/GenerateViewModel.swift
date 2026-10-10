@@ -187,6 +187,7 @@ final class GenerateViewModel: ObservableObject {
                 if status.status == "done" {
                     renderCompleted = true
                     jobProgress = nil
+                    saveToLibrary()
                 } else if status.status == "failed" {
                     errorMessage = status.detail ?? "Render failed."
                     jobProgress = nil
@@ -229,6 +230,21 @@ final class GenerateViewModel: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    /// Save the completed generation to the Library.
+    private func saveToLibrary() {
+        let story: [String: Any] = [
+            "id": sessionID ?? UUID().uuidString,
+            "title": topic.isEmpty ? "Untitled" : topic,
+            "summary": sampleStory,
+            "headline": selectedHeadline,
+            "created_at": ISO8601DateFormatter().string(from: Date()),
+            "status": "completed",
+            "emotion": selectedEmotion,
+            "format": selectedFormat,
+        ]
+        SavedStoriesStore.shared.save(story)
+    }
 
     private func nextStage(after stage: PipelineStage?) -> PipelineStage? {
         let all = PipelineStage.allCases
