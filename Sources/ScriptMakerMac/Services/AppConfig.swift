@@ -5,16 +5,27 @@ import Foundation
 /// The pipeline server URL is the single connection point for every use case.
 /// Defaults to localhost; IPv6 hosts are accepted and bracketed automatically.
 final class AppConfig: ObservableObject {
+    /// The default endpoint is named "localserver".
+    static let localserverName = "localserver"
     static let defaultServerURL = "http://localhost:8501"
     private static let serverURLKey = "serverURL"
+    private static let useSampleDataKey = "useSampleData"
 
     @Published var serverURL: String {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
     }
 
+    /// When true (the default), the app runs against bundled sample JSON
+    /// instead of a live server — full UX, offline, test-like output.
+    @Published var useSampleData: Bool {
+        didSet { UserDefaults.standard.set(useSampleData, forKey: Self.useSampleDataKey) }
+    }
+
     init() {
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
+        self.useSampleData = UserDefaults.standard.object(forKey: Self.useSampleDataKey) as? Bool
+            ?? true
     }
 
     /// Validated, normalized base URL. Throws fail-loud on bad input.
@@ -28,6 +39,7 @@ final class AppConfig: ObservableObject {
 
     func resetToDefaults() {
         serverURL = Self.defaultServerURL
+        useSampleData = true
     }
 
     // MARK: - Normalization

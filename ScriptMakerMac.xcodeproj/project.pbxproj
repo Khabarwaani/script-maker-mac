@@ -24,7 +24,16 @@
 		F017 /* ServerAddressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = R019 /* ServerAddressBar.swift */; };
 		F018 /* StoryboardStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R020 /* StoryboardStageView.swift */; };
 		F019 /* RenderStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R021 /* RenderStageView.swift */; };
+		F020 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = R022 /* SampleData.swift */; };
+		F021 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R023 /* LibraryViewModel.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
+		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
+		Brender /* render.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* render.json */; };
+		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
+		Bscenes /* scenes.json in Resources */ = {isa = PBXBuildFile; fileRef = Jscenes /* scenes.json */; };
+		Bdialogue /* dialogue.json in Resources */ = {isa = PBXBuildFile; fileRef = Jdialogue /* dialogue.json */; };
+		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
+		Bverify /* verify.json in Resources */ = {isa = PBXBuildFile; fileRef = Jverify /* verify.json */; };
 		/* File references */
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
 		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
@@ -44,6 +53,15 @@
 		R019 /* ServerAddressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAddressBar.swift; sourceTree = "<group>"; };
 		R020 /* StoryboardStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryboardStageView.swift; sourceTree = "<group>"; };
 		R021 /* RenderStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderStageView.swift; sourceTree = "<group>"; };
+		R022 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		R023 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
+		Jrender /* render.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = render.json; sourceTree = "<group>"; };
+		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
+		Jscenes /* scenes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = scenes.json; sourceTree = "<group>"; };
+		Jdialogue /* dialogue.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = dialogue.json; sourceTree = "<group>"; };
+		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
+		Jverify /* verify.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = verify.json; sourceTree = "<group>"; };
 		R011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		R012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		R013 /* ScriptMakerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScriptMakerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -103,6 +121,7 @@
 				R006 /* PreferencesViewModel.swift */,
 				R007 /* GenerateViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
+				R023 /* LibraryViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -127,6 +146,7 @@
 		G009 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				G010 /* Samples */,
 				R011 /* Assets.xcassets */,
 				R012 /* Info.plist */,
 			);
@@ -180,6 +200,8 @@
 				F017 /* ServerAddressBar.swift in Sources */,
 				F018 /* StoryboardStageView.swift in Sources */,
 				F019 /* RenderStageView.swift in Sources */,
+				F020 /* SampleData.swift in Sources */,
+				F021 /* LibraryViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -192,7 +214,7 @@
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */, Bverify /* verify.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {

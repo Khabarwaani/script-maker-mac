@@ -7,16 +7,20 @@ import Foundation
 struct PipelineAPI: Sendable {
     let baseURL: URL
     private let session: URLSession
+    /// When true, all calls return bundled sample JSON — no network.
+    let sampleMode: Bool
 
-    init(baseURL: URL, session: URLSession = .shared) {
+    init(baseURL: URL, session: URLSession = .shared, sampleMode: Bool = false) {
         self.baseURL = baseURL
         self.session = session
+        self.sampleMode = sampleMode
     }
 
     // MARK: - Health
 
     /// Non-throwing: for status indicators only.
     func ping() async -> Bool {
+        if sampleMode { return true }
         do {
             let (_, response) = try await session.data(for: request(path: "health", method: "GET"))
             return (response as? HTTPURLResponse).map { 200..<300 ~= $0.statusCode } ?? false
@@ -28,12 +32,19 @@ struct PipelineAPI: Sendable {
     // MARK: - Sessions & stages
 
     func createSession() async throws -> String {
+        if sampleMode { return "sample-session" }
         let data = try await perform(path: "sessions", method: "POST")
         return try JSONDecoder().decode(SessionResponse.self, from: data).sessionID
     }
 
     /// Run a stage; returns the raw JSON payload for the view model to interpret.
     func runStage(sessionID: String, stage: PipelineStage, inputs: [String: Any] = [:]) async throws -> [String: Any] {
+        if sampleMode {
+            guard let sample = SampleData.json(for: stage.rawValue) else {
+                throw APIError.notImplemented("sample data for stage \(stage.rawValue)")
+            }
+            return sample
+        }
         let data = try await perform(
             path: "sessions/\(sessionID)/stages/\(stage.rawValue)",
             method: "POST",
@@ -43,6 +54,7 @@ struct PipelineAPI: Sendable {
     }
 
     func select(sessionID: String, selection: [String: Any]) async throws -> [String: Any] {
+        if sampleMode { return [:] }
         let data = try await perform(
             path: "sessions/\(sessionID)/select",
             method: "POST",
@@ -51,9 +63,23 @@ struct PipelineAPI: Sendable {
         return try castJSON(data)
     }
 
+    /// List saved stories. Throws APIError.notImplemented until the server provides it.
+    func listStories() async throws -> [[String: Any]] {
+        if sampleMode {
+            return SampleData.json(for: "stories")?["stories"] as? [[String: Any]] ?? []
+        }
+        let data = try await request(path: "stories")
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let stories = json["stories"] as? [[String: Any]] else {
+            throw APIError.malformed("stories list")
+        }
+        return stories
+    }
+
     // MARK: - Jobs (long generations)
 
     func startJob(sessionID: String, stage: PipelineStage, inputs: [String: Any] = [:]) async throws -> String {
+        if sampleMode { return "sample-job" }
         var payload = inputs
         payload["stage"] = stage.rawValue
         let data = try await perform(path: "sessions/\(sessionID)/jobs", method: "POST", json: payload)
@@ -61,13 +87,20 @@ struct PipelineAPI: Sendable {
     }
 
     func jobStatus(jobID: String) async throws -> JobStatus {
+        if sampleMode { return JobStatus(status: "done", progress: 1.0, detail: "Sample render complete.") }
         let data = try await perform(path: "jobs/\(jobID)", method: "GET")
         return try JSONDecoder().decode(JobStatus.self, from: data)
     }
 
     /// Poll a job until it completes, yielding each status.
     func pollJob(jobID: String, interval: TimeInterval = 1.0) -> AsyncThrowingStream<JobStatus, Error> {
-        AsyncThrowingStream { continuation in
+        if sampleMode {
+            return AsyncThrowingStream { continuation in
+                continuation.yield(JobStatus(status: "done", progress: 1.0, detail: "Sample render complete."))
+                continuation.finish()
+            }
+        }
+        return AsyncThrowingStream { continuation in
             Task {
                 do {
                     while true {
@@ -90,7 +123,14 @@ struct PipelineAPI: Sendable {
 
     /// Server-sent substep events until the server closes the stream.
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error> {
-        AsyncThrowingStream { continuation in
+        if sampleMode {
+            return AsyncThrowingStream { continuation in
+                continuation.yield(SubstepEvent(stage: "verify", status: "running", message: "Sample: verifying facts…"))
+                continuation.yield(SubstepEvent(stage: "verify", status: "done", message: "Sample: 4 facts verified."))
+                continuation.finish()
+            }
+        }
+        return AsyncThrowingStream { continuation in
             Task {
                 do {
                     let url = baseURL.appendingPathComponent("sessions/\(sessionID)/events")
@@ -153,6 +193,9 @@ struct PipelineAPI: Sendable {
             }
             guard 200..<300 ~= http.statusCode else {
                 let body = String(data: data, encoding: .utf8) ?? ""
+                if http.statusCode == 404 || http.statusCode == 501 {
+                    throw APIError.notImplemented("\(req.httpMethod ?? "") \(path) — the server does not implement this endpoint")
+                }
                 throw APIError.server(http.statusCode, String(body.prefix(500)))
             }
             return data
@@ -177,6 +220,7 @@ enum APIError: LocalizedError {
     case malformed(String)
     case badStatus(Int)
     case transport(String)
+    case notImplemented(String)
 
     var errorDescription: String? {
         switch self {
@@ -190,6 +234,8 @@ enum APIError: LocalizedError {
             return "Server stream failed with status \(code)."
         case .transport(let what):
             return "Network error: \(what)."
+        case .notImplemented(let what):
+            return "Not implemented: \(what)."
         }
     }
 }

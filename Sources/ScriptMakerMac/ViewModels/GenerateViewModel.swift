@@ -23,7 +23,7 @@ final class GenerateViewModel: ObservableObject {
     }
 
     private func api() throws -> PipelineAPI {
-        try PipelineAPI(baseURL: config.baseURL())
+        try PipelineAPI(baseURL: config.baseURL(), sampleMode: config.useSampleData)
     }
 
     // MARK: - Flow
