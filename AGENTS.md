@@ -1,6 +1,19 @@
 # AGENTS.md — script-maker-mac
 
-Agent rules for this repo. Native macOS app; conventions mirror `ai-script-maker`.
+Agent rules for this repo. Written for this repo — not copied.
+
+## Dispatch
+
+Re-read the matching guideline each task:
+
+| Task | File |
+| :--- | :--- |
+| Feature | `docs/guidelines/workflows/feature.md` |
+| Bug fix | `docs/guidelines/workflows/bugfix.md` |
+| Git / PR | `docs/guidelines/workflows/git.md` |
+| Test or CI failure | `docs/guidelines/workflows/failure.md` |
+| Unit tests | `docs/guidelines/testing.md` |
+| Release | `docs/guidelines/workflows/release.md` |
 
 ## What this repo is
 

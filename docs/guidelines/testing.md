@@ -1,19 +1,26 @@
 # Tests
 
-Unit tests never make real calls: no network, no live LLM, no real subprocess. Mock, stub, or fake.
+Unit tests never make real calls: no network, no live server. Mock, stub, or fake.
 
 ## Testing strategy: CI first
 
-Testing is done in the GitHub CI pipeline (Test Suite workflow). Push the
-branch and open the draft PR — CI is the verification gate. Do NOT run the local
-suite routinely before pushing.
+Testing is done in GitHub CI (`xcodebuild` on macos). Push the branch and open
+the draft PR — CI is the verification gate. Do NOT attempt local builds: this
+VM is Linux and cannot run Xcode.
 
-Run tests locally ONLY when they fail on the server: reproduce the CI failure
-with `./runut` (or `python -m pytest tests/ -q` with `HRS_VENV=~/venvs/pw`),
-fix, and confirm green locally before pushing the fix. Mark the PR ready for
-review (`gh pr ready`) once server CI passes.
+A red CI run cannot be reproduced here. Report the failing step verbatim and
+stop — do not guess at fixes without the Mac build log.
+
+## What to test
+
+- ViewModels and Services, never Views.
+- `AppConfig.normalize`: valid URLs, IPv6 (bare/bracketed/with port),
+  and every fail-loud rejection.
+- `PipelineAPI`: mocked `URLSession` — session/stage/select/job payloads,
+  error mapping, SSE parsing.
+- No test hits the real server.
 
 ## Trunk assumption
 
-Assumes develop and main are green — working condition, all tests passing.
-If not, file a bug: a red trunk breaks this strategy.
+Assumes develop and main are green. If not, file a bug: a red trunk breaks
+this strategy.
