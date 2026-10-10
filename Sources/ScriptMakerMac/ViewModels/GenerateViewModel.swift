@@ -102,6 +102,7 @@ final class GenerateViewModel: ObservableObject {
 
     /// Long render job with progress.
     @Published var renderJobID: String?
+    @Published var renderCompleted = false
 
     func startRender(inputs: [String: Any] = [:]) async {
         await renderVideo(inputs: inputs)
@@ -110,6 +111,7 @@ final class GenerateViewModel: ObservableObject {
     func renderVideo(inputs: [String: Any] = [:]) async {
         guard let sid = sessionID else { return }
         isRunning = true
+        renderCompleted = false
         defer { isRunning = false }
         do {
             let api = try api()
@@ -117,12 +119,17 @@ final class GenerateViewModel: ObservableObject {
             renderJobID = jobID
             for try await status in api.pollJob(jobID: jobID) {
                 jobProgress = status.progress
-                if status.status == "failed" {
+                if status.status == "done" {
+                    renderCompleted = true
+                    jobProgress = nil
+                } else if status.status == "failed" {
                     errorMessage = status.detail ?? "Render failed."
+                    jobProgress = nil
                 }
             }
         } catch {
             errorMessage = error.localizedDescription
+            jobProgress = nil
         }
     }
 
@@ -152,6 +159,8 @@ final class GenerateViewModel: ObservableObject {
         events = []
         errorMessage = nil
         jobProgress = nil
+        renderJobID = nil
+        renderCompleted = false
     }
 
     // MARK: - Helpers
@@ -162,6 +171,38 @@ final class GenerateViewModel: ObservableObject {
             return stage == nil ? all.first : nil
         }
         return all[idx + 1]
+    }
+
+    private func previousStage(before stage: PipelineStage?) -> PipelineStage? {
+        let all = PipelineStage.allCases
+        guard let stage, let idx = all.firstIndex(of: stage), idx > 0 else {
+            return nil
+        }
+        return all[idx - 1]
+    }
+
+    /// Go to a specific stage (only if it has a payload — i.e., already visited).
+    func goToStage(_ stage: PipelineStage) {
+        guard stagePayloads[stage] != nil else { return }
+        currentStage = stage
+    }
+
+    /// Go back to the previous stage.
+    func goBack() {
+        if let prev = previousStage(before: currentStage) {
+            goToStage(prev)
+        }
+    }
+
+    /// Go forward to the next stage (if already visited) or run it.
+    func goForward() async {
+        if let next = nextStage(after: currentStage) {
+            if stagePayloads[next] != nil {
+                currentStage = next
+            } else {
+                await runStage(next)
+            }
+        }
     }
 
     private func listenForEvents(api: PipelineService, sessionID: String) {

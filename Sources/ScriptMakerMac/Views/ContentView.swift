@@ -151,15 +151,28 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(story["title"] as? String ?? "Untitled")
                     .font(.largeTitle)
+                if let date = story["created_at"] as? String, !date.isEmpty {
+                    Text(date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if let summary = story["summary"] as? String, !summary.isEmpty {
                     Text(summary)
                         .font(.callout)
-                        .foregroundStyle(.secondary)
                 }
-                // Full detail renders when the server provides story payloads.
-                Text("Story detail not implemented yet.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                // Render all other fields from the story JSON.
+                ForEach(story.keys.sorted(), id: \.self) { key in
+                    if !["id", "title", "summary", "created_at"].contains(key) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(key.replacingOccurrences(of: "_", with: " ").capitalized)
+                                .font(.headline)
+                            Text("\(story[key] ?? "")")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 8)
+                    }
+                }
             }
             .padding()
         }

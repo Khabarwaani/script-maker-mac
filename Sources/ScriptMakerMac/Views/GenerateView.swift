@@ -14,15 +14,22 @@ struct GenerateView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if viewModel.sessionID == nil {
-                inputForm
-            } else {
-                stageFlow
+        NavigationSplitView {
+            // Master: configuration sidebar (like Streamlit's sidebar).
+            configSidebar
+                .navigationTitle("Configuration")
+        } detail: {
+            // Detail: stage flow results.
+            VStack(alignment: .leading, spacing: 12) {
+                if viewModel.sessionID == nil {
+                    emptyDetail
+                } else {
+                    stageFlow
+                }
             }
+            .padding()
+            .navigationTitle("Studio")
         }
-        .padding()
-        .navigationTitle("Studio")
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("Retry stage") { Task { await viewModel.retryStage() } }
             Button("Retry fresh") { Task { await viewModel.retryFresh() } }
@@ -33,56 +40,77 @@ struct GenerateView: View {
         }
     }
 
-    // MARK: - Input
+    // MARK: - Master (config sidebar)
 
-    private var inputForm: some View {
+    private var configSidebar: some View {
         Form {
-            Text("Story & Topic")
-                .font(.headline)
-
-            // Server dropdown (from sample data / config).
-            Picker("Server", selection: $viewModel.selectedServerName) {
-                ForEach(viewModel.servers.indices, id: \.self) { idx in
-                    let name = viewModel.servers[idx]["name"] ?? ""
-                    Text(name).tag(name)
-                }
-            }
-
-            // Headline dropdown (from sample data).
-            if !viewModel.headlines.isEmpty {
-                Picker("Headline", selection: $viewModel.selectedHeadline) {
-                    ForEach(viewModel.headlines, id: \.self) { headline in
-                        Text(headline).tag(headline)
+            Section("Story & Topic") {
+                // Server dropdown (from sample data / config).
+                Picker("Server", selection: $viewModel.selectedServerName) {
+                    ForEach(viewModel.servers.indices, id: \.self) { idx in
+                        let name = viewModel.servers[idx]["name"] ?? ""
+                        Text(name).tag(name)
                     }
                 }
-                .onChange(of: viewModel.selectedHeadline) { _, new in
-                    viewModel.topic = new
+
+                // Headline dropdown (from sample data).
+                if !viewModel.headlines.isEmpty {
+                    Picker("Headline", selection: $viewModel.selectedHeadline) {
+                        ForEach(viewModel.headlines, id: \.self) { headline in
+                            Text(headline).tag(headline)
+                        }
+                    }
+                    .onChange(of: viewModel.selectedHeadline) { _, new in
+                        viewModel.topic = new
+                    }
                 }
+
+                TextField("News topic", text: $viewModel.topic)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Sample story (optional)", text: $viewModel.sampleStory, axis: .vertical)
+                    .lineLimit(3...8)
+                Text("The sample's content and idea guide dialogue and scenes. Timing and config still apply.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
-            TextField("News topic", text: $viewModel.topic)
-                .textFieldStyle(.roundedBorder)
-            TextField("Sample story (optional)", text: $viewModel.sampleStory, axis: .vertical)
-                .lineLimit(3...8)
-            Text("The sample's content and idea guide dialogue and scenes. Timing and config still apply.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Button("Generate") {
-                Task { await viewModel.start() }
+            Section {
+                Button("Generate") {
+                    Task { await viewModel.start() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.topic.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isRunning)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(viewModel.topic.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isRunning)
         }
+    }
+
+    // MARK: - Detail (empty state)
+
+    private var emptyDetail: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wand.and.stars")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("Configure your story in the sidebar, then press Generate.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Stage flow
 
     private var stageFlow: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Progress through stages.
+            // Progress through stages — tap a completed stage to revisit it.
             HStack {
                 ForEach(PipelineStage.allCases) { stage in
-                    stageChip(stage)
+                    Button { viewModel.goToStage(stage) } label: {
+                        stageChip(stage)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.stagePayloads[stage] == nil)
                 }
             }
 
@@ -91,6 +119,26 @@ struct GenerateView: View {
                let payload = viewModel.stagePayloads[stage] {
                 stageDetailView(for: stage, payload: payload)
             }
+
+            // Back / Forward navigation.
+            HStack {
+                Button {
+                    viewModel.goBack()
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .disabled(!canGoBack)
+
+                Spacer()
+
+                Button {
+                    Task { await viewModel.goForward() }
+                } label: {
+                    Label("Next", systemImage: "chevron.right")
+                }
+                .disabled(!canGoForward)
+            }
+            .padding(.top, 8)
 
             // Live substep events.
             if !viewModel.events.isEmpty {
@@ -117,6 +165,18 @@ struct GenerateView: View {
 
             Spacer()
         }
+    }
+
+    private var canGoBack: Bool {
+        guard let current = viewModel.currentStage,
+              let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
+        return idx > 0 && viewModel.stagePayloads[PipelineStage.allCases[idx - 1]] != nil
+    }
+
+    private var canGoForward: Bool {
+        guard let current = viewModel.currentStage,
+              let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
+        return idx + 1 < PipelineStage.allCases.count
     }
 
     @ViewBuilder

@@ -34,7 +34,14 @@ struct RenderStageView: View {
                 Divider()
 
                 Text("Render").font(.headline)
-                if viewModel.renderJobID == nil {
+                if viewModel.renderCompleted {
+                    Label("Render complete!", systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(Color.green)
+                    Text("Your video is ready.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else if viewModel.renderJobID == nil {
                     Button("Start render") {
                         Task { await viewModel.startRender() }
                     }
