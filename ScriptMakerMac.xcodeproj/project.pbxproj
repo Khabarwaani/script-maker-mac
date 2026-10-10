@@ -16,6 +16,8 @@
 		F008 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R008 /* ContentView.swift */; };
 		F009 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R009 /* PreferencesView.swift */; };
 		F010 /* GenerateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R010 /* GenerateView.swift */; };
+		F012 /* VerifyStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R014 /* VerifyStageView.swift */; };
+		F013 /* CharactersStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R015 /* CharactersStageView.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
 		/* File references */
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
@@ -28,6 +30,8 @@
 		R008 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		R009 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		R010 /* GenerateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateView.swift; sourceTree = "<group>"; };
+		R014 /* VerifyStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyStageView.swift; sourceTree = "<group>"; };
+		R015 /* CharactersStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharactersStageView.swift; sourceTree = "<group>"; };
 		R011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		R012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		R013 /* ScriptMakerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScriptMakerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -96,6 +100,8 @@
 				R008 /* ContentView.swift */,
 				R009 /* PreferencesView.swift */,
 				R010 /* GenerateView.swift */,
+				R014 /* VerifyStageView.swift */,
+				R015 /* CharactersStageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -148,6 +154,8 @@
 				F008 /* ContentView.swift in Sources */,
 				F009 /* PreferencesView.swift in Sources */,
 				F010 /* GenerateView.swift in Sources */,
+				F012 /* VerifyStageView.swift in Sources */,
+				F013 /* CharactersStageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
