@@ -141,7 +141,6 @@
 				R027 /* OfflineWebClient.swift */,
 				R028 /* PipelineService.swift */,
 				R029 /* APIError.swift */,
-				R030 /* SceneThumbnail.swift */,
 				R022 /* SampleData.swift */,
 			);
 			path = Services;
@@ -163,6 +162,7 @@
 			isa = PBXGroup;
 			children = (
 				R008 /* ContentView.swift */,
+				R030 /* SceneThumbnail.swift */,
 				R009 /* PreferencesView.swift */,
 				R010 /* GenerateView.swift */,
 				R014 /* VerifyStageView.swift */,
