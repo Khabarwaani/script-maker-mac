@@ -5,6 +5,11 @@ import Foundation
 struct OfflineWebClient: WebClient {
     func ping() async -> Bool { true }
 
+    func fetchData(from url: URL) async throws -> Data {
+        // Offline mode: no network fetches. Caller shows placeholder.
+        throw APIError.notImplemented("Image fetch unavailable offline")
+    }
+
     func createSession() async throws -> String { "sample-session" }
 
     func runStage(sessionID: String, stage: PipelineStage, inputs: [String: Any]) async throws -> [String: Any] {

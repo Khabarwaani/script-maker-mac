@@ -10,6 +10,9 @@ final class GenerateViewModel: ObservableObject {
     private let repository: any StoryRepository
     private var eventTask: Task<Void, Never>?
 
+    /// Config for child views that need it (e.g. thumbnails).
+    var appConfig: AppConfig { config }
+
     @Published var topic: String = ""
     @Published var sampleStory: String = ""
     @Published var sessionID: String?

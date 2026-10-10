@@ -283,7 +283,7 @@ struct GenerateView: View {
                 Task { await viewModel.select([:]) }
             }
         case .storyboard:
-            StoryboardStageView(payload: payload) {
+            StoryboardStageView(payload: payload, config: viewModel.appConfig) {
                 Task { await viewModel.select([:]) }
             }
         case .render:

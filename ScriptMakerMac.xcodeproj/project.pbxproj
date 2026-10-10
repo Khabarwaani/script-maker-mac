@@ -34,6 +34,8 @@
 		F028 /* StageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = R031 /* StageTracker.swift */; };
 		F029 /* StoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = R032 /* StoryRepository.swift */; };
 		F030 /* StoryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = R033 /* StoryDataSource.swift */; };
+		F031 /* ImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R034 /* ImageService.swift */; };
+		F032 /* ThumbnailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R035 /* ThumbnailViewModel.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
 		Bverify /* verify.json in Resources */ = {isa = PBXBuildFile; fileRef = Jverify /* verify.json */; };
 		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
@@ -73,6 +75,8 @@
 		R026 /* NetworkWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWebClient.swift; sourceTree = "<group>"; };
 		R027 /* OfflineWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWebClient.swift; sourceTree = "<group>"; };
 		R032 /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
+		R034 /* ImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageService.swift; sourceTree = "<group>"; };
+		R035 /* ThumbnailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailViewModel.swift; sourceTree = "<group>"; };
 		R033 /* StoryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDataSource.swift; sourceTree = "<group>"; };
 		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
@@ -149,6 +153,7 @@
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
 				R033 /* StoryDataSource.swift */,
+				R034 /* ImageService.swift */,
 				R022 /* SampleData.swift */,
 			);
 			path = Services;
@@ -162,6 +167,7 @@
 				R007 /* GenerateViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
+				R035 /* ThumbnailViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -300,6 +306,8 @@
 				F028 /* StageTracker.swift in Sources */,
 				F029 /* StoryRepository.swift in Sources */,
 				F030 /* StoryDataSource.swift in Sources */,
+				F031 /* ImageService.swift in Sources */,
+				F032 /* ThumbnailViewModel.swift in Sources */,
 				F005 /* ContentViewModel.swift in Sources */,
 				F006 /* PreferencesViewModel.swift in Sources */,
 				F007 /* GenerateViewModel.swift in Sources */,
