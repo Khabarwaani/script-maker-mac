@@ -7,6 +7,7 @@ import Foundation
 @MainActor
 final class GenerateViewModel: ObservableObject {
     private let config: AppConfig
+    private var eventTask: Task<Void, Never>?
 
     @Published var topic: String = ""
     @Published var sampleStory: String = ""
@@ -238,6 +239,8 @@ final class GenerateViewModel: ObservableObject {
     }
 
     func reset() async {
+        eventTask?.cancel()
+        eventTask = nil
         sessionID = nil
         currentStage = nil
         stagePayloads = [:]
@@ -306,9 +309,12 @@ final class GenerateViewModel: ObservableObject {
     }
 
     private func listenForEvents(api: PipelineService, sessionID: String) {
-        Task {
+        // Cancel any previous listener (prevents event leak on new session).
+        eventTask?.cancel()
+        eventTask = Task {
             do {
                 for try await event in api.eventStream(sessionID: sessionID) {
+                    if Task.isCancelled { break }
                     await MainActor.run { self.events.append(event) }
                 }
             } catch {
