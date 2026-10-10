@@ -10,7 +10,7 @@ struct PreferencesView: View {
             Section("Pipeline server") {
                 TextField("Server URL", text: $viewModel.draftURL)
                     .textFieldStyle(.roundedBorder)
-                Text("Default is this Mac (localhost). IPv6 addresses are accepted, e.g. http://[::1]:8000.")
+                Text("Default is this Mac (localhost:8501). IPv6 addresses are accepted, e.g. http://[::1]:8501.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

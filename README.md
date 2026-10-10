@@ -6,7 +6,7 @@ MVVM, async/await throughout.
 Same use cases as the classic app. Every task goes over HTTP to the pipeline
 server configured in Preferences (Cmd+,); nothing is computed locally.
 
-- **Works offline**: server defaults to `http://localhost:8000` — no internet needed.
+- **Works offline**: server defaults to `http://localhost:8501` — no internet needed.
 - **Server URL** is a top-level setting (IPv6-aware) — point it at a remote server anytime.
 - **Architecture**: MVVM — `Sources/ScriptMakerMac/{App,Models,Services,ViewModels,Views}`.
 - **Long generations** stream progress via Server-Sent Events; the UI never blocks.

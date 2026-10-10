@@ -5,7 +5,7 @@ import Foundation
 /// The pipeline server URL is the single connection point for every use case.
 /// Defaults to localhost; IPv6 hosts are accepted and bracketed automatically.
 final class AppConfig: ObservableObject {
-    static let defaultServerURL = "http://localhost:8000"
+    static let defaultServerURL = "http://localhost:8501"
     private static let serverURLKey = "serverURL"
 
     @Published var serverURL: String {
