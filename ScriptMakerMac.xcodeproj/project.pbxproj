@@ -354,6 +354,7 @@
 			buildSettings = {
 				CODE_SIGNING_ALLOWED = NO;
 				INFOPLIST_FILE = Tests/ScriptMakerMacTests/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
@@ -364,6 +365,7 @@
 			buildSettings = {
 				CODE_SIGNING_ALLOWED = NO;
 				INFOPLIST_FILE = Tests/ScriptMakerMacTests/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
