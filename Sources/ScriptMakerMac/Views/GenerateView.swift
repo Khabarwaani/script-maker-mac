@@ -79,10 +79,14 @@ struct GenerateView: View {
 
     private var stageFlow: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Progress through stages.
+            // Progress through stages — tap a completed stage to revisit it.
             HStack {
                 ForEach(PipelineStage.allCases) { stage in
-                    stageChip(stage)
+                    Button { viewModel.goToStage(stage) } label: {
+                        stageChip(stage)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.stagePayloads[stage] == nil)
                 }
             }
 
@@ -91,6 +95,26 @@ struct GenerateView: View {
                let payload = viewModel.stagePayloads[stage] {
                 stageDetailView(for: stage, payload: payload)
             }
+
+            // Back / Forward navigation.
+            HStack {
+                Button {
+                    viewModel.goBack()
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .disabled(!canGoBack)
+
+                Spacer()
+
+                Button {
+                    Task { await viewModel.goForward() }
+                } label: {
+                    Label("Next", systemImage: "chevron.right")
+                }
+                .disabled(!canGoForward)
+            }
+            .padding(.top, 8)
 
             // Live substep events.
             if !viewModel.events.isEmpty {
@@ -117,6 +141,18 @@ struct GenerateView: View {
 
             Spacer()
         }
+    }
+
+    private var canGoBack: Bool {
+        guard let current = viewModel.currentStage,
+              let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
+        return idx > 0 && viewModel.stagePayloads[PipelineStage.allCases[idx - 1]] != nil
+    }
+
+    private var canGoForward: Bool {
+        guard let current = viewModel.currentStage,
+              let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
+        return idx + 1 < PipelineStage.allCases.count
     }
 
     @ViewBuilder
