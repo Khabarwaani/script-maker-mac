@@ -1,54 +1,35 @@
 import Combine
 import Foundation
 
-/// Browser-like server address bar logic: edit the URL (host, port, IPv6),
-/// commit on Return, live connection indicator.
+/// Data source status for the toolbar: shows current mode and server URL.
+/// Selection and URL editing happen in Preferences, not here.
 @MainActor
 final class ServerAddressBarViewModel: ObservableObject {
     private let config: AppConfig
     private var cancellables = Set<AnyCancellable>()
 
-    /// What the user typed. Committed to config on Return.
-    @Published var draftURL: String
     @Published var isConnected = false
     @Published var isChecking = false
     @Published var dataSource: DataSource
+    @Published var serverURL: String
 
     init(config: AppConfig) {
         self.config = config
-        self.draftURL = config.serverURL
         self.dataSource = config.dataSource
-        // Stay in sync when Preferences changes the URL or sample mode.
+        self.serverURL = config.serverURL
+        // Stay in sync when Preferences changes the config.
         config.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                if self.draftURL != self.config.serverURL {
-                    self.draftURL = self.config.serverURL
-                }
                 if self.dataSource != self.config.dataSource {
                     self.dataSource = self.config.dataSource
                 }
+                if self.serverURL != self.config.serverURL {
+                    self.serverURL = self.config.serverURL
+                }
             }
             .store(in: &cancellables)
-    }
-
-    /// Normalize, save, and re-check. Reverts the draft on invalid input.
-    func commit() {
-        do {
-            let normalized = try AppConfig.normalize(raw: draftURL)
-            config.serverURL = normalized
-            draftURL = normalized
-        } catch {
-            draftURL = config.serverURL
-        }
-        Task { await refreshStatus() }
-    }
-
-    /// Switch between Server and Offline Data.
-    func setDataSource(_ source: DataSource) {
-        config.dataSource = source
-        Task { await refreshStatus() }
     }
 
     func refreshStatus() async {
