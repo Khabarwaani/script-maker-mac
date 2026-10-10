@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE icon-family>
+<icon-family>
+  <icon>
+    <image size="16x16">icon_16x16.png</image>
+  </icon>
+  <icon>
+    <image size="32x32">icon_32x32.png</image>
+  </icon>
+  <icon>
+    <image size="64x64">icon_64x64.png</image>
+  </icon>
+  <icon>
+    <image size="128x128">icon_128x128.png</image>
+  </icon>
+  <icon>
+    <image size="256x256">icon_256x256.png</image>
+  </icon>
+  <icon>
+    <image size="512x512">icon_512x512.png</image>
+  </icon>
+  <icon>
+    <image size="1024x1024">icon_1024x1024.png</image>
+  </icon>
+</icon-family>
