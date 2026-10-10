@@ -188,7 +188,7 @@
 		};
 		X001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = P000 /* Project object */;
+			containerPortal = PRJ001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = T001;
 			remoteInfo = ScriptMakerMac;
