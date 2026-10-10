@@ -205,6 +205,7 @@
 				E001 /* AppConfigTests.swift */,
 				E002 /* SampleDataTests.swift */,
 				E003 /* SampleAPITests.swift */,
+				E004 /* Info.plist */,
 			);
 			path = Tests/ScriptMakerMacTests;
 			sourceTree = "<group>";
@@ -352,7 +353,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGNING_ALLOWED = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Tests/ScriptMakerMacTests/Info.plist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
@@ -362,7 +363,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGNING_ALLOWED = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Tests/ScriptMakerMacTests/Info.plist;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
