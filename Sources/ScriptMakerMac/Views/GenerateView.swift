@@ -63,6 +63,12 @@ struct GenerateView: View {
                 }
             }
 
+            // Active stage detail view.
+            if let stage = viewModel.currentStage,
+               let payload = viewModel.stagePayloads[stage] {
+                stageDetailView(for: stage, payload: payload)
+            }
+
             // Live substep events.
             if !viewModel.events.isEmpty {
                 List(viewModel.events.suffix(8)) { event in
@@ -87,6 +93,22 @@ struct GenerateView: View {
             }
 
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func stageDetailView(for stage: PipelineStage, payload: [String: Any]) -> some View {
+        switch stage {
+        case .verify:
+            VerifyStageView(payload: payload) {
+                Task { await viewModel.select([:]) }
+            }
+        case .characters:
+            CharactersStageView(payload: payload) { selection in
+                Task { await viewModel.select(selection) }
+            }
+        default:
+            EmptyView()
         }
     }
 
