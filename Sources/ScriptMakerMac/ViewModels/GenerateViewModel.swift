@@ -29,8 +29,6 @@ final class GenerateViewModel: ObservableObject {
     @Published var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
     @Published var selectedHashtag: String = ""
     @Published var customHashtag: String = ""
-    @Published var topics: [String] = []
-    @Published var selectedTopic: String = ""
 
     // Configuration (mirrors Streamlit config section).
     @Published var aiSources: [String] = ["Antigravity", "Gemini", "Grok", "Muse"]
@@ -73,9 +71,6 @@ final class GenerateViewModel: ObservableObject {
         if let h = SampleData.json(for: "headlines")?["headlines"] as? [String] {
             headlines = h
             if selectedHeadline.isEmpty { selectedHeadline = h.first ?? "" }
-            // Topics mirror headlines for the dropdown.
-            topics = h
-            if selectedTopic.isEmpty { selectedTopic = h.first ?? "" }
         }
         updateInstruction()
     }

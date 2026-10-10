@@ -76,8 +76,8 @@ struct GenerateView: View {
                 TextField("Custom hashtag (e.g. #MakeInIndia)", text: $viewModel.customHashtag)
                     .textFieldStyle(.roundedBorder)
 
-                // Headline dropdown (from sample data).
-                if !viewModel.headlines.isEmpty {
+                // Headline dropdown (from sample data) — not in Manual mode.
+                if viewModel.selectedStorySource != "Manual" && !viewModel.headlines.isEmpty {
                     Picker("Headline", selection: $viewModel.selectedHeadline) {
                         ForEach(viewModel.headlines, id: \.self) { headline in
                             Text(headline).tag(headline)
@@ -85,24 +85,14 @@ struct GenerateView: View {
                     }
                     .onChange(of: viewModel.selectedHeadline) { _, new in
                         viewModel.topic = new
-                        viewModel.selectedTopic = new
                     }
                 }
 
-                // Topic dropdown.
-                if !viewModel.topics.isEmpty {
-                    Picker("Topic", selection: $viewModel.selectedTopic) {
-                        ForEach(viewModel.topics, id: \.self) { topic in
-                            Text(topic).tag(topic)
-                        }
-                    }
-                    .onChange(of: viewModel.selectedTopic) { _, new in
-                        viewModel.topic = new
-                    }
+                // Manual topic entry — only in Manual source mode.
+                if viewModel.selectedStorySource == "Manual" {
+                    TextField("News topic", text: $viewModel.topic)
+                        .textFieldStyle(.roundedBorder)
                 }
-
-                TextField("News topic", text: $viewModel.topic)
-                    .textFieldStyle(.roundedBorder)
                 TextField("Sample story (optional)", text: $viewModel.sampleStory, axis: .vertical)
                     .lineLimit(3...8)
                 Text("The sample's content and idea guide dialogue and scenes. Timing and config still apply.")
