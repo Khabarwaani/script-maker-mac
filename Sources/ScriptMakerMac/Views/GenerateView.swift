@@ -108,6 +108,18 @@ struct GenerateView: View {
                 }
             }
 
+            Section("Generation Mode") {
+                Picker("Mode", selection: $viewModel.workflowMode) {
+                    ForEach(GenerateViewModel.WorkflowMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                Text("Continuous: runs all stages automatically. Step-Wise: advance manually through each stage.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Button("Generate") {
                     Task { await viewModel.start() }

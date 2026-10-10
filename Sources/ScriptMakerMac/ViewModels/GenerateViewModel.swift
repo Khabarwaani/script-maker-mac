@@ -52,6 +52,14 @@ final class GenerateViewModel: ObservableObject {
     @Published var formats: [String] = ["9:16 Vertical", "16:9 Horizontal", "1:1 Square"]
     @Published var selectedFormat: String = "9:16 Vertical"
 
+    // Generation mode: Continuous (run all stages) or Step-Wise (manual advance).
+    enum WorkflowMode: String, CaseIterable, Identifiable {
+        case continuous = "Continuous"
+        case stepwise = "Step-Wise"
+        var id: String { rawValue }
+    }
+    @Published var workflowMode: WorkflowMode = .continuous
+
     init(config: AppConfig) {
         self.config = config
         loadSampleLists()
@@ -134,6 +142,7 @@ final class GenerateViewModel: ObservableObject {
     }
 
     /// User picked an option — send the selection and continue.
+    /// In Continuous mode, runs all remaining stages automatically.
     func select(_ selection: [String: Any]) async {
         guard let sid = sessionID else { return }
         isRunning = true
@@ -141,8 +150,15 @@ final class GenerateViewModel: ObservableObject {
         do {
             let api = try api()
             _ = try await api.select(sessionID: sid, selection: selection)
-            if let next = nextStage(after: currentStage) {
-                try await runStage(next, api: api, inputs: [:])
+            if workflowMode == .continuous {
+                // Run all remaining stages automatically.
+                var next = nextStage(after: currentStage)
+                while let stage = next {
+                    try await runStage(stage, api: api, inputs: stageInputs())
+                    next = nextStage(after: stage)
+                }
+            } else if let next = nextStage(after: currentStage) {
+                try await runStage(next, api: api, inputs: stageInputs())
             }
         } catch {
             errorMessage = error.localizedDescription
