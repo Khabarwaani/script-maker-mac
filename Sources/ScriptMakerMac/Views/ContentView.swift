@@ -4,11 +4,15 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var viewModel: ContentViewModel
     @StateObject private var generateViewModel: GenerateViewModel
+    @StateObject private var addressBarViewModel: ServerAddressBarViewModel
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
         _generateViewModel = StateObject(
             wrappedValue: GenerateViewModel(config: viewModel.config)
+        )
+        _addressBarViewModel = StateObject(
+            wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
         )
     }
 
@@ -33,6 +37,11 @@ struct ContentView: View {
             }
         }
         .task { await viewModel.refreshConnection() }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                ServerAddressBar(viewModel: addressBarViewModel)
+            }
+        }
     }
 
     @ViewBuilder
