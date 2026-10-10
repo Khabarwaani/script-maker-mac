@@ -210,10 +210,20 @@ struct GenerateView: View {
                 }
             }
 
-            // Active stage detail view.
+            // Active stage detail view with live tracker.
             if let stage = viewModel.currentStage,
                let payload = viewModel.stagePayloads[stage] {
+                StageTracker(stage: stage, events: viewModel.events, isRunning: viewModel.isRunning)
                 stageDetailView(for: stage, payload: payload)
+            }
+
+            // Completed stages as collapsible output cards.
+            ForEach(PipelineStage.allCases) { stage in
+                if stage != viewModel.currentStage, let payload = viewModel.stagePayloads[stage] {
+                    OutputCard(stage: stage) {
+                        stageDetailView(for: stage, payload: payload)
+                    }
+                }
             }
 
             // Back / Forward navigation.
@@ -236,18 +246,6 @@ struct GenerateView: View {
             }
             .padding(.top, 8)
 
-            // Live substep events.
-            if !viewModel.events.isEmpty {
-                List(viewModel.events.suffix(8)) { event in
-                    HStack {
-                        Text(event.label).font(.callout)
-                        Spacer()
-                        Text(event.status).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .frame(minHeight: 120)
-            }
-
             // Render progress.
             if let progress = viewModel.jobProgress {
                 ProgressView(value: progress) {
@@ -255,7 +253,7 @@ struct GenerateView: View {
                 }
             }
 
-            if viewModel.isRunning {
+            if viewModel.isRunning && viewModel.currentStage == nil {
                 ProgressView().scaleEffect(0.8)
             }
 
