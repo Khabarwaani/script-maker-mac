@@ -1,10 +1,15 @@
 import SwiftUI
 
-/// Root navigation: sidebar with Generate / Library, connection status below.
+/// UX mapping:
+/// - Navigation bar (toolbar): title · server address bar · Preferences
+/// - Tab bar: Generate | Library
 struct ContentView: View {
     @ObservedObject var viewModel: ContentViewModel
     @StateObject private var generateViewModel: GenerateViewModel
     @StateObject private var addressBarViewModel: ServerAddressBarViewModel
+    @StateObject private var preferencesViewModel: PreferencesViewModel
+
+    @State private var showingPreferences = false
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -14,55 +19,39 @@ struct ContentView: View {
         _addressBarViewModel = StateObject(
             wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
         )
+        _preferencesViewModel = StateObject(
+            wrappedValue: PreferencesViewModel(config: viewModel.config)
+        )
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(ContentViewModel.Tab.allCases, selection: $viewModel.selectedTab) { tab in
-                Label(tab.title, systemImage: tab == .generate ? "wand.and.stars" : "books.vertical")
-            }
-            .listStyle(.sidebar)
-            .navigationTitle("Script Maker")
-            .safeAreaInset(edge: .bottom) {
-                connectionFooter
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-            }
-        } detail: {
-            switch viewModel.selectedTab {
-            case .generate:
-                GenerateView(viewModel: generateViewModel)
-            case .library:
-                LibraryView()
-            }
+        TabView(selection: $viewModel.selectedTab) {
+            GenerateView(viewModel: generateViewModel)
+                .tabItem { Label("Generate", systemImage: "wand.and.stars") }
+                .tag(ContentViewModel.Tab.generate)
+            LibraryView()
+                .tabItem { Label("Library", systemImage: "books.vertical") }
+                .tag(ContentViewModel.Tab.library)
         }
-        .task { await viewModel.refreshConnection() }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Label("Script Maker", systemImage: "clapperboard")
+                    .font(.headline)
+            }
             ToolbarItem(placement: .principal) {
                 ServerAddressBar(viewModel: addressBarViewModel)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var connectionFooter: some View {
-        switch viewModel.connection {
-        case .unknown, .checking:
-            Label("Checking server…", systemImage: "circle.dotted")
-                .foregroundStyle(.secondary)
-        case .connected:
-            Label("Connected", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        case .unreachable(let where_):
-            VStack(alignment: .leading, spacing: 2) {
-                Label("Offline", systemImage: "wifi.slash")
-                    .foregroundStyle(.red)
-                Text(where_)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingPreferences = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .help("Preferences… (⌘,)")
             }
+        }
+        .sheet(isPresented: $showingPreferences) {
+            PreferencesView(viewModel: preferencesViewModel)
         }
     }
 }
