@@ -47,7 +47,7 @@ final class PreferencesViewModel: ObservableObject {
         errorMessage = nil
         noticeMessage = nil
         do {
-            let api = try PipelineService(config: config)
+            let api = PipelineService(config: config)
             noticeMessage = await api.ping() ? "Server reachable." : "Server unreachable."
         } catch {
             errorMessage = error.localizedDescription

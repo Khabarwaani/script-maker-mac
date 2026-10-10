@@ -45,11 +45,17 @@ final class ServerAddressBarViewModel: ObservableObject {
         Task { await refreshStatus() }
     }
 
+    /// Switch between Server and Offline Data.
+    func setDataSource(_ source: DataSource) {
+        config.dataSource = source
+        Task { await refreshStatus() }
+    }
+
     func refreshStatus() async {
         isChecking = true
         defer { isChecking = false }
         do {
-            let api = try PipelineService(config: config)
+            let api = PipelineService(config: config)
             isConnected = await api.ping()
         } catch {
             isConnected = false
