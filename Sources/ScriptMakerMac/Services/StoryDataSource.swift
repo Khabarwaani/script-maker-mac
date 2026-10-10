@@ -1,25 +1,31 @@
 import Foundation
 
-/// Data Source layer: raw data access (UserDefaults, files).
-/// Repository sits above this, Service above that.
+/// Platform layer: DataSource protocols.
+/// Defines HOW data is accessed (not the framework details).
 ///
-/// Layers (bottom to top):
-///   DataSource (UserDefaultsStoryDataSource)
+///   Domain (Repository protocol)
 ///       ↓
-///   Repository (StoryRepository protocol)
+///   Platform (Repository impl + DataSource protocol) ← YOU ARE HERE
 ///       ↓
-///   Service (PipelineService)
-///       ↓
-///   ViewModel
-///       ↓
-///   View
+///   Infra (KeyValueStore, HTTPClient, FileStore)
 
-/// Raw UserDefaults access for stories.
-struct UserDefaultsStoryDataSource: Sendable {
+/// Protocol for story persistence.
+protocol StoryDataSourceProtocol: Sendable {
+    func load() -> [[String: Any]]
+    func save(_ stories: [[String: Any]])
+}
+
+/// Platform implementation using Infra's KeyValueStore.
+struct UserDefaultsStoryDataSource: StoryDataSourceProtocol {
+    private let store: KeyValueStore
     private let key = "savedStories"
 
+    init(store: KeyValueStore = KeyValueStore()) {
+        self.store = store
+    }
+
     func load() -> [[String: Any]] {
-        guard let data = UserDefaults.standard.data(forKey: key),
+        guard let data = store.data(forKey: key),
               let stories = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             return []
         }
@@ -28,7 +34,7 @@ struct UserDefaultsStoryDataSource: Sendable {
 
     func save(_ stories: [[String: Any]]) {
         if let data = try? JSONSerialization.data(withJSONObject: stories) {
-            UserDefaults.standard.set(data, forKey: key)
+            store.set(data, forKey: key)
         }
     }
 }

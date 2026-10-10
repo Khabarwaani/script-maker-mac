@@ -1,18 +1,17 @@
 import Foundation
 
 /// Data layer: repository implementation.
-/// Implements the domain's StoryRepository protocol using infra data sources.
-/// This is the "one more layer" between dumb infra and business logic.
+/// Implements the domain's StoryRepository protocol using platform data sources.
 ///
 ///   Domain (StoryRepository protocol)
 ///       ↓
-///   Data (LocalStoryRepository) ← YOU ARE HERE
+///   Platform (LocalStoryRepository + DataSource protocol) ← YOU ARE HERE
 ///       ↓
-///   Infra (UserDefaultsStoryDataSource)
+///   Infra (KeyValueStore, HTTPClient, FileStore)
 final class LocalStoryRepository: StoryRepository, @unchecked Sendable {
-    private let dataSource: UserDefaultsStoryDataSource
+    private let dataSource: any StoryDataSourceProtocol
 
-    init(dataSource: UserDefaultsStoryDataSource = UserDefaultsStoryDataSource()) {
+    init(dataSource: any StoryDataSourceProtocol = UserDefaultsStoryDataSource()) {
         self.dataSource = dataSource
     }
 
