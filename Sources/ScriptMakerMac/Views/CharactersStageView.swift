@@ -58,7 +58,7 @@ struct CharactersStageView: View {
             if let kind = persona["kind"] as? String, !kind.isEmpty, kind != "Human" {
                 Text(kind)
                     .font(.caption)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
             }
         }
         .padding(.vertical, 4)
