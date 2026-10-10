@@ -7,11 +7,25 @@ http://::1:8000 and http://[::1]:8000 both work.
 import ipaddress
 import json
 import os
+import platform
+
+_APP_NAME = "ScriptMakerMac"
+
+
+def _config_dir() -> str:
+    """App-level config location. macOS: ~/Library/Application Support/ScriptMakerMac.
+    Elsewhere: ~/.script-maker-mac (dev/CI)."""
+    if platform.system() == "Darwin":
+        return os.path.join(
+            os.path.expanduser("~"), "Library", "Application Support", _APP_NAME
+        )
+    return os.path.join(os.path.expanduser("~"), ".script-maker-mac")
+
 
 DEFAULT_SERVER_URL = "http://localhost:8000"
+DEFAULT_UI_PORT = 8502
 
-_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".script-maker-mac")
-_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.json")
+_CONFIG_PATH = os.path.join(_config_dir(), "config.json")
 
 
 def _bracket_ipv6(hostport: str) -> str:
@@ -73,7 +87,19 @@ def get_server_url() -> str:
 def set_server_url(url: str) -> str:
     """Persist the server URL. Returns the normalized URL. Fail-loud on bad input."""
     url = normalize_server_url(url)
-    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    os.makedirs(_config_dir(), exist_ok=True)
     with open(_CONFIG_PATH, "w") as f:
         json.dump({"server_url": url}, f)
     return url
+
+
+def get_ui_port() -> int:
+    """UI port for the Streamlit server. Override via config file."""
+    try:
+        with open(_CONFIG_PATH) as f:
+            port = int(json.load(f).get("ui_port", DEFAULT_UI_PORT))
+            if 1 <= port <= 65535:
+                return port
+    except (OSError, ValueError):
+        pass
+    return DEFAULT_UI_PORT
