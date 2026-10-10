@@ -16,6 +16,7 @@
 		F029 /* StoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = R032 /* StoryRepository.swift */; };
 		F030 /* StoryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = R033 /* StoryDataSource.swift */; };
 		F031 /* ImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R034 /* ImageService.swift */; };
+		F033 /* LocalStoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = R036 /* LocalStoryRepository.swift */; };
 		F008 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R008 /* ContentView.swift */; };
 		F009 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R009 /* PreferencesView.swift */; };
 		F010 /* GenerateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R010 /* GenerateView.swift */; };
@@ -79,6 +80,7 @@
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
 		R032 /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
 		R033 /* StoryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDataSource.swift; sourceTree = "<group>"; };
+		R036 /* LocalStoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoryRepository.swift; sourceTree = "<group>"; };
 		R034 /* ImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageService.swift; sourceTree = "<group>"; };
 		R035 /* ThumbnailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailViewModel.swift; sourceTree = "<group>"; };
 		R029 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
@@ -156,6 +158,7 @@
 				R032 /* StoryRepository.swift */,
 				R033 /* StoryDataSource.swift */,
 				R034 /* ImageService.swift */,
+				R036 /* LocalStoryRepository.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -313,6 +316,7 @@
 				F029 /* StoryRepository.swift in Sources */,
 				F030 /* StoryDataSource.swift in Sources */,
 				F031 /* ImageService.swift in Sources */,
+				F033 /* LocalStoryRepository.swift in Sources */,
 				F008 /* ContentView.swift in Sources */,
 				F009 /* PreferencesView.swift in Sources */,
 				F010 /* GenerateView.swift in Sources */,
