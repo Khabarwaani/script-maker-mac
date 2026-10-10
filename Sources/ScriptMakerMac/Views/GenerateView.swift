@@ -39,6 +39,27 @@ struct GenerateView: View {
         Form {
             Text("Story & Topic")
                 .font(.headline)
+
+            // Server dropdown (from sample data / config).
+            Picker("Server", selection: $viewModel.selectedServerName) {
+                ForEach(viewModel.servers.indices, id: \.self) { idx in
+                    let name = viewModel.servers[idx]["name"] ?? ""
+                    Text(name).tag(name)
+                }
+            }
+
+            // Headline dropdown (from sample data).
+            if !viewModel.headlines.isEmpty {
+                Picker("Headline", selection: $viewModel.selectedHeadline) {
+                    ForEach(viewModel.headlines, id: \.self) { headline in
+                        Text(headline).tag(headline)
+                    }
+                }
+                .onChange(of: viewModel.selectedHeadline) { _, new in
+                    viewModel.topic = new
+                }
+            }
+
             TextField("News topic", text: $viewModel.topic)
                 .textFieldStyle(.roundedBorder)
             TextField("Sample story (optional)", text: $viewModel.sampleStory, axis: .vertical)

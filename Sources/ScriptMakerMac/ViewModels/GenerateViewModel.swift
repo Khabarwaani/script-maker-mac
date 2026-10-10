@@ -18,8 +18,29 @@ final class GenerateViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var jobProgress: Double?
 
+    // Headlines and servers from sample data (or server when live).
+    @Published var headlines: [String] = []
+    @Published var selectedHeadline: String = ""
+    @Published var servers: [[String: String]] = []
+    @Published var selectedServerName: String = AppConfig.localserverName
+
     init(config: AppConfig) {
         self.config = config
+        loadSampleLists()
+    }
+
+    /// Load headline/server dropdowns from sample data.
+    func loadSampleLists() {
+        if let h = SampleData.json(for: "headlines")?["headlines"] as? [String] {
+            headlines = h
+            if selectedHeadline.isEmpty { selectedHeadline = h.first ?? "" }
+        }
+        if let s = SampleData.json(for: "servers")?["servers"] as? [[String: String]] {
+            servers = s
+            if let first = s.first, selectedServerName.isEmpty {
+                selectedServerName = first["name"] ?? AppConfig.localserverName
+            }
+        }
     }
 
     private func api() throws -> PipelineAPI {
