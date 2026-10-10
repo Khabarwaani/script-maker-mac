@@ -55,6 +55,7 @@
 		Bdialogue /* dialogue.json in Resources */ = {isa = PBXBuildFile; fileRef = Jdialogue /* dialogue.json */; };
 		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
 		/* File references */
+		R038 /* CompositionRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionRoot.swift; sourceTree = "<group>"; };
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
 		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
 		R003 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };

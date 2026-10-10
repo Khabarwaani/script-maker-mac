@@ -35,16 +35,18 @@ Presentation → Domain → Platform → Infra
 - Depends on: Platform (via protocols only)
 
 **3. Platform** (`Services/`: LocalStoryRepository, StoryDataSourceProtocol, WebClients)
+- **Stateful**: caching, session management, repository coordination
 - Repository implementations, DataSource protocols, DTOs, mappers
-- `LocalStoryRepository`: implements Domain's protocol using DataSources
-- `NetworkWebClient` / `OfflineWebClient`: implement `WebClient` protocol
+- `LocalStoryRepository`: implements Domain's protocol using DataSources (can cache)
+- `NetworkWebClient` / `OfflineWebClient`: implement `WebClient` protocol (hold baseURL, session config)
 - Depends on: Infra (via protocols/wrappers)
 
 **4. Infra** (`Services/`: InfraStore.swift)
-- Dumb framework wrappers — no business logic, no app types
-- `HTTPClient`: URLSession wrapper
-- `KeyValueStore`: UserDefaults wrapper
-- `FileStore`: FileManager wrapper
+- **Stateless**: pure execution primitives, no caching, no business logic
+- Dumb framework wrappers — no app types, no state
+- `HTTPClient`: URLSession wrapper — just executes requests
+- `KeyValueStore`: UserDefaults wrapper — just reads/writes
+- `FileStore`: FileManager wrapper — just file I/O
 - Depends on: nothing (dependency-free)
 
 ### Layered Interaction Model
@@ -70,6 +72,14 @@ Presentation → Domain → Platform → Infra
 2. **Protocols at boundaries**: Domain defines `StoryRepository`; Platform defines `StoryDataSourceProtocol`; Infra provides concrete wrappers.
 3. **No framework in Domain**: Domain never imports SwiftUI or touches UserDefaults/URLSession directly.
 4. **Testable**: Every layer can be mocked via protocols.
+5. **Platform is stateful, Infra is stateless**: Platform may cache, hold session state, coordinate. Infra just executes — no caching logic, no state.
+6. **Protocol-oriented**: Depend on protocols, not concrete types. Every layer boundary is a protocol.
+7. **SOLID**:
+   - Single Responsibility: Each class has one reason to change
+   - Open/Closed: Extend via protocols, not modification
+   - Liskov: Subtypes must be substitutable (e.g., any `WebClient` works)
+   - Interface Segregation: Small focused protocols (`StoryDataSourceProtocol`)
+   - Dependency Inversion: High-level modules depend on abstractions
 
 ---
 
