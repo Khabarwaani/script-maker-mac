@@ -5,6 +5,7 @@ import SwiftUI
 /// action, overlay, SFX, and the Veo prompt with verification status.
 struct StoryboardStageView: View {
     let payload: [String: Any]
+    let config: AppConfig
     var onContinue: () -> Void
 
     private var storyboards: [[String: Any]] {
@@ -72,7 +73,8 @@ struct StoryboardStageView: View {
             HStack(alignment: .top, spacing: 12) {
                 SceneThumbnail(
                     sceneID: scene["scene_id"] as? String ?? UUID().uuidString,
-                    imageURL: scene["thumbnail_url"] as? String ?? scene["image_url"] as? String
+                    imageURL: scene["thumbnail_url"] as? String ?? scene["image_url"] as? String,
+                    config: config
                 )
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title).font(.headline)

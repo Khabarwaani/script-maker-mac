@@ -7,7 +7,11 @@ import Foundation
 @MainActor
 final class GenerateViewModel: ObservableObject {
     private let config: AppConfig
+    private let repository: any StoryRepository
     private var eventTask: Task<Void, Never>?
+
+    /// Config for child views that need it (e.g. thumbnails).
+    var appConfig: AppConfig { config }
 
     @Published var topic: String = ""
     @Published var sampleStory: String = ""
@@ -29,8 +33,6 @@ final class GenerateViewModel: ObservableObject {
     @Published var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
     @Published var selectedHashtag: String = ""
     @Published var customHashtag: String = ""
-    @Published var topics: [String] = []
-    @Published var selectedTopic: String = ""
 
     // Configuration (mirrors Streamlit config section).
     @Published var aiSources: [String] = ["Antigravity", "Gemini", "Grok", "Muse"]
@@ -63,8 +65,9 @@ final class GenerateViewModel: ObservableObject {
     @Published var instructionText: String = ""
     @Published var isRefreshingHeadlines = false
 
-    init(config: AppConfig) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
         self.config = config
+        self.repository = repository
         loadSampleLists()
     }
 
@@ -73,9 +76,6 @@ final class GenerateViewModel: ObservableObject {
         if let h = SampleData.json(for: "headlines")?["headlines"] as? [String] {
             headlines = h
             if selectedHeadline.isEmpty { selectedHeadline = h.first ?? "" }
-            // Topics mirror headlines for the dropdown.
-            topics = h
-            if selectedTopic.isEmpty { selectedTopic = h.first ?? "" }
         }
         updateInstruction()
     }
@@ -253,7 +253,7 @@ final class GenerateViewModel: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Save the completed generation to the Library.
+    /// Save the completed generation to the Library via the repository.
     private func saveToLibrary() {
         let story: [String: Any] = [
             "id": sessionID ?? UUID().uuidString,
@@ -265,7 +265,7 @@ final class GenerateViewModel: ObservableObject {
             "emotion": selectedEmotion,
             "format": selectedFormat,
         ]
-        SavedStoriesStore.shared.save(story)
+        Task { await repository.save(story) }
     }
 
     private func nextStage(after stage: PipelineStage?) -> PipelineStage? {

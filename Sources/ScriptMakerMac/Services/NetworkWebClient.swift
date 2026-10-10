@@ -19,6 +19,11 @@ struct NetworkWebClient: WebClient {
         }
     }
 
+    func fetchData(from url: URL) async throws -> Data {
+        let (data, _) = try await session.data(from: url)
+        return data
+    }
+
     func createSession() async throws -> String {
         let data = try await perform(path: "sessions", method: "POST")
         return try JSONDecoder().decode(SessionResponse.self, from: data).sessionID
