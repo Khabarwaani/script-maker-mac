@@ -45,13 +45,20 @@ struct GenerateView: View {
     private var configSidebar: some View {
         Form {
             Section("Story & Topic") {
-                // Server dropdown (from sample data / config).
-                Picker("Server", selection: $viewModel.selectedServerName) {
-                    ForEach(viewModel.servers.indices, id: \.self) { idx in
-                        let name = viewModel.servers[idx]["name"] ?? ""
-                        Text(name).tag(name)
+                Picker("Source", selection: $viewModel.selectedStorySource) {
+                    ForEach(viewModel.storySources, id: \.self) { source in
+                        Text(source).tag(source)
                     }
                 }
+
+                Picker("Trending Hashtag", selection: $viewModel.selectedHashtag) {
+                    Text("None").tag("")
+                    ForEach(viewModel.trendingHashtags, id: \.self) { tag in
+                        Text(tag).tag(tag)
+                    }
+                }
+                TextField("Custom hashtag (e.g. #MakeInIndia)", text: $viewModel.customHashtag)
+                    .textFieldStyle(.roundedBorder)
 
                 // Headline dropdown (from sample data).
                 if !viewModel.headlines.isEmpty {
@@ -72,6 +79,33 @@ struct GenerateView: View {
                 Text("The sample's content and idea guide dialogue and scenes. Timing and config still apply.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Configuration") {
+                Picker("AI Source", selection: $viewModel.selectedAISource) {
+                    ForEach(viewModel.aiSources, id: \.self) { Text($0).tag($0) }
+                }
+                Picker("AI Model", selection: $viewModel.selectedAIModel) {
+                    ForEach(viewModel.aiModels, id: \.self) { Text($0).tag($0) }
+                }
+                Picker("AI Power", selection: $viewModel.selectedAIPower) {
+                    ForEach(viewModel.aiPowers, id: \.self) { Text($0).tag($0) }
+                }
+                Stepper("Duration: \(viewModel.duration)s", value: $viewModel.duration, in: 5...60, step: 5)
+                Picker("Emotion", selection: $viewModel.selectedEmotion) {
+                    ForEach(viewModel.emotions, id: \.self) { Text($0).tag($0) }
+                }
+                Stepper("Scripts: \(viewModel.scriptCount)", value: $viewModel.scriptCount, in: 1...5)
+                Stepper("Retries: \(viewModel.maxRetries)", value: $viewModel.maxRetries, in: 0...10)
+                Stepper("Characters: \(viewModel.characterCount)", value: $viewModel.characterCount, in: 1...10)
+                Picker("Character Kind", selection: $viewModel.selectedCharacterKind) {
+                    ForEach(viewModel.characterKinds, id: \.self) { Text($0).tag($0) }
+                }
+                TextField("Kind Detail", text: $viewModel.characterKindDetail)
+                    .textFieldStyle(.roundedBorder)
+                Picker("Format", selection: $viewModel.selectedFormat) {
+                    ForEach(viewModel.formats, id: \.self) { Text($0).tag($0) }
+                }
             }
 
             Section {
