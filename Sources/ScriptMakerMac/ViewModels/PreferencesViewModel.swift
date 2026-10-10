@@ -37,6 +37,7 @@ final class PreferencesViewModel: ObservableObject {
     func resetToDefaults() {
         config.resetToDefaults()
         draftURL = config.serverURL
+        dataSource = config.dataSource
         errorMessage = nil
         noticeMessage = "Reset to default."
     }

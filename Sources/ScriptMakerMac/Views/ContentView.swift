@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// UX mapping:
-/// - Navigation bar (toolbar): title · server address bar · Preferences
-/// - Tab bar: Generate | Library
+/// Native macOS layout (HIG):
+/// - Sidebar: Studio | Library navigation (like Mail/Finder)
+/// - Toolbar: title, connection status, Preferences
+/// - Detail: selected section's content
 struct ContentView: View {
     @ObservedObject var viewModel: ContentViewModel
     @StateObject private var generateViewModel: GenerateViewModel
@@ -25,20 +26,28 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView(selection: $viewModel.selectedTab) {
-            GenerateView(viewModel: generateViewModel)
-                .tabItem { Label("Studio", systemImage: "wand.and.stars") }
-                .tag(ContentViewModel.Tab.studio)
-            LibraryView(config: viewModel.config)
-                .tabItem { Label("Library", systemImage: "books.vertical") }
-                .tag(ContentViewModel.Tab.library)
+        NavigationSplitView {
+            // Sidebar: app sections (HIG: sidebar navigation for macOS)
+            List(selection: $viewModel.selectedTab) {
+                ForEach(ContentViewModel.Tab.allCases) { tab in
+                    NavigationLink(value: tab) {
+                        Label(tab.title, systemImage: tab == .studio ? "wand.and.stars" : "books.vertical")
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle("Script Maker")
+        } detail: {
+            // Detail: selected section
+            switch viewModel.selectedTab {
+            case .studio:
+                GenerateView(viewModel: generateViewModel)
+            case .library:
+                LibraryView(config: viewModel.config)
+            }
         }
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Label("Script Maker", systemImage: "clapperboard")
-                    .font(.headline)
-            }
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .primaryAction) {
                 ServerAddressBar(viewModel: addressBarViewModel)
             }
             ToolbarItem(placement: .primaryAction) {
@@ -176,9 +185,39 @@ struct LibraryView: View {
                     Text(summary)
                         .font(.callout)
                 }
+
+                // Video section
+                Section("Video") {
+                    if let videoURL = story["video_url"] as? String, !videoURL.isEmpty {
+                        Text("Video attached")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No video attached")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Upload video…") {
+                        // TODO: file picker for video upload
+                    }
+                    .help("Attach a video file to this story")
+                }
+
+                // Merge section
+                Section("Merge clip at end") {
+                    Text("Append the configured closing clip to the story video.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Merge closing clip") {
+                        Task { await viewModel.mergeClip(storyID: story["id"] as? String ?? "") }
+                    }
+                    .disabled((story["video_url"] as? String)?.isEmpty ?? true)
+                    .help("Merge the default ending clip at the video's end")
+                }
+
                 // Render all other fields from the story JSON.
                 ForEach(story.keys.sorted(), id: \.self) { key in
-                    if !["id", "title", "summary", "created_at"].contains(key) {
+                    if !["id", "title", "summary", "created_at", "video_url"].contains(key) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(key.replacingOccurrences(of: "_", with: " ").capitalized)
                                 .font(.headline)
