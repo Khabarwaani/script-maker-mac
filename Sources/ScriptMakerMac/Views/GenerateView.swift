@@ -107,6 +107,14 @@ struct GenerateView: View {
             CharactersStageView(payload: payload) { selection in
                 Task { await viewModel.select(selection) }
             }
+        case .dialogue:
+            DialogueStageView(payload: payload) { selection in
+                Task { await viewModel.select(selection) }
+            }
+        case .scenes:
+            ScenesStageView(payload: payload) {
+                Task { await viewModel.select([:]) }
+            }
         default:
             EmptyView()
         }
