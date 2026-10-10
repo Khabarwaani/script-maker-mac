@@ -33,6 +33,8 @@
 		Bscenes /* scenes.json in Resources */ = {isa = PBXBuildFile; fileRef = Jscenes /* scenes.json */; };
 		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
 		Brender /* render.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* render.json */; };
+		Bheadlines /* headlines.json in Resources */ = {isa = PBXBuildFile; fileRef = Jheadlines /* headlines.json */; };
+		Bservers /* servers.json in Resources */ = {isa = PBXBuildFile; fileRef = Jservers /* servers.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
 		Brender /* render.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* render.json */; };
@@ -60,6 +62,7 @@
 		R020 /* StoryboardStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryboardStageView.swift; sourceTree = "<group>"; };
 		R021 /* RenderStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderStageView.swift; sourceTree = "<group>"; };
 		R022 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		R024 /* ScriptMakerMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ScriptMakerMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		R023 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
 		Jverify /* verify.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = verify.json; sourceTree = "<group>"; };
 		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
@@ -67,6 +70,8 @@
 		Jscenes /* scenes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = scenes.json; sourceTree = "<group>"; };
 		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
 		Jrender /* render.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = render.json; sourceTree = "<group>"; };
+		Jheadlines /* headlines.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = headlines.json; sourceTree = "<group>"; };
+		Jservers /* servers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = servers.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jrender /* render.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = render.json; sourceTree = "<group>"; };
@@ -176,8 +181,33 @@
 				Jstoryboard /* storyboard.json */,
 				Jrender /* render.json */,
 				Jstories /* stories.json */,
+				Jservers /* servers.json */,
+				Jheadlines /* headlines.json */,
 			);
 			path = Samples;
+			sourceTree = "<group>";
+		};
+		D001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T001 /* ScriptMakerMac */;
+			targetProxy = X001 /* PBXContainerItemProxy */;
+		};
+		X001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T001;
+			remoteInfo = ScriptMakerMac;
+		};
+		G012 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				E001 /* AppConfigTests.swift */,
+				E002 /* SampleDataTests.swift */,
+				E003 /* SampleAPITests.swift */,
+				E004 /* Info.plist */,
+			);
+			path = Tests/ScriptMakerMacTests;
 			sourceTree = "<group>";
 		};
 		/* Target */
@@ -196,11 +226,36 @@
 			productReference = R013 /* ScriptMakerMac.app */;
 			productType = "com.apple.product-type.application";
 		};
+		T002 /* ScriptMakerMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C002 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */;
+			buildPhases = (
+				P004 /* Sources */,
+				P005 /* Frameworks */,
+			);
+			buildRules = ( );
+			dependencies = (
+				D001 /* PBXTargetDependency */,
+			);
+			name = ScriptMakerMacTests;
+			productName = ScriptMakerMacTests;
+			productReference = R024 /* ScriptMakerMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		C001 /* Build configuration list for PBXNativeTarget "ScriptMakerMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B001 /* Debug */,
 				B002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C002 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B005 /* Debug */,
+				B006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -238,10 +293,26 @@
 			files = ( );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		P004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E011 /* AppConfigTests.swift in Sources */,
+				E012 /* SampleDataTests.swift in Sources */,
+				E013 /* SampleAPITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ( );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* render.json in Resources */, Bstories /* stories.json in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* render.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {
@@ -273,6 +344,28 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		B005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				INFOPLIST_FILE = Tests/ScriptMakerMacTests/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		B006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				INFOPLIST_FILE = Tests/ScriptMakerMacTests/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
@@ -333,7 +426,7 @@
 			productRefGroup = G003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = ( T001 /* ScriptMakerMac */, );
+			targets = ( T001 /* ScriptMakerMac */, T002 /* ScriptMakerMacTests */, );
 		};
 	};
 	rootObject = PRJ001 /* Project object */;

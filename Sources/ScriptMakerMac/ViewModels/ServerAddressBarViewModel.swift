@@ -12,17 +12,22 @@ final class ServerAddressBarViewModel: ObservableObject {
     @Published var draftURL: String
     @Published var isConnected = false
     @Published var isChecking = false
+    @Published var useSampleData: Bool
 
     init(config: AppConfig) {
         self.config = config
         self.draftURL = config.serverURL
-        // Stay in sync when Preferences changes the URL.
+        self.useSampleData = config.useSampleData
+        // Stay in sync when Preferences changes the URL or sample mode.
         config.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
                 if self.draftURL != self.config.serverURL {
                     self.draftURL = self.config.serverURL
+                }
+                if self.useSampleData != self.config.useSampleData {
+                    self.useSampleData = self.config.useSampleData
                 }
             }
             .store(in: &cancellables)

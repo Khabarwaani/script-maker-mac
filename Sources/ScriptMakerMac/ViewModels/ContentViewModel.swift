@@ -4,11 +4,11 @@ import Foundation
 @MainActor
 final class ContentViewModel: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
-        case generate, library
+        case studio, library
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .generate: return "Generate"
+            case .studio: return "Studio"
             case .library: return "Library"
             }
         }
@@ -16,7 +16,7 @@ final class ContentViewModel: ObservableObject {
 
     let config: AppConfig
 
-    @Published var selectedTab: Tab = .generate
+    @Published var selectedTab: Tab = .studio
     @Published var connection: ConnectionState = .unknown
 
     init(config: AppConfig) {

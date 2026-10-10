@@ -27,8 +27,8 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $viewModel.selectedTab) {
             GenerateView(viewModel: generateViewModel)
-                .tabItem { Label("Generate", systemImage: "wand.and.stars") }
-                .tag(ContentViewModel.Tab.generate)
+                .tabItem { Label("Studio", systemImage: "wand.and.stars") }
+                .tag(ContentViewModel.Tab.studio)
             LibraryView(config: viewModel.config)
                 .tabItem { Label("Library", systemImage: "books.vertical") }
                 .tag(ContentViewModel.Tab.library)
@@ -103,7 +103,7 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
             Text("No saved stories yet.")
                 .font(.headline)
-            Text("Generate a reel in the Generate tab — it auto-saves here on completion.")
+            Text("Generate a reel in the Studio tab — it auto-saves here on completion.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

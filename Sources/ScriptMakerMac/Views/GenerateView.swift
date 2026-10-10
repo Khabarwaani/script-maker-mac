@@ -22,7 +22,7 @@ struct GenerateView: View {
             }
         }
         .padding()
-        .navigationTitle("Generate")
+        .navigationTitle("Studio")
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("Retry stage") { Task { await viewModel.retryStage() } }
             Button("Retry fresh") { Task { await viewModel.retryFresh() } }
@@ -37,6 +37,29 @@ struct GenerateView: View {
 
     private var inputForm: some View {
         Form {
+            Text("Story & Topic")
+                .font(.headline)
+
+            // Server dropdown (from sample data / config).
+            Picker("Server", selection: $viewModel.selectedServerName) {
+                ForEach(viewModel.servers.indices, id: \.self) { idx in
+                    let name = viewModel.servers[idx]["name"] ?? ""
+                    Text(name).tag(name)
+                }
+            }
+
+            // Headline dropdown (from sample data).
+            if !viewModel.headlines.isEmpty {
+                Picker("Headline", selection: $viewModel.selectedHeadline) {
+                    ForEach(viewModel.headlines, id: \.self) { headline in
+                        Text(headline).tag(headline)
+                    }
+                }
+                .onChange(of: viewModel.selectedHeadline) { _, new in
+                    viewModel.topic = new
+                }
+            }
+
             TextField("News topic", text: $viewModel.topic)
                 .textFieldStyle(.roundedBorder)
             TextField("Sample story (optional)", text: $viewModel.sampleStory, axis: .vertical)
@@ -44,7 +67,7 @@ struct GenerateView: View {
             Text("The sample's content and idea guide dialogue and scenes. Timing and config still apply.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("Start") {
+            Button("Generate") {
                 Task { await viewModel.start() }
             }
             .buttonStyle(.borderedProminent)
