@@ -23,6 +23,10 @@ struct HTTPClient: Sendable {
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         try await session.data(for: request)
     }
+
+    func bytes(for request: URLRequest) async throws -> (URLSession.AsyncBytes, URLResponse) {
+        try await session.bytes(for: request)
+    }
 }
 
 /// Generic key-value store (UserDefaults wrapper).

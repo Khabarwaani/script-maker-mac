@@ -20,8 +20,7 @@ struct NetworkWebClient: WebClient {
     }
 
     func fetchData(from url: URL) async throws -> Data {
-        let (data, _) = try await httpClient.data(from: url)
-        return data
+        try await httpClient.data(from: url)
     }
 
     func createSession() async throws -> String {
@@ -93,7 +92,7 @@ struct NetworkWebClient: WebClient {
             Task {
                 do {
                     let url = baseURL.appendingPathComponent("sessions/\(sessionID)/events")
-                    let (bytes, response) = try await session.bytes(for: URLRequest(url: url))
+                    let (bytes, response) = try await httpClient.bytes(for: URLRequest(url: url))
                     guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
                         throw APIError.badStatus((response as? HTTPURLResponse)?.statusCode ?? -1)
                     }
