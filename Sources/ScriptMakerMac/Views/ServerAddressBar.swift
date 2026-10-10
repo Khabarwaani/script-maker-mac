@@ -7,11 +7,23 @@ struct ServerAddressBar: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            // Data source picker: Server or Offline Data (either/or).
+            Picker("", selection: $viewModel.dataSource) {
+                ForEach(DataSource.allCases) { source in
+                    Text(source.label).tag(source)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 200)
+            .onChange(of: viewModel.dataSource) { _, new in
+                viewModel.setDataSource(new)
+            }
+
             if viewModel.dataSource == .offline {
-                // Sample mode: show dummy indicator instead of URL field.
-                Label("Sample Data", systemImage: "testtube.2")
+                // Offline mode: subtle indicator, not an alarming orange badge.
+                Label("Offline", systemImage: "wifi.slash")
                     .font(.callout)
-                    .foregroundStyle(Color.orange)
+                    .foregroundStyle(.secondary)
                     .help("Offline demo — using bundled sample JSON")
             } else {
                 Image(systemName: viewModel.isConnected ? "link.circle.fill" : "link.circle")
