@@ -1,0 +1,259 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		/* Build files */
+		F001 /* ScriptMakerMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = R001 /* ScriptMakerMacApp.swift */; };
+		F002 /* PipelineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = R002 /* PipelineModels.swift */; };
+		F003 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = R003 /* AppConfig.swift */; };
+		F004 /* PipelineAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = R004 /* PipelineAPI.swift */; };
+		F005 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R005 /* ContentViewModel.swift */; };
+		F006 /* PreferencesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R006 /* PreferencesViewModel.swift */; };
+		F007 /* GenerateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R007 /* GenerateViewModel.swift */; };
+		F008 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R008 /* ContentView.swift */; };
+		F009 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R009 /* PreferencesView.swift */; };
+		F010 /* GenerateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R010 /* GenerateView.swift */; };
+		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
+		/* File references */
+		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
+		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
+		R003 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		R004 /* PipelineAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineAPI.swift; sourceTree = "<group>"; };
+		R005 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
+		R006 /* PreferencesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesViewModel.swift; sourceTree = "<group>"; };
+		R007 /* GenerateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateViewModel.swift; sourceTree = "<group>"; };
+		R008 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		R009 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		R010 /* GenerateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateView.swift; sourceTree = "<group>"; };
+		R011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		R012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		R013 /* ScriptMakerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScriptMakerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		/* Groups */
+		G001 = {
+			isa = PBXGroup;
+			children = (
+				G002 /* ScriptMakerMac */,
+				G003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G002 /* ScriptMakerMac */ = {
+			isa = PBXGroup;
+			children = (
+				G004 /* App */,
+				G005 /* Models */,
+				G006 /* Services */,
+				G007 /* ViewModels */,
+				G008 /* Views */,
+				G009 /* Resources */,
+			);
+			path = Sources/ScriptMakerMac;
+			sourceTree = "<group>";
+		};
+		G003 /* Products */ = {
+			isa = PBXGroup;
+			children = ( R013 /* ScriptMakerMac.app */, );
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G004 /* App */ = {
+			isa = PBXGroup;
+			children = ( R001 /* ScriptMakerMacApp.swift */, );
+			path = App;
+			sourceTree = "<group>";
+		};
+		G005 /* Models */ = {
+			isa = PBXGroup;
+			children = ( R002 /* PipelineModels.swift */, );
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G006 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				R003 /* AppConfig.swift */,
+				R004 /* PipelineAPI.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G007 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				R005 /* ContentViewModel.swift */,
+				R006 /* PreferencesViewModel.swift */,
+				R007 /* GenerateViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G008 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				R008 /* ContentView.swift */,
+				R009 /* PreferencesView.swift */,
+				R010 /* GenerateView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G009 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				R011 /* Assets.xcassets */,
+				R012 /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		/* Target */
+		T001 /* ScriptMakerMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C001 /* Build configuration list for PBXNativeTarget "ScriptMakerMac" */;
+			buildPhases = (
+				P001 /* Sources */,
+				P002 /* Frameworks */,
+				P003 /* Resources */,
+			);
+			buildRules = ( );
+			dependencies = ( );
+			name = ScriptMakerMac;
+			productName = ScriptMakerMac;
+			productReference = R013 /* ScriptMakerMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C001 /* Build configuration list for PBXNativeTarget "ScriptMakerMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B001 /* Debug */,
+				B002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		P001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F001 /* ScriptMakerMacApp.swift in Sources */,
+				F002 /* PipelineModels.swift in Sources */,
+				F003 /* AppConfig.swift in Sources */,
+				F004 /* PipelineAPI.swift in Sources */,
+				F005 /* ContentViewModel.swift in Sources */,
+				F006 /* PreferencesViewModel.swift in Sources */,
+				F007 /* GenerateViewModel.swift in Sources */,
+				F008 /* ContentView.swift in Sources */,
+				F009 /* PreferencesView.swift in Sources */,
+				F010 /* GenerateView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ( );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ( F011 /* Assets.xcassets in Resources */, );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = Sources/ScriptMakerMac/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		B002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = Sources/ScriptMakerMac/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		C002 /* Build configuration list for PBXProject "ScriptMakerMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B003 /* Debug */,
+				B004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		PRJ001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					T001 = { CreatedOnToolsVersion = 15.0; };
+				};
+			};
+			buildConfigurationList = C002 /* Build configuration list for PBXProject "ScriptMakerMac" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = ( en, );
+			mainGroup = G001;
+			productRefGroup = G003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = ( T001 /* ScriptMakerMac */, );
+		};
+	};
+	rootObject = PRJ001 /* Project object */;
+}

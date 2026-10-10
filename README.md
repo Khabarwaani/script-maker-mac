@@ -1,40 +1,27 @@
 # Script Maker for Mac
 
-Thin-client UI for Script Maker. Same UX as always — only the data layer changed:
-instead of importing the pipeline directly, every task goes over HTTP to the
-pipeline server.
+Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
+MVVM, async/await throughout.
+
+Same use cases as the classic app. Every task goes over HTTP to the pipeline
+server configured in Preferences (Cmd+,); nothing is computed locally.
 
 - **Works offline**: server defaults to `http://localhost:8000` — no internet needed.
-- **Server URL** is a top-level setting — point it at a remote server anytime.
-- **UX**: identical components, theming and Apple HIG compliance as the classic app.
+- **Server URL** is a top-level setting (IPv6-aware) — point it at a remote server anytime.
+- **Architecture**: MVVM — `Sources/ScriptMakerMac/{App,Models,Services,ViewModels,Views}`.
+- **Long generations** stream progress via Server-Sent Events; the UI never blocks.
+- **Failures** offer the same four options as the classic app: retry stage, retry fresh, skip, dismiss.
 
-## Architecture
+## Open in Xcode
 
-```
-script-maker-mac (this repo, public)     ai-script-maker (private)
-┌─────────────────────────────┐         ┌──────────────────────────┐
-│ Streamlit UI (thin client)  │  HTTP   │ Pipeline server (API)    │
-│ app/main.py                 │ ◄─────► │ sessions / stages / jobs │
-│ app/api_client.py           │   SSE   │ SSE progress stream      │
-└─────────────────────────────┘         └──────────────────────────┘
-```
+Open `ScriptMakerMac.xcworkspace` (or `ScriptMakerMac.xcodeproj`) at the repo root.
 
-## Run
+## Build the DMG (on a Mac)
 
 ```bash
-pip install -r requirements.txt
-streamlit run app/main.py
+packaging/mac/build_dmg.sh 1.0
 ```
-
-The app starts even with no server — it shows connection status and keeps the
-UX usable offline. Start the pipeline server (default `http://localhost:8000`)
-to generate.
-
-## Packaging (Mac)
-
-`packaging/mac/` holds the `.app` bundle scaffolding (`Info.plist`, icon) and
-`build_dmg.sh` — run on a Mac to produce the DMG.
 
 ## CI
 
-`.github/workflows/ci.yml` — import check + unit tests on every push/PR.
+`.github/workflows/ci.yml` — `xcodebuild` Debug build on every push/PR (public repo: free).

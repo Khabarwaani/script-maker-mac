@@ -1,0 +1,26 @@
+import SwiftUI
+
+/// Script Maker for Mac — native thin client, MVVM.
+///
+/// Same use cases as the classic app. Every task goes over HTTP to the
+/// pipeline server configured in Preferences; nothing is computed locally.
+@main
+struct ScriptMakerMacApp: App {
+    @StateObject private var contentViewModel: ContentViewModel
+
+    init() {
+        let config = AppConfig()
+        _contentViewModel = StateObject(wrappedValue: ContentViewModel(config: config))
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView(viewModel: contentViewModel)
+        }
+        Settings {
+            PreferencesView(
+                viewModel: PreferencesViewModel(config: contentViewModel.config)
+            )
+        }
+    }
+}
