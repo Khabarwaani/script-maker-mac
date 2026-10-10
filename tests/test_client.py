@@ -31,6 +31,36 @@ class TestConfig(unittest.TestCase):
         with self.assertRaises(ValueError):
             config.set_server_url("ftp://example.com")
 
+    def test_ipv6_bare_loopback_with_port(self):
+        self.assertEqual(
+            config.normalize_server_url("http://::1:8000"),
+            "http://[::1]:8000",
+        )
+
+    def test_ipv6_already_bracketed(self):
+        self.assertEqual(
+            config.normalize_server_url("http://[::1]:8000"),
+            "http://[::1]:8000",
+        )
+
+    def test_ipv6_full_address_no_port(self):
+        self.assertEqual(
+            config.normalize_server_url("http://2001:db8::1"),
+            "http://[2001:db8::1]",
+        )
+
+    def test_ipv4_unchanged(self):
+        self.assertEqual(
+            config.normalize_server_url("http://192.168.1.10:8000"),
+            "http://192.168.1.10:8000",
+        )
+
+    def test_hostname_unchanged(self):
+        self.assertEqual(
+            config.normalize_server_url("http://localhost:8000"),
+            "http://localhost:8000",
+        )
+
 
 class TestApiClient(unittest.TestCase):
     def test_stages_cover_pipeline(self):
