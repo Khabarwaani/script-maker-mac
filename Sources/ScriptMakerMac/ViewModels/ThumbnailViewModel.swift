@@ -9,9 +9,12 @@ final class ThumbnailViewModel: ObservableObject {
     @Published private(set) var images: [String: NSImage] = [:]
 
     init(config: AppConfig) {
-        let webClient: any WebClient = config.dataSource == .server
-            ? NetworkWebClient(config: config)
-            : OfflineWebClient()
+        let webClient: any WebClient
+        if config.dataSource == .server, let url = URL(string: config.serverURL) {
+            webClient = NetworkWebClient(baseURL: url)
+        } else {
+            webClient = OfflineWebClient()
+        }
         self.imageService = ImageService(webClient: webClient)
     }
 
