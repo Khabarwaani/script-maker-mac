@@ -1,18 +1,18 @@
 import Foundation
 
-/// Real HTTP WebClient. Talks to the pipeline server via URLSession.
+/// Real HTTP WebClient. Talks to the pipeline server via Infra's HTTPClient.
 struct NetworkWebClient: WebClient {
     let baseURL: URL
-    private let session: URLSession
+    private let httpClient: HTTPClient
 
-    init(baseURL: URL, session: URLSession = .shared) {
+    init(baseURL: URL, httpClient: HTTPClient = HTTPClient()) {
         self.baseURL = baseURL
-        self.session = session
+        self.httpClient = httpClient
     }
 
     func ping() async -> Bool {
         do {
-            let (_, response) = try await session.data(for: request(path: "health", method: "GET"))
+            let (_, response) = try await httpClient.data(for: request(path: "health", method: "GET"))
             return (response as? HTTPURLResponse).map { 200..<300 ~= $0.statusCode } ?? false
         } catch {
             return false
@@ -20,8 +20,7 @@ struct NetworkWebClient: WebClient {
     }
 
     func fetchData(from url: URL) async throws -> Data {
-        let (data, _) = try await session.data(from: url)
-        return data
+        try await httpClient.data(from: url)
     }
 
     func createSession() async throws -> String {
@@ -93,7 +92,7 @@ struct NetworkWebClient: WebClient {
             Task {
                 do {
                     let url = baseURL.appendingPathComponent("sessions/\(sessionID)/events")
-                    let (bytes, response) = try await session.bytes(for: URLRequest(url: url))
+                    let (bytes, response) = try await httpClient.bytes(for: URLRequest(url: url))
                     guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
                         throw APIError.badStatus((response as? HTTPURLResponse)?.statusCode ?? -1)
                     }
@@ -146,7 +145,7 @@ struct NetworkWebClient: WebClient {
             req.httpBody = try JSONSerialization.data(withJSONObject: json)
         }
         do {
-            let (data, response) = try await session.data(for: req)
+            let (data, response) = try await httpClient.data(for: req)
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.transport("No HTTP response")
             }
