@@ -55,7 +55,7 @@ final class ServerAddressBarViewModel: ObservableObject {
         isChecking = true
         defer { isChecking = false }
         do {
-            let api = PipelineService(config: config)
+            let api = try PipelineService(config: config)
             isConnected = await api.ping()
         } catch {
             isConnected = false
