@@ -118,9 +118,25 @@ struct LibraryView: View {
                     storyRow(viewModel.stories[idx])
                         .tag(viewModel.stories[idx]["id"] as? String ?? "")
                 }
+                .onDelete { offsets in
+                    for idx in offsets {
+                        let id = viewModel.stories[idx]["id"] as? String ?? ""
+                        Task { await viewModel.deleteStory(id: id) }
+                    }
+                }
             }
             .listStyle(.sidebar)
             .navigationTitle("Stories · \(viewModel.stories.count)")
+            .toolbar {
+                ToolbarItem {
+                    Button {
+                        Task { await viewModel.refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("Refresh")
+                }
+            }
         } detail: {
             if let story = viewModel.selectedStory {
                 storyDetail(story)

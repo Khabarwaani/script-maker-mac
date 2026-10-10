@@ -69,7 +69,15 @@ struct StoryboardStageView: View {
         let verified = (prompt?["verification_status"] as? String ?? "verified") == "verified"
 
         return VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.headline)
+            HStack(alignment: .top, spacing: 12) {
+                SceneThumbnail(
+                    sceneID: scene["scene_id"] as? String ?? UUID().uuidString,
+                    imageURL: scene["thumbnail_url"] as? String ?? scene["image_url"] as? String
+                )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                }
+            }
             if !location.isEmpty {
                 Label("Location: \(location)", systemImage: "mappin")
                     .font(.callout).foregroundStyle(.secondary)
