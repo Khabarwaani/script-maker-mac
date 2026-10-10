@@ -80,6 +80,12 @@ final class GenerateViewModel: ObservableObject {
     }
 
     /// Long render job with progress.
+    @Published var renderJobID: String?
+
+    func startRender(inputs: [String: Any] = [:]) async {
+        await renderVideo(inputs: inputs)
+    }
+
     func renderVideo(inputs: [String: Any] = [:]) async {
         guard let sid = sessionID else { return }
         isRunning = true
@@ -87,6 +93,7 @@ final class GenerateViewModel: ObservableObject {
         do {
             let api = try api()
             let jobID = try await api.startJob(sessionID: sid, stage: .render, inputs: inputs)
+            renderJobID = jobID
             for try await status in api.pollJob(jobID: jobID) {
                 jobProgress = status.progress
                 if status.status == "failed" {
