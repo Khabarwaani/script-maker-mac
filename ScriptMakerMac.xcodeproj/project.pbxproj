@@ -122,6 +122,7 @@
 			children = (
 				R003 /* AppConfig.swift */,
 				R004 /* PipelineAPI.swift */,
+				R022 /* SampleData.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
