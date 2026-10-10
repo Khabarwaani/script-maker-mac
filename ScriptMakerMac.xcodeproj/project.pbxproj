@@ -153,6 +153,9 @@
 				R028 /* PipelineService.swift */,
 				R029 /* APIError.swift */,
 				R022 /* SampleData.swift */,
+				R032 /* StoryRepository.swift */,
+				R033 /* StoryDataSource.swift */,
+				R034 /* ImageService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -163,6 +166,7 @@
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
 				R007 /* GenerateViewModel.swift */,
+				R035 /* ThumbnailViewModel.swift */,
 				R035 /* ThumbnailViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
