@@ -235,6 +235,7 @@
 			isa = PBXGroup;
 			children = (
 				E001 /* AppConfigTests.swift */,
+				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
 				E003 /* SampleAPITests.swift */,
 				E004 /* Info.plist */,
@@ -340,6 +341,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E011 /* AppConfigTests.swift in Sources */,
+				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
 				E013 /* SampleAPITests.swift in Sources */,
 			);
