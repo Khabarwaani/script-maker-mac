@@ -24,6 +24,42 @@ final class GenerateViewModel: ObservableObject {
     @Published var servers: [[String: String]] = []
     @Published var selectedServerName: String = AppConfig.localserverName
 
+    // Story & Topic (mirrors Streamlit settings panel).
+    @Published var storySources: [String] = ["Manual", "India News", "Trending Hashtags"]
+    @Published var selectedStorySource: String = "India News"
+    @Published var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
+    @Published var selectedHashtag: String = ""
+    @Published var customHashtag: String = ""
+    @Published var topics: [String] = []
+    @Published var selectedTopic: String = ""
+
+    // Configuration (mirrors Streamlit config section).
+    @Published var aiSources: [String] = ["Antigravity", "Gemini", "Grok", "Muse"]
+    @Published var selectedAISource: String = "Antigravity"
+    @Published var aiModels: [String] = ["Default"]
+    @Published var selectedAIModel: String = "Default"
+    @Published var aiPowers: [String] = ["Low", "Medium", "High"]
+    @Published var selectedAIPower: String = "Medium"
+    @Published var duration: Int = 12
+    @Published var emotions: [String] = ["Neutral", "Happy", "Sad", "Angry", "Surprised", "Fearful"]
+    @Published var selectedEmotion: String = "Neutral"
+    @Published var scriptCount: Int = 1
+    @Published var maxRetries: Int = 3
+    @Published var characterCount: Int = 3
+    @Published var characterKinds: [String] = ["Human", "Non-living", "Mixed"]
+    @Published var selectedCharacterKind: String = "Human"
+    @Published var characterKindDetail: String = ""
+    @Published var formats: [String] = ["9:16 Vertical", "16:9 Horizontal", "1:1 Square"]
+    @Published var selectedFormat: String = "9:16 Vertical"
+
+    // Generation mode: Continuous (run all stages) or Step-Wise (manual advance).
+    enum WorkflowMode: String, CaseIterable, Identifiable {
+        case continuous = "Continuous"
+        case stepwise = "Step-Wise"
+        var id: String { rawValue }
+    }
+    @Published var workflowMode: WorkflowMode = .continuous
+
     init(config: AppConfig) {
         self.config = config
         loadSampleLists()
@@ -59,10 +95,31 @@ final class GenerateViewModel: ObservableObject {
             let sid = try await api.createSession()
             sessionID = sid
             listenForEvents(api: api, sessionID: sid)
-            try await runStage(.verify, api: api, inputs: ["topic": topic, "sample_story": sampleStory])
+            try await runStage(.verify, api: api, inputs: stageInputs())
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// All config as stage inputs (mirrors Streamlit's session state).
+    private func stageInputs() -> [String: Any] {
+        [
+            "topic": topic,
+            "sample_story": sampleStory,
+            "story_source": selectedStorySource,
+            "trending_hashtag": customHashtag.isEmpty ? selectedHashtag : customHashtag,
+            "ai_source": selectedAISource,
+            "ai_model": selectedAIModel,
+            "ai_power": selectedAIPower,
+            "duration": duration,
+            "emotion": selectedEmotion,
+            "script_count": scriptCount,
+            "max_retries": maxRetries,
+            "character_count": characterCount,
+            "character_kind": selectedCharacterKind,
+            "character_kind_detail": characterKindDetail,
+            "format": selectedFormat,
+        ]
     }
 
     /// Run one stage; records its payload and advances.
@@ -85,6 +142,7 @@ final class GenerateViewModel: ObservableObject {
     }
 
     /// User picked an option — send the selection and continue.
+    /// In Continuous mode, runs all remaining stages automatically.
     func select(_ selection: [String: Any]) async {
         guard let sid = sessionID else { return }
         isRunning = true
@@ -92,8 +150,15 @@ final class GenerateViewModel: ObservableObject {
         do {
             let api = try api()
             _ = try await api.select(sessionID: sid, selection: selection)
-            if let next = nextStage(after: currentStage) {
-                try await runStage(next, api: api, inputs: [:])
+            if workflowMode == .continuous {
+                // Run all remaining stages automatically.
+                var next = nextStage(after: currentStage)
+                while let stage = next {
+                    try await runStage(stage, api: api, inputs: stageInputs())
+                    next = nextStage(after: stage)
+                }
+            } else if let next = nextStage(after: currentStage) {
+                try await runStage(next, api: api, inputs: stageInputs())
             }
         } catch {
             errorMessage = error.localizedDescription
