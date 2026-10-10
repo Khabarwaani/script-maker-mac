@@ -27,13 +27,19 @@
 		F020 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = R022 /* SampleData.swift */; };
 		F021 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R023 /* LibraryViewModel.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
+		Bverify /* verify.json in Resources */ = {isa = PBXBuildFile; fileRef = Jverify /* verify.json */; };
+		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
+		Bdialogue /* dialogue.json in Resources */ = {isa = PBXBuildFile; fileRef = Jdialogue /* dialogue.json */; };
+		Bscenes /* scenes.json in Resources */ = {isa = PBXBuildFile; fileRef = Jscenes /* scenes.json */; };
+		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
+		Brender /* render.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* render.json */; };
+		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
 		Brender /* render.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* render.json */; };
 		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
 		Bscenes /* scenes.json in Resources */ = {isa = PBXBuildFile; fileRef = Jscenes /* scenes.json */; };
 		Bdialogue /* dialogue.json in Resources */ = {isa = PBXBuildFile; fileRef = Jdialogue /* dialogue.json */; };
 		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
-		Bverify /* verify.json in Resources */ = {isa = PBXBuildFile; fileRef = Jverify /* verify.json */; };
 		/* File references */
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
 		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
@@ -55,13 +61,19 @@
 		R021 /* RenderStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderStageView.swift; sourceTree = "<group>"; };
 		R022 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
 		R023 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		Jverify /* verify.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = verify.json; sourceTree = "<group>"; };
+		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
+		Jdialogue /* dialogue.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = dialogue.json; sourceTree = "<group>"; };
+		Jscenes /* scenes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = scenes.json; sourceTree = "<group>"; };
+		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
+		Jrender /* render.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = render.json; sourceTree = "<group>"; };
+		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jrender /* render.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = render.json; sourceTree = "<group>"; };
 		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
 		Jscenes /* scenes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = scenes.json; sourceTree = "<group>"; };
 		Jdialogue /* dialogue.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = dialogue.json; sourceTree = "<group>"; };
 		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
-		Jverify /* verify.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = verify.json; sourceTree = "<group>"; };
 		R011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		R012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		R013 /* ScriptMakerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScriptMakerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -153,6 +165,20 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		G010 /* Samples */ = {
+			isa = PBXGroup;
+			children = (
+				Jverify /* verify.json */,
+				Jcharacters /* characters.json */,
+				Jdialogue /* dialogue.json */,
+				Jscenes /* scenes.json */,
+				Jstoryboard /* storyboard.json */,
+				Jrender /* render.json */,
+				Jstories /* stories.json */,
+			);
+			path = Samples;
+			sourceTree = "<group>";
+		};
 		/* Target */
 		T001 /* ScriptMakerMac */ = {
 			isa = PBXNativeTarget;
@@ -214,7 +240,7 @@
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, Bverify /* verify.json in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* render.json in Resources */, Bstories /* stories.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {
