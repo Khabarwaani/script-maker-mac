@@ -80,21 +80,20 @@ struct LibraryView: View {
         .task { await viewModel.refresh() }
     }
 
-    private var notImplementedView: (String) -> some View {
-        { notice in
-            VStack(spacing: 12) {
-                Image(systemName: "books.vertical")
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary)
-                Text("Not implemented")
-                    .font(.headline)
-                Text(notice)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding()
+    @ViewBuilder
+    private func notImplementedView(_ notice: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "books.vertical")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("Not implemented")
+                .font(.headline)
+            Text(notice)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
+        .padding()
     }
 
     private var emptyView: some View {
@@ -114,8 +113,11 @@ struct LibraryView: View {
 
     private var storyList: some View {
         NavigationSplitView {
-            List(viewModel.stories, id: \.self, selection: $viewModel.selectedStoryID) { story in
-                storyRow(story)
+            List(selection: $viewModel.selectedStoryID) {
+                ForEach(viewModel.stories.indices, id: \.self) { idx in
+                    storyRow(viewModel.stories[idx])
+                        .tag(viewModel.stories[idx]["id"] as? String ?? "")
+                }
             }
             .listStyle(.sidebar)
             .navigationTitle("Stories · \(viewModel.stories.count)")
