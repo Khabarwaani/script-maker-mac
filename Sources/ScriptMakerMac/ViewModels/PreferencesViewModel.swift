@@ -1,14 +1,13 @@
 import Foundation
 
 /// Preferences screen logic: edit + validate the server URL, test connectivity.
+/// Changes are staged in the view model and only saved to config on Save().
 @MainActor
 final class PreferencesViewModel: ObservableObject {
     private let config: AppConfig
 
     @Published var draftURL: String
-    @Published var dataSource: DataSource {
-        didSet { config.dataSource = dataSource }
-    }
+    @Published var dataSource: DataSource
     @Published var errorMessage: String?
     @Published var noticeMessage: String?
     @Published var isTesting = false
@@ -21,6 +20,7 @@ final class PreferencesViewModel: ObservableObject {
 
     var currentURL: String { config.serverURL }
 
+    /// Save all staged changes to config.
     func save() {
         errorMessage = nil
         noticeMessage = nil
@@ -28,6 +28,7 @@ final class PreferencesViewModel: ObservableObject {
             let normalized = try AppConfig.normalize(raw: draftURL)
             config.serverURL = normalized
             draftURL = normalized
+            config.dataSource = dataSource
             noticeMessage = "Saved."
         } catch {
             errorMessage = error.localizedDescription

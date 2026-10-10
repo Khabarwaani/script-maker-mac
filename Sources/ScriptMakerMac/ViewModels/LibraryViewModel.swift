@@ -20,6 +20,8 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func refresh() async {
+        // Prevent redundant refreshes (view .task can fire multiple times).
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
         notice = nil
