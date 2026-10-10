@@ -1,13 +1,12 @@
 import Foundation
 
-/// HTTP gateway to the pipeline server. Actor-isolated, async/await throughout.
+/// HTTP gateway to the pipeline server. Sendable struct, async/await throughout.
 ///
 /// One instance per configured base URL. All errors are typed and fail-loud —
 /// the UI decides how to present them, never silently.
-actor PipelineAPI {
+struct PipelineAPI: Sendable {
     let baseURL: URL
     private let session: URLSession
-    private let decoder = JSONDecoder()
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -30,7 +29,7 @@ actor PipelineAPI {
 
     func createSession() async throws -> String {
         let data = try await perform(path: "sessions", method: "POST")
-        return try decoder.decode(SessionResponse.self, from: data).sessionID
+        return try JSONDecoder().decode(SessionResponse.self, from: data).sessionID
     }
 
     /// Run a stage; returns the raw JSON payload for the view model to interpret.
@@ -58,12 +57,12 @@ actor PipelineAPI {
         var payload = inputs
         payload["stage"] = stage.rawValue
         let data = try await perform(path: "sessions/\(sessionID)/jobs", method: "POST", json: payload)
-        return try decoder.decode(JobResponse.self, from: data).jobID
+        return try JSONDecoder().decode(JobResponse.self, from: data).jobID
     }
 
     func jobStatus(jobID: String) async throws -> JobStatus {
         let data = try await perform(path: "jobs/\(jobID)", method: "GET")
-        return try decoder.decode(JobStatus.self, from: data)
+        return try JSONDecoder().decode(JobStatus.self, from: data)
     }
 
     /// Poll a job until it completes, yielding each status.

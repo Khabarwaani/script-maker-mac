@@ -25,7 +25,7 @@ best practices throughout.
 - `Sources/ScriptMakerMac/App/` — `@main` entry only.
 - `Sources/ScriptMakerMac/Models/` — Codable types, enums. No logic.
 - `Sources/ScriptMakerMac/Services/` — `AppConfig` (UserDefaults, IPv6-aware URL),
-  `PipelineAPI` (actor, URLSession, async/await, SSE). No UI imports.
+  `PipelineAPI` (Sendable struct, URLSession, async/await, SSE). No UI imports.
 - `Sources/ScriptMakerMac/ViewModels/` — `@MainActor final class : ObservableObject`.
   Owns state, calls services, exposes `@Published`. No UIKit/SwiftUI layout code.
 - `Sources/ScriptMakerMac/Views/` — dumb SwiftUI. No business logic, no direct
