@@ -351,6 +351,7 @@
 		B003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
@@ -359,6 +360,7 @@
 		B004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
 			};
