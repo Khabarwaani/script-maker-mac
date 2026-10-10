@@ -2,7 +2,7 @@ import Foundation
 
 /// The stepwise generation flow: topic in, stages in order, recovery on failure.
 ///
-/// Mirrors the classic app's use cases — every step goes through PipelineAPI.
+/// Mirrors the classic app's use cases — every step goes through PipelineService.
 /// Long stages stream SubstepEvents; the view renders them and never blocks.
 @MainActor
 final class GenerateViewModel: ObservableObject {
@@ -43,8 +43,8 @@ final class GenerateViewModel: ObservableObject {
         }
     }
 
-    private func api() throws -> PipelineAPI {
-        try PipelineAPI(baseURL: config.baseURL(), sampleMode: config.useSampleData)
+    private func api() throws -> PipelineService {
+        try PipelineService(config: config)
     }
 
     // MARK: - Flow
@@ -78,7 +78,7 @@ final class GenerateViewModel: ObservableObject {
         }
     }
 
-    private func runStage(_ stage: PipelineStage, api: PipelineAPI, inputs: [String: Any]) async throws {
+    private func runStage(_ stage: PipelineStage, api: PipelineService, inputs: [String: Any]) async throws {
         currentStage = stage
         let payload = try await api.runStage(sessionID: sessionID ?? "", stage: stage, inputs: inputs)
         stagePayloads[stage] = payload
@@ -164,7 +164,7 @@ final class GenerateViewModel: ObservableObject {
         return all[idx + 1]
     }
 
-    private func listenForEvents(api: PipelineAPI, sessionID: String) {
+    private func listenForEvents(api: PipelineService, sessionID: String) {
         Task {
             do {
                 for try await event in api.eventStream(sessionID: sessionID) {

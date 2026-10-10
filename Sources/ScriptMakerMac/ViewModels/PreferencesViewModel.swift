@@ -6,8 +6,8 @@ final class PreferencesViewModel: ObservableObject {
     private let config: AppConfig
 
     @Published var draftURL: String
-    @Published var useSampleData: Bool {
-        didSet { config.useSampleData = useSampleData }
+    @Published var dataSource: DataSource {
+        didSet { config.dataSource = dataSource }
     }
     @Published var errorMessage: String?
     @Published var noticeMessage: String?
@@ -16,7 +16,7 @@ final class PreferencesViewModel: ObservableObject {
     init(config: AppConfig) {
         self.config = config
         self.draftURL = config.serverURL
-        self.useSampleData = config.useSampleData
+        self.dataSource = config.dataSource
     }
 
     var currentURL: String { config.serverURL }
@@ -47,7 +47,7 @@ final class PreferencesViewModel: ObservableObject {
         errorMessage = nil
         noticeMessage = nil
         do {
-            let api = PipelineAPI(baseURL: try config.baseURL(), sampleMode: config.useSampleData)
+            let api = PipelineService(config: config)
             noticeMessage = await api.ping() ? "Server reachable." : "Server unreachable."
         } catch {
             errorMessage = error.localizedDescription

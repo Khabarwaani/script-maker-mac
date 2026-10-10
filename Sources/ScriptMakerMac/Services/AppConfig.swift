@@ -1,5 +1,21 @@
 import Foundation
 
+/// Where the app gets its data — either a live pipeline server
+/// or the bundled offline sample JSON. Exactly one is active.
+enum DataSource: String, Codable, CaseIterable, Identifiable {
+    case server
+    case offline
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .server: return "Server"
+        case .offline: return "Offline Data"
+        }
+    }
+}
+
 /// App-level configuration, persisted in UserDefaults.
 ///
 /// The pipeline server URL is the single connection point for every use case.
@@ -9,23 +25,30 @@ final class AppConfig: ObservableObject {
     static let localserverName = "localserver"
     static let defaultServerURL = "http://localhost:8501"
     private static let serverURLKey = "serverURL"
-    private static let useSampleDataKey = "useSampleData"
+    private static let dataSourceKey = "dataSource"
 
     @Published var serverURL: String {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
     }
 
-    /// When true (the default), the app runs against bundled sample JSON
-    /// instead of a live server — full UX, offline, test-like output.
-    @Published var useSampleData: Bool {
-        didSet { UserDefaults.standard.set(useSampleData, forKey: Self.useSampleDataKey) }
+    /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
+    /// Offline is the default — full UX, no network.
+    @Published var dataSource: DataSource {
+        didSet { UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey) }
     }
 
     init() {
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
-        self.useSampleData = UserDefaults.standard.object(forKey: Self.useSampleDataKey) as? Bool
-            ?? true
+        // Migrate the old boolean key: true -> offline, false -> server.
+        if let raw = UserDefaults.standard.string(forKey: Self.dataSourceKey),
+           let ds = DataSource(rawValue: raw) {
+            self.dataSource = ds
+        } else if let old = UserDefaults.standard.object(forKey: "useSampleData") as? Bool {
+            self.dataSource = old ? .offline : .server
+        } else {
+            self.dataSource = .offline
+        }
     }
 
     /// Validated, normalized base URL. Throws fail-loud on bad input.
@@ -39,7 +62,7 @@ final class AppConfig: ObservableObject {
 
     func resetToDefaults() {
         serverURL = Self.defaultServerURL
-        useSampleData = true
+        dataSource = .offline
     }
 
     // MARK: - Normalization

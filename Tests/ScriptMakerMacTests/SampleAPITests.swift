@@ -3,19 +3,18 @@ import XCTest
 
 /// All UX flows must work against the dummy (sample) API — no network.
 final class SampleAPITests: XCTestCase {
-    private func api() -> PipelineAPI {
-        PipelineAPI(
-            baseURL: URL(string: "http://localhost:8501")!,
-            sampleMode: true
-        )
+    private func service() -> PipelineService {
+        var config = AppConfig()
+        config.dataSource = .offline
+        return try! PipelineService(config: config)
     }
 
     func testPingReturnsTrue() async {
-        XCTAssertTrue(await api().ping())
+        XCTAssertTrue(await service().ping())
     }
 
     func testFullStageFlow() async throws {
-        let api = api()
+        let api = service()
         let sessionID = try await api.createSession()
         XCTAssertEqual(sessionID, "sample-session")
 
@@ -31,7 +30,7 @@ final class SampleAPITests: XCTestCase {
     }
 
     func testRenderJobFlow() async throws {
-        let api = api()
+        let api = service()
         let jobID = try await api.startJob(sessionID: "sample-session", stage: .render)
         XCTAssertEqual(jobID, "sample-job")
 
@@ -52,7 +51,7 @@ final class SampleAPITests: XCTestCase {
     }
 
     func testListStories() async throws {
-        let stories = try await api().listStories()
+        let stories = try await service().listStories()
         XCTAssertFalse(stories.isEmpty)
     }
 }

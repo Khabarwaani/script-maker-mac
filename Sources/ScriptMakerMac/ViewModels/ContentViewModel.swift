@@ -23,8 +23,8 @@ final class ContentViewModel: ObservableObject {
         self.config = config
     }
 
-    var api: PipelineAPI? {
-        try? PipelineAPI(baseURL: config.baseURL(), sampleMode: config.useSampleData)
+    var api: PipelineService? {
+        try? PipelineService(config: config)
     }
 
     /// Refresh connectivity without throwing — status indicator only.
