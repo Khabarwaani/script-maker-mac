@@ -259,9 +259,16 @@ final class GenerateViewModel {
         await refreshHeadlines()
     }
 
+    var isRefreshingCategories = false
+
     /// Fetch news categories from server when available.
     func loadNewsCategories() async {
-        guard !isLocalJSON else { return }
+        isRefreshingCategories = true
+        defer { isRefreshingCategories = false }
+        guard !isLocalJSON else {
+            loadCatalog()
+            return
+        }
         do {
             let service = try api()
             let response = try await service.fetchNewsCategories()
@@ -275,9 +282,31 @@ final class GenerateViewModel {
                     combined.insert("#️⃣ Trending Hashtags (Google)", at: min(3, combined.count))
                 }
                 storySources = combined
+                if selectedStorySource.isEmpty || !storySources.contains(selectedStorySource) {
+                    if let defaultCat = response.categories.first(where: { $0.id == response.defaultCategory }) {
+                        selectedStorySource = defaultCat.label
+                    } else if let first = serverLabels.first {
+                        selectedStorySource = first
+                    }
+                }
+                if !isManualSource && !isHashtagSource {
+                    await refreshHeadlines()
+                }
             }
         } catch {
-            // Keep catalog story sources
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Populates data on startup or view appearance.
+    func initialLoad() async {
+        if config.dataSource == .server {
+            await loadNewsCategories()
+            if headlines.isEmpty {
+                await refreshHeadlines()
+            }
+        } else {
+            loadSampleLists()
         }
     }
 

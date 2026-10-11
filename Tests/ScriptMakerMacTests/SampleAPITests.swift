@@ -162,6 +162,8 @@ final class SampleAPITests: XCTestCase {
     @MainActor
     func testGenerateViewModelRefreshHeadlines() async throws {
         let appConfig = AppConfig()
+        appConfig.dataSource = .offline
+        appConfig.localJSONDelay = 0
         let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
         viewModel.selectedStorySource = "🇮🇳 India Top Stories & Breaking"
         viewModel.topic = ""
@@ -169,6 +171,16 @@ final class SampleAPITests: XCTestCase {
         XCTAssertFalse(viewModel.headlines.isEmpty)
         XCTAssertEqual(viewModel.selectedHeadline, "Delhi announces odd-even vehicle restrictions to combat air pollution")
         XCTAssertEqual(viewModel.topic, viewModel.selectedHeadline)
+    }
+
+    @MainActor
+    func testGenerateViewModelLoadNewsCategories() async throws {
+        let appConfig = AppConfig()
+        appConfig.dataSource = .offline
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        await viewModel.loadNewsCategories()
+        XCTAssertFalse(viewModel.storySources.isEmpty)
+        XCTAssertTrue(viewModel.storySources.contains("🇮🇳 India Top Stories & Breaking"))
     }
 }
 

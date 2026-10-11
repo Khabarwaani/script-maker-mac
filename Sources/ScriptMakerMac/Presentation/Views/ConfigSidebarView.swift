@@ -16,18 +16,33 @@ struct ConfigSidebarView: View {
         .scrollIndicators(.visible)
         .background(ScrollBarConfiguration())
         .disabled(viewModel.isRunning)
+        .task {
+            await viewModel.initialLoad()
+        }
     }
 
     private var storySection: some View {
         StudioSection("Story") {
-            Button { Task { await viewModel.refreshHeadlines() } } label: { Image(systemName: "arrow.clockwise") }
-                .help("Refresh headlines").disabled(viewModel.isRefreshingHeadlines)
+            EmptyView()
         } content: {
             StudioRow("Source", inset: 0) {
-                StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
-                    .onChange(of: viewModel.selectedStorySource) { _, _ in
-                        Task { await viewModel.onStorySourceChanged() }
+                HStack(spacing: 8) {
+                    StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                        .onChange(of: viewModel.selectedStorySource) { _, _ in
+                            Task { await viewModel.onStorySourceChanged() }
+                        }
+                    Button {
+                        Task { await viewModel.loadNewsCategories() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.callout)
+                            .foregroundStyle(viewModel.isRefreshingCategories ? AppTheme.secondaryInk : AppTheme.ink)
                     }
+                    .buttonStyle(.plain)
+                    .help("Refresh news categories")
+                    .disabled(viewModel.isRefreshingCategories)
+                    .padding(.trailing, 10)
+                }
             }
             if viewModel.isHashtagSource {
                 StudioRow("Trending hashtag", inset: 0) {
@@ -35,10 +50,31 @@ struct ConfigSidebarView: View {
                 }
                 StudioRow("Custom hashtag") { TextField("e.g. #MakeInIndia", text: $viewModel.customHashtag) }
             }
-            if !viewModel.isManualSource && !viewModel.headlines.isEmpty {
+            if !viewModel.isManualSource {
                 StudioRow("Headline", inset: 0) {
-                    StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
-                        .onChange(of: viewModel.selectedHeadline) { _, new in viewModel.topic = new }
+                    HStack(spacing: 8) {
+                        if viewModel.headlines.isEmpty {
+                            Text(viewModel.isRefreshingHeadlines ? "Loading headlines…" : "No headlines loaded")
+                                .font(.callout)
+                                .foregroundStyle(AppTheme.secondaryInk)
+                                .padding(.leading, 10)
+                            Spacer()
+                        } else {
+                            StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
+                                .onChange(of: viewModel.selectedHeadline) { _, new in viewModel.topic = new }
+                        }
+                        Button {
+                            Task { await viewModel.refreshHeadlines() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.callout)
+                                .foregroundStyle(viewModel.isRefreshingHeadlines ? AppTheme.secondaryInk : AppTheme.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Refresh headlines")
+                        .disabled(viewModel.isRefreshingHeadlines)
+                        .padding(.trailing, 10)
+                    }
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
