@@ -237,7 +237,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.localJSONDelay = 0
         let repository = WorkflowStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
-        generator.scriptCount = 1
+        generator.scriptCount = 3
         generator.topic = "Step-wise lifecycle test"
         generator.workflowMode = .stepwise
         await generator.start()
@@ -250,12 +250,13 @@ final class LocalWorkflowTests: XCTestCase {
             XCTAssertEqual(generator.stagePayloads.count, index + 2)
             XCTAssertFalse(generator.renderCompleted)
             let saved = await repository.all()
-            XCTAssertEqual(saved.count, stage == .validation ? 1 : 0)
+            XCTAssertEqual(saved.count, stage == .validation ? 3 : 0)
         }
         XCTAssertTrue(generator.generationCompleted)
         XCTAssertFalse(generator.renderCompleted)
         let saved = await repository.all()
-        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(saved.count, 3)
+        XCTAssertEqual(generator.savedStoryCount, 3)
     }
 }
 

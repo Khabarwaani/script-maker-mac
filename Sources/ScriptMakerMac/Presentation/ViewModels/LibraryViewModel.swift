@@ -47,9 +47,10 @@ final class LibraryViewModel {
         }
         notice = nil
         if config.dataSource != .server {
+            stories = await repository.all()
+            if !stories.contains(where: { $0.id == selectedStoryID }) { selectedStoryID = stories.first?.id }
             do { _ = try await PipelineService(config: config).listStories() }
             catch { notice = error.localizedDescription }
-            stories = await repository.all()
             return
         }
         do {

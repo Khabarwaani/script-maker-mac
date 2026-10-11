@@ -364,6 +364,7 @@ final class GenerateViewModel {
 
     private var generatedStoryIDs: [Int: String] = [:]
     private var generationCreatedAt = DateFormatting.iso8601Now()
+    var savedStoryCount = 0
     var generationCompleted = false
     var renderJobID: String?
     var renderCompleted = false
@@ -435,6 +436,7 @@ final class GenerateViewModel {
         renderJobID = nil
         renderCompleted = false
         generationCompleted = false
+        savedStoryCount = 0
         generatedStoryIDs = [:]
         generationCreatedAt = DateFormatting.iso8601Now()
     }
@@ -483,6 +485,7 @@ final class GenerateViewModel {
                 stageOutputs: outputs
             )
             await repository.save(story)
+            savedStoryCount = index + 1
         }
     }
 
