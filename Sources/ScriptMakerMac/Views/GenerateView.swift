@@ -165,7 +165,7 @@ struct GenerateView: View {
                     Task { await viewModel.start() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.topic.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isRunning)
+                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
             }
         }
     }
