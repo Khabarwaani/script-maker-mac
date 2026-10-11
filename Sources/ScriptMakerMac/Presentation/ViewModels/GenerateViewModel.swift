@@ -501,44 +501,45 @@ final class GenerateViewModel {
             sessionID = UUID().uuidString
             for try await event in api.createAndStreamStory(params: streamParams) {
                 switch event {
-                case .planStream(_, _):
+                case .planStream:
                     break
 
-                case .planStage(let position, let stageType, _):
-                    if let stageEnum = PipelineStageType(rawValue: stageType) {
+                case .planStage(let plan):
+                    if let stageEnum = PipelineStageType(rawValue: plan.stageType) {
                         currentStage = stageEnum
-                    } else if position >= 1 && position <= PipelineStageType.allCases.count {
-                        currentStage = PipelineStageType.allCases[position - 1]
+                    } else if plan.position >= 1 && plan.position <= PipelineStageType.allCases.count {
+                        currentStage = PipelineStageType.allCases[plan.position - 1]
                     }
 
-                case .progressStage(let position, let stageType, let status):
-                    if let stageEnum = PipelineStageType(rawValue: stageType) {
+                case .progressStage(let progress):
+                    if let stageEnum = PipelineStageType(rawValue: progress.stageType) {
                         currentStage = stageEnum
-                    } else if position >= 1 && position <= PipelineStageType.allCases.count {
-                        currentStage = PipelineStageType.allCases[position - 1]
+                    } else if progress.position >= 1 && progress.position <= PipelineStageType.allCases.count {
+                        currentStage = PipelineStageType.allCases[progress.position - 1]
                     }
                     if let cur = currentStage {
                         let sub = SubstepEvent(
                             name: cur.rawValue,
                             stage: cur.rawValue,
                             label: cur.title,
-                            status: status,
-                            detail: "Status: \(status)"
+                            status: progress.status,
+                            detail: "Status: \(progress.status)"
                         )
                         events.append(sub)
                     }
 
-                case .progressSubstep(_, let substep, let stageType, let status):
+                case .progressSubstep(let progress):
                     let sub = SubstepEvent(
-                        name: substep,
-                        stage: stageType,
-                        label: "\(stageType.capitalized) substep \(substep)",
-                        status: status,
+                        name: progress.substep,
+                        stage: progress.substepType,
+                        label: "\(progress.substepType.capitalized) substep \(progress.substep)",
+                        status: progress.status,
                         detail: "Working..."
                     )
                     events.append(sub)
 
-                case .outputSubstep(_, let substep, let substepType, let name, let status, _):
+                case .outputSubstep(let step, let substep, let substepType, let name, let status, _):
+                    _ = step
                     let sub = SubstepEvent(
                         name: substep,
                         stage: substepType,
@@ -558,8 +559,8 @@ final class GenerateViewModel {
                         currentStage = stageEnum
                     }
 
-                case .error(let message, _, _):
-                    errorMessage = message
+                case .error(let errorPayload):
+                    errorMessage = errorPayload.error
 
                 case .end:
                     generationCompleted = true

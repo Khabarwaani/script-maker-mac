@@ -171,41 +171,39 @@ struct OfflineWebClient: WebClient {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let stagesMeta = [
-                        ["id": 1, "type": "validation", "label": "Instruction Decomposition & Wire Fact Validation"],
-                        ["id": 2, "type": "casting", "label": "Viral Angles & Hindi Hooks"],
-                        ["id": 3, "type": "dialogue", "label": "Spoken Dialogue Writing & Word Count Calibration"],
-                        ["id": 4, "type": "scenes", "label": "Scene Derivation from Dialogue"],
-                        ["id": 5, "type": "storyboard", "label": "Scene Storyboards & Cinematic Visual Direction"],
-                        ["id": 6, "type": "script", "label": "Integration & Final Validation"]
+                    let stagesPlan = [
+                        StreamStagePlan(id: 1, type: "validation", label: "Instruction Decomposition & Wire Fact Validation"),
+                        StreamStagePlan(id: 2, type: "casting", label: "Viral Angles & Hindi Hooks"),
+                        StreamStagePlan(id: 3, type: "dialogue", label: "Spoken Dialogue Writing & Word Count Calibration"),
+                        StreamStagePlan(id: 4, type: "scenes", label: "Scene Derivation from Dialogue"),
+                        StreamStagePlan(id: 5, type: "storyboard", label: "Scene Storyboards & Cinematic Visual Direction"),
+                        StreamStagePlan(id: 6, type: "script", label: "Integration & Final Validation")
                     ]
 
-                    continuation.yield(.planStream(version: "5.1.2", stages: stagesMeta))
+                    continuation.yield(.planStream(StreamPlanStreamPayload(version: "5.1.2", stages: stagesPlan)))
                     try await pause()
 
-                    for (idx, meta) in stagesMeta.enumerated() {
+                    for (idx, meta) in stagesPlan.enumerated() {
                         let position = idx + 1
-                        let stageType = meta["type"] as? String ?? ""
-                        let label = meta["label"] as? String ?? ""
+                        let stageType = meta.type
+                        let label = meta.label
 
                         let substeps = [
-                            ["id": "\(position).1", "substep_type": stageType, "name": "\(label) - Step 1"],
-                            ["id": "\(position).2", "substep_type": stageType, "name": "\(label) - Step 2"]
+                            StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "\(label) - Step 1"),
+                            StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "\(label) - Step 2")
                         ]
 
-                        continuation.yield(.planStage(position: position, stageType: stageType, substeps: substeps))
-                        continuation.yield(.progressStage(position: position, stageType: stageType, status: "running"))
+                        continuation.yield(.planStage(StreamPlanStagePayload(position: position, stageType: stageType, substeps: substeps)))
+                        continuation.yield(.progressStage(StreamProgressStagePayload(position: position, stageType: stageType, status: "running")))
 
                         for sub in substeps {
-                            let subId = sub["id"] ?? ""
-                            let subName = sub["name"] ?? ""
-                            continuation.yield(.progressSubstep(position: position, substep: subId, stageType: stageType, status: "running"))
+                            continuation.yield(.progressSubstep(StreamProgressSubstepPayload(position: position, substep: sub.id, substepType: stageType, status: "running")))
                             try await pause()
                             continuation.yield(.outputSubstep(
                                 step: position,
-                                substep: subId,
+                                substep: sub.id,
                                 substepType: stageType,
-                                name: subName,
+                                name: sub.name,
                                 status: "success",
                                 output: ["result": "OK"]
                             ))

@@ -28,17 +28,221 @@ public enum PipelineStageType: String, CaseIterable, Identifiable, Codable, Send
 /// Backward compatibility alias for PipelineStage
 typealias PipelineStage = PipelineStageType
 
-/// An SSE event from POST /api/v1/stories/stream (Stream API Contract v1).
-public enum CreatorStreamEvent: Sendable {
-    case planStream(version: String, stages: [[String: Any]])
-    case planStage(position: Int, stageType: String, substeps: [[String: Any]])
-    case progressStage(position: Int, stageType: String, status: String)
-    case progressSubstep(position: Int, substep: String, stageType: String, status: String)
-    case outputSubstep(step: Int, substep: String, substepType: String, name: String, status: String, output: [String: Any])
-    case outputStage(step: Int, status: String, outputType: String, output: [String: Any], llmCalls: [[String: Any]]?)
-    case error(message: String, stage: Int?, failedSubstep: String?)
-    case end
+// MARK: - Stream API Contract v1 Models
+
+public struct StreamStagePlan: Codable, Sendable, Identifiable, Equatable {
+    public let id: Int
+    public let type: String
+    public let label: String
+
+    public init(id: Int, type: String, label: String) {
+        self.id = id
+        self.type = type
+        self.label = label
+    }
 }
+
+public struct StreamSubstepPlan: Codable, Sendable, Identifiable, Equatable {
+    public let id: String
+    public let substepType: String
+    public let name: String
+
+    public init(id: String, substepType: String, name: String) {
+        self.id = id
+        self.substepType = substepType
+        self.name = name
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case substepType = "substep_type"
+        case name
+    }
+}
+
+public struct StreamPlanStreamPayload: Codable, Sendable, Equatable {
+    public let type: String?
+    public let version: String
+    public let stages: [StreamStagePlan]
+
+    public init(version: String, stages: [StreamStagePlan], type: String? = "plan_stream") {
+        self.type = type
+        self.version = version
+        self.stages = stages
+    }
+}
+
+public struct StreamPlanStagePayload: Codable, Sendable, Equatable {
+    public let type: String?
+    public let position: Int
+    public let stageType: String
+    public let substeps: [StreamSubstepPlan]
+
+    public init(position: Int, stageType: String, substeps: [StreamSubstepPlan], type: String? = "plan_stage") {
+        self.type = type
+        self.position = position
+        self.stageType = stageType
+        self.substeps = substeps
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, position
+        case stageType = "stage_type"
+        case substeps
+    }
+}
+
+public struct StreamProgressStagePayload: Codable, Sendable, Equatable {
+    public let type: String?
+    public let position: Int
+    public let stageType: String
+    public let status: String
+
+    public init(position: Int, stageType: String, status: String, type: String? = "progress_stage") {
+        self.type = type
+        self.position = position
+        self.stageType = stageType
+        self.status = status
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, position
+        case stageType = "stage_type"
+        case status
+    }
+}
+
+public struct StreamProgressSubstepPayload: Codable, Sendable, Equatable {
+    public let type: String?
+    public let position: Int
+    public let substep: String
+    public let substepType: String
+    public let status: String
+
+    public init(position: Int, substep: String, substepType: String, status: String, type: String? = "progress_substep") {
+        self.type = type
+        self.position = position
+        self.substep = substep
+        self.substepType = substepType
+        self.status = status
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, position, substep
+        case substepType = "substep_type"
+        case status
+    }
+}
+
+public struct StreamOutputSubstepPayload: Codable, Sendable {
+    public let type: String?
+    public let step: Int
+    public let substep: String
+    public let substepType: String
+    public let name: String
+    public let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case type, step, substep
+        case substepType = "substep_type"
+        case name, status
+    }
+}
+
+public struct StreamLLMCall: Codable, Sendable, Equatable {
+    public let prompt: String?
+    public let response: String?
+    public let model: String?
+    public let power: String?
+    public let status: String?
+
+    public init(prompt: String? = nil, response: String? = nil, model: String? = nil, power: String? = nil, status: String? = nil) {
+        self.prompt = prompt
+        self.response = response
+        self.model = model
+        self.power = power
+        self.status = status
+    }
+}
+
+public struct StreamOutputStagePayload: Codable, Sendable {
+    public let type: String?
+    public let step: Int
+    public let status: String
+    public let outputType: String
+    public let llmCalls: [StreamLLMCall]?
+
+    enum CodingKeys: String, CodingKey {
+        case type, step, status
+        case outputType = "output_type"
+        case llmCalls = "llm_calls"
+    }
+}
+
+public struct StreamErrorPayload: Codable, Sendable, Equatable {
+    public let type: String?
+    public let error: String
+    public let stage: Int?
+    public let failedSubstep: String?
+
+    public init(error: String, stage: Int? = nil, failedSubstep: String? = nil, type: String? = "error") {
+        self.type = type
+        self.error = error
+        self.stage = stage
+        self.failedSubstep = failedSubstep
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, error, stage
+        case failedSubstep = "failed_substep"
+    }
+}
+
+/// An SSE event from POST /api/v1/stories/stream (Stream API Contract v1).
+public enum CreatorStreamEvent: Sendable, Decodable {
+    case planStream(StreamPlanStreamPayload)
+    case planStage(StreamPlanStagePayload)
+    case progressStage(StreamProgressStagePayload)
+    case progressSubstep(StreamProgressSubstepPayload)
+    case outputSubstep(step: Int, substep: String, substepType: String, name: String, status: String, output: [String: Any])
+    case outputStage(step: Int, status: String, outputType: String, output: [String: Any], llmCalls: [StreamLLMCall]?)
+    case error(StreamErrorPayload)
+    case end
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        let single = try decoder.singleValueContainer()
+
+        switch type {
+        case "plan_stream":
+            self = .planStream(try single.decode(StreamPlanStreamPayload.self))
+        case "plan_stage":
+            self = .planStage(try single.decode(StreamPlanStagePayload.self))
+        case "progress_stage":
+            self = .progressStage(try single.decode(StreamProgressStagePayload.self))
+        case "progress_substep":
+            self = .progressSubstep(try single.decode(StreamProgressSubstepPayload.self))
+        case "output_substep":
+            let meta = try single.decode(StreamOutputSubstepPayload.self)
+            self = .outputSubstep(step: meta.step, substep: meta.substep, substepType: meta.substepType, name: meta.name, status: meta.status, output: [:])
+        case "output_stage":
+            let meta = try single.decode(StreamOutputStagePayload.self)
+            self = .outputStage(step: meta.step, status: meta.status, outputType: meta.outputType, output: [:], llmCalls: meta.llmCalls)
+        case "error":
+            self = .error(try single.decode(StreamErrorPayload.self))
+        case "end":
+            self = .end
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown stream event type \(type)")
+        }
+    }
+}
+
 enum PipelineJob: String {
     case render
 }

@@ -286,66 +286,23 @@ struct NetworkWebClient: WebClient {
 
     private static func parseCreatorEvent(name: String, json: String) -> CreatorStreamEvent? {
         if name == "end" { return .end }
-        guard let data = json.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+        guard let data = json.data(using: .utf8) else { return nil }
+
+        // Use typed JSONDecoder for Stream API Contract v1
+        if let decoded = try? JSONDecoder().decode(CreatorStreamEvent.self, from: data) {
+            // If output payload dictionary is needed for output_stage / output_substep, extract the raw sub-object
+            if case .outputStage(let step, let status, let outputType, _, let llmCalls) = decoded,
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let output = dict["output"] as? [String: Any] {
+                return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
+            } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, _) = decoded,
+                      let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let output = dict["output"] as? [String: Any] {
+                return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, output: output)
+            }
+            return decoded
         }
-        let type = dict["type"] as? String ?? name
-
-        switch type {
-        case "plan_stream":
-            let version = dict["version"] as? String ?? "1.0.0"
-            let stages = dict["stages"] as? [[String: Any]] ?? []
-            return .planStream(version: version, stages: stages)
-
-        case "plan_stage":
-            let position = dict["position"] as? Int ?? 1
-            let stageType = dict["stage_type"] as? String ?? ""
-            let substeps = dict["substeps"] as? [[String: Any]] ?? []
-            return .planStage(position: position, stageType: stageType, substeps: substeps)
-
-        case "progress_stage":
-            let position = dict["position"] as? Int ?? 1
-            let stageType = dict["stage_type"] as? String ?? ""
-            let status = dict["status"] as? String ?? "running"
-            return .progressStage(position: position, stageType: stageType, status: status)
-
-        case "progress_substep":
-            let position = dict["position"] as? Int ?? 1
-            let substep = dict["substep"] as? String ?? ""
-            let stageType = dict["substep_type"] as? String ?? ""
-            let status = dict["status"] as? String ?? "running"
-            return .progressSubstep(position: position, substep: substep, stageType: stageType, status: status)
-
-        case "output_substep":
-            let step = dict["step"] as? Int ?? 1
-            let substep = dict["substep"] as? String ?? ""
-            let substepType = dict["substep_type"] as? String ?? ""
-            let name = dict["name"] as? String ?? ""
-            let status = dict["status"] as? String ?? "success"
-            let output = dict["output"] as? [String: Any] ?? [:]
-            return .outputSubstep(step: step, substep: substep, substepType: substepType, name: name, status: status, output: output)
-
-        case "output_stage":
-            let step = dict["step"] as? Int ?? 1
-            let status = dict["status"] as? String ?? "success"
-            let outputType = dict["output_type"] as? String ?? ""
-            let output = dict["output"] as? [String: Any] ?? [:]
-            let llmCalls = dict["llm_calls"] as? [[String: Any]]
-            return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
-
-        case "error":
-            let message = dict["error"] as? String ?? dict["message"] as? String ?? json
-            let stage = dict["stage"] as? Int
-            let failedSubstep = dict["failed_substep"] as? String
-            return .error(message: message, stage: stage, failedSubstep: failedSubstep)
-
-        case "end":
-            return .end
-
-        default:
-            return nil
-        }
+        return nil
     }
 
     func verifyNewsEndpoints() async throws -> Bool {
