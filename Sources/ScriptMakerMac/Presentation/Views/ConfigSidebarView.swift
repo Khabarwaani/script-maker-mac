@@ -274,7 +274,10 @@ struct StudioOptionPicker: View {
     }
 
     var body: some View {
-        Button { showingOptions.toggle() } label: {
+        Button {
+            guard !options.isEmpty else { return }
+            showingOptions.toggle()
+        } label: {
             HStack(spacing: 8) {
                 Text(label(selection)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.down").font(.caption).foregroundStyle(AppTheme.secondaryInk)
@@ -284,37 +287,36 @@ struct StudioOptionPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(options.isEmpty)
         .accessibilityLabel(title)
         .accessibilityValue(label(selection))
-        .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
-            if options.isEmpty {
-                Text("No data")
-                    .font(.callout)
-                    .foregroundStyle(AppTheme.secondaryInk)
-                    .padding(20)
-                    .frame(width: 200)
-            } else {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(options, id: \.self) { option in
-                            Button {
-                                selection = option
-                                showingOptions = false
-                            } label: {
-                                HStack {
-                                    Text(label(option)).frame(maxWidth: .infinity, alignment: .leading)
-                                    Image(systemName: "checkmark").opacity(selection == option ? 1 : 0)
-                                }
-                                .padding(10).contentShape(Rectangle())
-                                .background(selection == option ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                            }.buttonStyle(.plain)
-                        }
-                    }.padding(8)
-                }
-                .frame(width: 340, height: min(CGFloat(options.count) * 42 + 16, 400))
-                .foregroundStyle(AppTheme.ink).background(AppTheme.card)
-                .scrollIndicators(.visible)
+        .popover(
+            isPresented: Binding(
+                get: { showingOptions && !options.isEmpty },
+                set: { showingOptions = $0 }
+            ),
+            arrowEdge: .bottom
+        ) {
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(options, id: \.self) { option in
+                        Button {
+                            selection = option
+                            showingOptions = false
+                        } label: {
+                            HStack {
+                                Text(label(option)).frame(maxWidth: .infinity, alignment: .leading)
+                                Image(systemName: "checkmark").opacity(selection == option ? 1 : 0)
+                            }
+                            .padding(10).contentShape(Rectangle())
+                            .background(selection == option ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                        }.buttonStyle(.plain)
+                    }
+                }.padding(8)
             }
+            .frame(width: 340, height: min(CGFloat(options.count) * 42 + 16, 400))
+            .foregroundStyle(AppTheme.ink).background(AppTheme.card)
+            .scrollIndicators(.visible)
         }
     }
 }
