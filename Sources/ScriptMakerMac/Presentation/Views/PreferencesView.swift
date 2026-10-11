@@ -34,10 +34,6 @@ struct PreferencesView: View {
                     TextField("Server URL", text: $viewModel.draftURL).textFieldStyle(.roundedBorder)
                     HStack {
                         Button("Test connection") { Task { await viewModel.testConnection() } }
-                        Button("Use Local JSON") {
-                            viewModel.dataSource = .offline
-                            Task { await viewModel.save() }
-                        }
                         Button("Save") { Task { await viewModel.save() } }
                     }.disabled(viewModel.isTesting)
                 }
