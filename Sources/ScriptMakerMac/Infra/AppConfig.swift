@@ -38,16 +38,18 @@ final class AppConfig {
     private static let newsPageSizeKey = "newsPageSize"
     static let defaultNewsPageSize = 20
 
+    private let defaults: UserDefaults
+
     var appearance: AppAppearance {
-        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+        didSet { defaults.set(appearance.rawValue, forKey: "appearance") }
     }
 
     var localJSONDelay: Double {
-        didSet { UserDefaults.standard.set(localJSONDelay, forKey: "localJSONDelay") }
+        didSet { defaults.set(localJSONDelay, forKey: "localJSONDelay") }
     }
 
     var newsPageSize: Int {
-        didSet { UserDefaults.standard.set(newsPageSize, forKey: Self.newsPageSizeKey) }
+        didSet { defaults.set(newsPageSize, forKey: Self.newsPageSizeKey) }
     }
 
     var buildTitle: String {
@@ -59,34 +61,35 @@ final class AppConfig {
     }
 
     var serverURL: String {
-        didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
+        didSet { defaults.set(serverURL, forKey: Self.serverURLKey) }
     }
 
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
     var dataSource: DataSource {
         didSet {
-            UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey)
-            UserDefaults.standard.removeObject(forKey: "useSampleData")
+            defaults.set(dataSource.rawValue, forKey: Self.dataSourceKey)
+            defaults.removeObject(forKey: "useSampleData")
         }
     }
 
-    init() {
-        self.localJSONDelay = UserDefaults.standard.object(forKey: "localJSONDelay") as? Double ?? 1
-        let savedPageSize = UserDefaults.standard.integer(forKey: Self.newsPageSizeKey)
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
+        let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
         self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
-        self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
-        self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
+        self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
+        self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
-        if let raw = UserDefaults.standard.string(forKey: Self.dataSourceKey),
+        if let raw = defaults.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {
             self.dataSource = ds
-            UserDefaults.standard.removeObject(forKey: "useSampleData")
-        } else if let old = UserDefaults.standard.object(forKey: "useSampleData") as? Bool {
+            defaults.removeObject(forKey: "useSampleData")
+        } else if let old = defaults.object(forKey: "useSampleData") as? Bool {
             let migrated: DataSource = old ? .offline : .server
             self.dataSource = migrated
-            UserDefaults.standard.set(migrated.rawValue, forKey: Self.dataSourceKey)
-            UserDefaults.standard.removeObject(forKey: "useSampleData")
+            defaults.set(migrated.rawValue, forKey: Self.dataSourceKey)
+            defaults.removeObject(forKey: "useSampleData")
         } else {
             self.dataSource = .offline
         }
@@ -115,12 +118,12 @@ final class AppConfig {
 
     func saveStudioConfig(_ config: StudioConfig) {
         if let data = try? JSONEncoder().encode(config) {
-            UserDefaults.standard.set(data, forKey: Self.studioConfigKey)
+            defaults.set(data, forKey: Self.studioConfigKey)
         }
     }
 
     func loadStudioConfig() -> StudioConfig? {
-        guard let data = UserDefaults.standard.data(forKey: Self.studioConfigKey) else { return nil }
+        guard let data = defaults.data(forKey: Self.studioConfigKey) else { return nil }
         return try? JSONDecoder().decode(StudioConfig.self, from: data)
     }
 
@@ -134,12 +137,12 @@ final class AppConfig {
     func cacheHeadlines(_ headlines: [String], forSource source: String) {
         let payload = CachedHeadlinesPayload(headlines: headlines, timestamp: Date())
         if let data = try? JSONEncoder().encode(payload) {
-            UserDefaults.standard.set(data, forKey: Self.headlinesCacheKeyPrefix + source)
+            defaults.set(data, forKey: Self.headlinesCacheKeyPrefix + source)
         }
     }
 
     func getCachedHeadlines(forSource source: String, maxAge: TimeInterval = 86400) -> [String]? {
-        guard let data = UserDefaults.standard.data(forKey: Self.headlinesCacheKeyPrefix + source),
+        guard let data = defaults.data(forKey: Self.headlinesCacheKeyPrefix + source),
               let payload = try? JSONDecoder().decode(CachedHeadlinesPayload.self, from: data) else {
             return nil
         }
@@ -150,11 +153,11 @@ final class AppConfig {
     }
 
     func saveLastSelectedHeadline(_ headline: String, forSource source: String) {
-        UserDefaults.standard.set(headline, forKey: Self.selectedHeadlineKeyPrefix + source)
+        defaults.set(headline, forKey: Self.selectedHeadlineKeyPrefix + source)
     }
 
     func getLastSelectedHeadline(forSource source: String) -> String? {
-        UserDefaults.standard.string(forKey: Self.selectedHeadlineKeyPrefix + source)
+        defaults.string(forKey: Self.selectedHeadlineKeyPrefix + source)
     }
 
     // MARK: - Normalization

@@ -38,8 +38,14 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(AppConfig.localserverName, "localserver")
     }
 
+    private func makeIsolatedDefaults() -> UserDefaults {
+        let suiteName = "test.suite.\(UUID().uuidString)"
+        return UserDefaults(suiteName: suiteName)!
+    }
+
     func testHeadlinesCaching24HourExpiry() {
-        let config = AppConfig()
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfig(defaults: defaults)
         let testSource = "test_source_\(UUID().uuidString)"
         let sample = ["Headline A", "Headline B"]
 
@@ -53,7 +59,8 @@ final class AppConfigTests: XCTestCase {
     }
 
     func testLastSelectedHeadlinePersistence() {
-        let config = AppConfig()
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfig(defaults: defaults)
         let testSource = "test_source_\(UUID().uuidString)"
         config.saveLastSelectedHeadline("Important Breaking News", forSource: testSource)
         XCTAssertEqual(config.getLastSelectedHeadline(forSource: testSource), "Important Breaking News")
@@ -65,7 +72,8 @@ final class AppConfigTests: XCTestCase {
             let reachable: Bool
             func isReachable(at url: URL) async -> Bool { reachable }
         }
-        let config = AppConfig()
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfig(defaults: defaults)
         let vm = PreferencesViewModel(config: config, connectionChecker: MockChecker(reachable: false))
         vm.dataSource = .server
         vm.draftURL = "http://localhost:8000"
@@ -76,7 +84,8 @@ final class AppConfigTests: XCTestCase {
     }
 
     func testNewsPageSizeDefaultAndPersistence() {
-        let config = AppConfig()
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfig(defaults: defaults)
         XCTAssertEqual(config.newsPageSize, 20)
         config.newsPageSize = 35
         XCTAssertEqual(config.newsPageSize, 35)
@@ -91,13 +100,14 @@ final class AppConfigTests: XCTestCase {
     }
 
     func testDataSourcePersistenceAcrossLaunches() {
-        let config1 = AppConfig()
+        let defaults = makeIsolatedDefaults()
+        let config1 = AppConfig(defaults: defaults)
         config1.dataSource = .server
-        XCTAssertEqual(UserDefaults.standard.string(forKey: "dataSource"), "server")
-        XCTAssertNil(UserDefaults.standard.object(forKey: "useSampleData"))
+        XCTAssertEqual(defaults.string(forKey: "dataSource"), "server")
+        XCTAssertNil(defaults.object(forKey: "useSampleData"))
 
-        // Simulate app relaunch
-        let config2 = AppConfig()
+        // Simulate app relaunch with same persistent defaults
+        let config2 = AppConfig(defaults: defaults)
         XCTAssertEqual(config2.dataSource, .server)
     }
 }

@@ -161,12 +161,11 @@ final class SampleAPITests: XCTestCase {
 
     @MainActor
     func testGenerateViewModelRefreshHeadlines() async throws {
-        let appConfig = AppConfig()
+        let suite = UserDefaults(suiteName: "test.api.headlines.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
         appConfig.dataSource = .offline
         appConfig.localJSONDelay = 0
         let testSource = "🇮🇳 India Top Stories & Breaking"
-        UserDefaults.standard.removeObject(forKey: "headlinesCache_" + testSource)
-        UserDefaults.standard.removeObject(forKey: "selectedHeadline_" + testSource)
         let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
         viewModel.selectedStorySource = testSource
         viewModel.topic = ""
@@ -178,7 +177,8 @@ final class SampleAPITests: XCTestCase {
 
     @MainActor
     func testGenerateViewModelLoadNewsCategories() async throws {
-        let appConfig = AppConfig()
+        let suite = UserDefaults(suiteName: "test.api.categories.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
         appConfig.dataSource = .offline
         let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
         await viewModel.loadNewsCategories()
