@@ -128,11 +128,11 @@
 			isa = PBXGroup;
 			children = (
 				G004 /* App */,
-				G005 /* Models */,
 				G011 /* Core */,
-				G006 /* Services */,
-				G007 /* ViewModels */,
-				G008 /* Views */,
+				G024 /* Domain */,
+				G020 /* Infra */,
+				G015 /* Platform */,
+				G021 /* Presentation */,
 				G009 /* Resources */,
 			);
 			path = Sources/ScriptMakerMac;
@@ -150,10 +150,34 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		G005 /* Models */ = {
+		G024 /* Domain */ = {
 			isa = PBXGroup;
-			children = ( R002 /* PipelineModels.swift */, R040 /* Story.swift */, );
-			path = Models;
+			children = (
+				G013 /* Entities */,
+				G014 /* Services */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		G013 /* Entities */ = {
+			isa = PBXGroup;
+			children = (
+				R002 /* PipelineModels.swift */,
+				R040 /* Story.swift */,
+			);
+			path = Entities;
+			sourceTree = "<group>";
+		};
+		G014 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				R028 /* PipelineService.swift */,
+				R034 /* ImageService.swift */,
+				R029 /* APIError.swift */,
+				R032 /* StoryRepository.swift */,
+				R025 /* WebClient.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		G011 /* Core */ = {
@@ -162,41 +186,70 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
-		G006 /* Services */ = {
+		G015 /* Platform */ = {
 			isa = PBXGroup;
 			children = (
-				R003 /* AppConfig.swift */,
-				R025 /* WebClient.swift */,
+				G016 /* Repositories */,
+				G017 /* DataSources */,
+				G018 /* WebClients */,
+				G019 /* Mappers */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		G016 /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+				R036 /* LocalStoryRepository.swift */,
+			);
+			path = Repositories;
+			sourceTree = "<group>";
+		};
+		G017 /* DataSources */ = {
+			isa = PBXGroup;
+			children = (
+				R033 /* StoryDataSource.swift */,
+				R022 /* SampleData.swift */,
+			);
+			path = DataSources;
+			sourceTree = "<group>";
+		};
+		G018 /* WebClients */ = {
+			isa = PBXGroup;
+			children = (
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
-				R028 /* PipelineService.swift */,
-				R029 /* APIError.swift */,
-				R022 /* SampleData.swift */,
-				R032 /* StoryRepository.swift */,
-				R033 /* StoryDataSource.swift */,
-				R034 /* ImageService.swift */,
-				R036 /* LocalStoryRepository.swift */,
-				R037 /* InfraStore.swift */,
-				R041 /* StoryMapper.swift */,
 			);
-			path = Services;
+			path = WebClients;
 			sourceTree = "<group>";
 		};
-		G007 /* ViewModels */ = {
+		G019 /* Mappers */ = {
 			isa = PBXGroup;
 			children = (
-				R005 /* ContentViewModel.swift */,
-				R006 /* PreferencesViewModel.swift */,
-				R007 /* GenerateViewModel.swift */,
-				R035 /* ThumbnailViewModel.swift */,
-				R035 /* ThumbnailViewModel.swift */,
-				R018 /* ServerAddressBarViewModel.swift */,
-				R023 /* LibraryViewModel.swift */,
+				R041 /* StoryMapper.swift */,
 			);
-			path = ViewModels;
+			path = Mappers;
 			sourceTree = "<group>";
 		};
-		G008 /* Views */ = {
+		G020 /* Infra */ = {
+			isa = PBXGroup;
+			children = (
+				R037 /* InfraStore.swift */,
+				R003 /* AppConfig.swift */,
+			);
+			path = Infra;
+			sourceTree = "<group>";
+		};
+		G021 /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				G022 /* Views */,
+				G023 /* ViewModels */,
+			);
+			path = Presentation;
+			sourceTree = "<group>";
+		};
+		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
 				R008 /* ContentView.swift */,
@@ -214,6 +267,19 @@
 				R021 /* RenderStageView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		G023 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				R005 /* ContentViewModel.swift */,
+				R006 /* PreferencesViewModel.swift */,
+				R007 /* GenerateViewModel.swift */,
+				R035 /* ThumbnailViewModel.swift */,
+				R018 /* ServerAddressBarViewModel.swift */,
+				R023 /* LibraryViewModel.swift */,
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 		G009 /* Resources */ = {
