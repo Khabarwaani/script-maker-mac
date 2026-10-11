@@ -9,6 +9,7 @@
 		F001 /* ScriptMakerMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = R001 /* ScriptMakerMacApp.swift */; };
 		F035 /* CoreUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = R039 /* CoreUtilities.swift */; };
 		F036 /* Story.swift in Sources */ = {isa = PBXBuildFile; fileRef = R040 /* Story.swift */; };
+		F043 /* StudioConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = R047 /* StudioConfig.swift */; };
 		F002 /* PipelineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = R002 /* PipelineModels.swift */; };
 		F003 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = R003 /* AppConfig.swift */; };
 		F005 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R005 /* ContentViewModel.swift */; };
@@ -65,6 +66,7 @@
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
 		R039 /* CoreUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreUtilities.swift; sourceTree = "<group>"; };
 		R040 /* Story.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Story.swift; sourceTree = "<group>"; };
+		R047 /* StudioConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioConfig.swift; sourceTree = "<group>"; };
 		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
 		R003 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		R005 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 			children = (
 				R002 /* PipelineModels.swift */,
 				R040 /* Story.swift */,
+				R047 /* StudioConfig.swift */,
 			);
 			path = Entities;
 			sourceTree = "<group>";
@@ -398,6 +401,7 @@
 				F001 /* ScriptMakerMacApp.swift in Sources */,
 				F035 /* CoreUtilities.swift in Sources */,
 				F036 /* Story.swift in Sources */,
+				F043 /* StudioConfig.swift in Sources */,
 				F002 /* PipelineModels.swift in Sources */,
 				F003 /* AppConfig.swift in Sources */,
 				F022 /* WebClient.swift in Sources */,
