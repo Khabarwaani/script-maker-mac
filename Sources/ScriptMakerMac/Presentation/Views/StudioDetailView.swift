@@ -255,11 +255,7 @@ struct StudioDetailView: View {
         let isRunning = stage.status.lowercased() == "running"
         let isSelected = viewModel.currentStage?.rawValue == stage.type
         return HStack(spacing: 5) {
-            if isRunning {
-                ProgressView().scaleEffect(0.55).frame(width: 12, height: 12)
-            } else {
-                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-            }
+            Image(systemName: isDone ? "checkmark.circle.fill" : isRunning ? "arrow.triangle.2.circlepath" : "circle")
             Text("Stage \(stage.id): \(stage.label)")
         }
         .font(.caption)

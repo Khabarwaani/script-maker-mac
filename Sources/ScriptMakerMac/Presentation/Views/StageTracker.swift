@@ -219,9 +219,9 @@ struct StageDropboxView: View {
     private func statusIcon(for status: String) -> some View {
         switch status.lowercased() {
         case "running":
-            ProgressView()
-                .scaleEffect(0.65)
-                .frame(width: 16, height: 16)
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(AppTheme.accent)
+                .font(.body)
         case "success", "done", "complete", "passed":
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(AppTheme.success)
@@ -355,9 +355,9 @@ struct SubstepDropboxView: View {
     private func substepStatusIcon(for status: String) -> some View {
         switch status.lowercased() {
         case "running":
-            ProgressView()
-                .scaleEffect(0.55)
-                .frame(width: 14, height: 14)
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(AppTheme.accent)
+                .font(.caption)
         case "success", "done", "complete", "passed":
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(AppTheme.success)
