@@ -17,16 +17,16 @@ struct ContentView: View {
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        _generateViewModel = StateObject(
+        _generateViewModel = State(
             wrappedValue: GenerateViewModel(config: viewModel.config)
         )
-        _libraryViewModel = StateObject(
+        _libraryViewModel = State(
             wrappedValue: LibraryViewModel(config: viewModel.config)
         )
-        _addressBarViewModel = StateObject(
+        _addressBarViewModel = State(
             wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
         )
-        _preferencesViewModel = StateObject(
+        _preferencesViewModel = State(
             wrappedValue: PreferencesViewModel(config: viewModel.config)
         )
     }
