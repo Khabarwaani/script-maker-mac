@@ -68,7 +68,7 @@ final class AppConfig {
         let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
-        return "v\(version) · \(commit)"
+        return "Script Maker (v\(version) - \(commit))"
     }
 
     var serverURL: String {
