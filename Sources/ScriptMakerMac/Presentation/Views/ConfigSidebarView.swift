@@ -46,7 +46,25 @@ struct ConfigSidebarView: View {
             }
             if viewModel.isHashtagSource {
                 StudioRow("Trending hashtag", inset: 0) {
-                    StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
+                    HStack(spacing: 8) {
+                        if viewModel.trendingHashtags.isEmpty {
+                            Text(viewModel.isRefreshingHashtags ? "Loading hashtags…" : "No data")
+                                .font(.callout)
+                                .foregroundStyle(AppTheme.secondaryInk)
+                                .padding(.leading, 10)
+                            Spacer()
+                        } else {
+                            StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
+                                .disabled(viewModel.isRefreshingHashtags)
+                        }
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingHashtags,
+                            helpText: "Refresh trending hashtags"
+                        ) {
+                            Task { await viewModel.refreshHashtags() }
+                        }
+                        .padding(.trailing, 10)
+                    }
                 }
                 StudioRow("Custom hashtag") { TextField("e.g. #MakeInIndia", text: $viewModel.customHashtag) }
             }

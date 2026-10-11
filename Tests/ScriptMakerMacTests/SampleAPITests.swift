@@ -185,6 +185,14 @@ final class SampleAPITests: XCTestCase {
         XCTAssertFalse(viewModel.storySources.isEmpty)
         XCTAssertTrue(viewModel.storySources.contains("🇮🇳 India Top Stories & Breaking"))
     }
+
+    @MainActor
+    func testGenerateViewModelRefreshHashtagsEmptyByDefault() async throws {
+        let suite = UserDefaults(suiteName: "test.api.hashtags.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        XCTAssertTrue(viewModel.trendingHashtags.isEmpty)
+    }
 }
 
 final class MockNewsURLProtocol: URLProtocol {
