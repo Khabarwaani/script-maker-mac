@@ -1,7 +1,7 @@
 # Failures
 
-Server CI (`xcodebuild`) is the gate. This VM is Linux and cannot run Xcode —
-a red CI run cannot be reproduced here; report it, don't guess.
+GitHub Actions CI (`xcodebuild test`) is the gate. Run tests locally only when diagnosing
+and reproducing a failure reported by CI. Report the failure verbatim before fixing.
 
 Triage:
 
