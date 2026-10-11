@@ -6,17 +6,34 @@ struct StoryListView: View {
     @State private var deletingAll = false
     @State private var isCollapsed = false
 
+    @State private var showingAddStorySheet = false
+    @State private var newStoryTitle = ""
+    @State private var newStorySummary = ""
+    @State private var newStoryScreenplay = ""
+    @State private var newStoryEmotion = ""
+    @State private var newStoryFormat = ""
+
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
+            HStack(spacing: 12) {
                 Button { isCollapsed.toggle() } label: {
                     Label("Stories · \(viewModel.stories.count)", systemImage: isCollapsed ? "chevron.right" : "chevron.down")
                         .font(.headline)
                 }.buttonStyle(.plain).help(Text(verbatim: isCollapsed ? "Expand stories" : "Collapse stories"))
+
                 Spacer()
+
+                Button {
+                    showingAddStorySheet = true
+                } label: {
+                    Label("Add Story", systemImage: "plus")
+                }
+                .help(Text(verbatim: "Add or import a story to the library"))
+
                 Button { Task { await viewModel.refresh() } } label: {
                     Image(systemName: "arrow.clockwise")
                 }.help(Text(verbatim: "Refresh library")).disabled(viewModel.isLoading)
+
                 Button { deletingAll = true } label: {
                     Image(systemName: "trash")
                 }.help(Text(verbatim: "Delete all stories")).accessibilityLabel("Delete all stories")
@@ -56,6 +73,65 @@ struct StoryListView: View {
         } message: {
             Text("All \(viewModel.stories.count) saved stories will be permanently deleted. This cannot be undone.")
         }
+        .sheet(isPresented: $showingAddStorySheet) {
+            NavigationStack {
+                Form {
+                    Section("Story Details") {
+                        TextField("Title", text: $newStoryTitle)
+                        TextField("Emotion (e.g. Curiosity)", text: $newStoryEmotion)
+                        TextField("Format (e.g. Normal Talk)", text: $newStoryFormat)
+                    }
+                    Section("Summary") {
+                        TextField("Summary", text: $newStorySummary, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
+                    Section("Screenplay") {
+                        TextField("Screenplay content…", text: $newStoryScreenplay, axis: .vertical)
+                            .lineLimit(6...12)
+                    }
+                }
+                .formStyle(.grouped)
+                .navigationTitle("Add Story")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            resetNewStoryForm()
+                            showingAddStorySheet = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            let title = newStoryTitle
+                            let summary = newStorySummary
+                            let screenplay = newStoryScreenplay
+                            let emotion = newStoryEmotion
+                            let format = newStoryFormat
+                            Task {
+                                await viewModel.addStory(
+                                    title: title,
+                                    summary: summary,
+                                    screenplay: screenplay,
+                                    emotion: emotion,
+                                    format: format
+                                )
+                            }
+                            resetNewStoryForm()
+                            showingAddStorySheet = false
+                        }
+                        .disabled(newStoryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                .frame(minWidth: 480, minHeight: 460)
+            }
+        }
+    }
+
+    private func resetNewStoryForm() {
+        newStoryTitle = ""
+        newStorySummary = ""
+        newStoryScreenplay = ""
+        newStoryEmotion = ""
+        newStoryFormat = ""
     }
 
     private func storyList(limit: Int? = nil) -> some View {

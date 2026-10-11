@@ -466,6 +466,44 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertTrue(generator.streamExtraDetails.isEmpty)
         XCTAssertFalse(generator.isSavedToLibrary)
     }
+
+    func testStudioConfigAutoSavesOnChange() async throws {
+        let suite = UserDefaults(suiteName: "test.config.autosave.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
+        let generator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+
+        // Default dialogue/scripts should be 1
+        XCTAssertEqual(generator.scriptCount, 1)
+
+        // Modify duration, scriptCount, emotion, etc.
+        generator.duration = 45
+        generator.scriptCount = 2
+        generator.selectedEmotion = "Shock"
+        generator.selectedFormat = "Debate"
+        generator.characterCount = 2
+
+        // Verify changes were immediately persisted to AppConfig without calling start()
+        let saved = try XCTUnwrap(appConfig.loadStudioConfig())
+        XCTAssertEqual(saved.duration, 45)
+        XCTAssertEqual(saved.scriptCount, 2)
+        XCTAssertEqual(saved.emotion, "Shock")
+        XCTAssertEqual(saved.format, "Debate")
+        XCTAssertEqual(saved.characterCount, 2)
+
+        // Verify a new ViewModel restored the exact persisted values
+        let restoredGenerator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+        XCTAssertEqual(restoredGenerator.duration, 45)
+        XCTAssertEqual(restoredGenerator.scriptCount, 2)
+        XCTAssertEqual(restoredGenerator.selectedEmotion, "Shock")
+        XCTAssertEqual(restoredGenerator.selectedFormat, "Debate")
+        XCTAssertEqual(restoredGenerator.characterCount, 2)
+
+        // Verify resetting configuration resets scriptCount back to 1 and auto-saves
+        restoredGenerator.resetConfiguration(save: true)
+        XCTAssertEqual(restoredGenerator.scriptCount, 1)
+        let resetSaved = try XCTUnwrap(appConfig.loadStudioConfig())
+        XCTAssertEqual(resetSaved.scriptCount, 1)
+    }
 }
 
 final class LocalSimulationTests: XCTestCase {

@@ -148,7 +148,7 @@ struct ConfigSidebarView: View {
 
     private var configurationSection: some View {
         StudioSection("Configuration") {
-            Button("Reset") { viewModel.resetConfiguration() }.help(Text(verbatim: "Restore defaults"))
+            Button("Reset") { viewModel.resetConfiguration(save: true) }.help(Text(verbatim: "Restore defaults"))
         } content: {
             StudioRow("Duration (s)") {
                 StudioNumberInput("Duration", value: $viewModel.duration, range: 1...Int.max, step: 5)

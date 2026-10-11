@@ -127,12 +127,12 @@ struct PipelineService: Sendable {
         // Use typed JSONDecoder for Stream API Contract v1
         if let decoded = try? JSONDecoder().decode(CreatorStreamEvent.self, from: data) {
             // Extract raw dictionaries for stage/substep output payloads
-            if case .outputStage(let step, let status, let outputType, _, let llmCalls) = decoded,
+            if case .outputStage(let step, let status, let outputType, let elapsedMs, _, let llmCalls) = decoded,
                let output = rawDict["output"] as? [String: Any] {
-                return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
-            } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, _) = decoded,
+                return .outputStage(step: step, status: status, outputType: outputType, elapsedMs: elapsedMs, output: output, llmCalls: llmCalls)
+            } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, let elapsedMs, _) = decoded,
                       let output = rawDict["output"] as? [String: Any] {
-                return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, output: output)
+                return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, elapsedMs: elapsedMs, output: output)
             } else if case .unknown(let type, _) = decoded {
                 return .unknown(type: type, data: rawDict)
             }

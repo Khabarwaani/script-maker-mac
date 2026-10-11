@@ -22,8 +22,6 @@ struct StageTracker: View {
                     Text("— Running")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.secondaryInk)
-                    ProgressView()
-                        .scaleEffect(0.7)
                 } else {
                     Text("— Complete")
                         .font(.subheadline)
@@ -93,8 +91,9 @@ struct StreamProgressAccordionView: View {
 
                 if viewModel.isRunning {
                     HStack(spacing: 6) {
-                        ProgressView()
-                            .scaleEffect(0.6)
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.accent)
                         Text("Live Stream")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(AppTheme.accent)
@@ -105,8 +104,9 @@ struct StreamProgressAccordionView: View {
             if viewModel.streamStages.isEmpty {
                 HStack(spacing: 8) {
                     if viewModel.isRunning {
-                        ProgressView()
-                            .scaleEffect(0.7)
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.callout)
+                            .foregroundStyle(AppTheme.accent)
                         Text("Connecting to generation stream…")
                             .font(.callout)
                             .foregroundStyle(AppTheme.secondaryInk)
@@ -152,8 +152,9 @@ struct StageDropboxView: View {
                     if stage.substeps.isEmpty {
                         if stage.status.lowercased() == "running" {
                             HStack(spacing: 8) {
-                                ProgressView()
-                                    .scaleEffect(0.7)
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.accent)
                                 Text("Executing stage…")
                                     .font(.caption)
                                     .foregroundStyle(AppTheme.secondaryInk)
@@ -199,6 +200,15 @@ struct StageDropboxView: View {
                     Text("Stage \(stage.id): \(stage.label)")
                         .font(.headline)
                         .foregroundStyle(AppTheme.ink)
+
+                    if let elapsed = stage.formattedElapsed {
+                        Text(elapsed)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(AppTheme.secondaryInk)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.sunken, in: Capsule())
+                    }
 
                     Spacer()
 
@@ -342,6 +352,12 @@ struct SubstepDropboxView: View {
             Text(substep.name)
                 .font(.callout)
                 .foregroundStyle(AppTheme.ink)
+
+            if let elapsed = substep.formattedElapsed {
+                Text(elapsed)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(AppTheme.secondaryInk)
+            }
 
             Spacer()
 

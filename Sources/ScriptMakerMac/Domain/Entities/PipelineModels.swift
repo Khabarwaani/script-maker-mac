@@ -97,18 +97,21 @@ public struct StreamProgressStagePayload: Codable, Sendable, Equatable {
     public let position: Int
     public let stageType: String
     public let status: String
+    public let elapsedMs: Int?
 
-    public init(position: Int, stageType: String, status: String, type: String? = "progress_stage") {
+    public init(position: Int, stageType: String, status: String, elapsedMs: Int? = nil, type: String? = "progress_stage") {
         self.type = type
         self.position = position
         self.stageType = stageType
         self.status = status
+        self.elapsedMs = elapsedMs
     }
 
     enum CodingKeys: String, CodingKey {
         case type, position
         case stageType = "stage_type"
         case status
+        case elapsedMs = "elapsed_ms"
     }
 }
 
@@ -118,19 +121,22 @@ public struct StreamProgressSubstepPayload: Codable, Sendable, Equatable {
     public let substep: String
     public let substepType: String
     public let status: String
+    public let elapsedMs: Int?
 
-    public init(position: Int, substep: String, substepType: String, status: String, type: String? = "progress_substep") {
+    public init(position: Int, substep: String, substepType: String, status: String, elapsedMs: Int? = nil, type: String? = "progress_substep") {
         self.type = type
         self.position = position
         self.substep = substep
         self.substepType = substepType
         self.status = status
+        self.elapsedMs = elapsedMs
     }
 
     enum CodingKeys: String, CodingKey {
         case type, position, substep
         case substepType = "substep_type"
         case status
+        case elapsedMs = "elapsed_ms"
     }
 }
 
@@ -141,11 +147,13 @@ public struct StreamOutputSubstepPayload: Codable, Sendable {
     public let substepType: String
     public let name: String
     public let status: String
+    public let elapsedMs: Int?
 
     enum CodingKeys: String, CodingKey {
         case type, step, substep
         case substepType = "substep_type"
         case name, status
+        case elapsedMs = "elapsed_ms"
     }
 }
 
@@ -170,11 +178,13 @@ public struct StreamOutputStagePayload: Codable, Sendable {
     public let step: Int
     public let status: String
     public let outputType: String
+    public let elapsedMs: Int?
     public let llmCalls: [StreamLLMCall]?
 
     enum CodingKeys: String, CodingKey {
         case type, step, status
         case outputType = "output_type"
+        case elapsedMs = "elapsed_ms"
         case llmCalls = "llm_calls"
     }
 }
@@ -203,12 +213,19 @@ public struct StreamEndPayload: Codable, Sendable, Equatable {
     public let result: String?
     public let error: String?
     public let code: String?
+    public let elapsedMs: Int?
 
-    public init(result: String? = "success", error: String? = nil, code: String? = nil, type: String? = "end") {
+    public init(result: String? = "success", error: String? = nil, code: String? = nil, elapsedMs: Int? = nil, type: String? = "end") {
         self.type = type
         self.result = result
         self.error = error
         self.code = code
+        self.elapsedMs = elapsedMs
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, result, error, code
+        case elapsedMs = "elapsed_ms"
     }
 }
 
@@ -218,8 +235,8 @@ public enum CreatorStreamEvent: Sendable, Decodable {
     case planStage(StreamPlanStagePayload)
     case progressStage(StreamProgressStagePayload)
     case progressSubstep(StreamProgressSubstepPayload)
-    case outputSubstep(step: Int, substep: String, substepType: String, name: String, status: String, output: [String: Any])
-    case outputStage(step: Int, status: String, outputType: String, output: [String: Any], llmCalls: [StreamLLMCall]?)
+    case outputSubstep(step: Int, substep: String, substepType: String, name: String, status: String, elapsedMs: Int?, output: [String: Any])
+    case outputStage(step: Int, status: String, outputType: String, elapsedMs: Int?, output: [String: Any], llmCalls: [StreamLLMCall]?)
     case error(StreamErrorPayload)
     case end(StreamEndPayload?)
     case unknown(type: String, data: [String: Any])
@@ -244,10 +261,10 @@ public enum CreatorStreamEvent: Sendable, Decodable {
             self = .progressSubstep(try single.decode(StreamProgressSubstepPayload.self))
         case "output_substep":
             let meta = try single.decode(StreamOutputSubstepPayload.self)
-            self = .outputSubstep(step: meta.step, substep: meta.substep, substepType: meta.substepType, name: meta.name, status: meta.status, output: [:])
+            self = .outputSubstep(step: meta.step, substep: meta.substep, substepType: meta.substepType, name: meta.name, status: meta.status, elapsedMs: meta.elapsedMs, output: [:])
         case "output_stage":
             let meta = try single.decode(StreamOutputStagePayload.self)
-            self = .outputStage(step: meta.step, status: meta.status, outputType: meta.outputType, output: [:], llmCalls: meta.llmCalls)
+            self = .outputStage(step: meta.step, status: meta.status, outputType: meta.outputType, elapsedMs: meta.elapsedMs, output: [:], llmCalls: meta.llmCalls)
         case "error":
             self = .error(try single.decode(StreamErrorPayload.self))
         case "end":
@@ -299,6 +316,7 @@ public struct PipelineSubstepState: Identifiable, Equatable, Sendable {
     public var name: String
     public var status: String
     public var detail: String?
+    public var elapsedMs: Int?
     public var isExpanded: Bool
     public var extraDetails: [ExtraDetailItem]
 
@@ -308,6 +326,7 @@ public struct PipelineSubstepState: Identifiable, Equatable, Sendable {
         name: String,
         status: String = "pending",
         detail: String? = nil,
+        elapsedMs: Int? = nil,
         isExpanded: Bool = false,
         extraDetails: [ExtraDetailItem] = []
     ) {
@@ -316,6 +335,7 @@ public struct PipelineSubstepState: Identifiable, Equatable, Sendable {
         self.name = name
         self.status = status
         self.detail = detail
+        self.elapsedMs = elapsedMs
         self.isExpanded = isExpanded
         self.extraDetails = extraDetails
     }
@@ -325,6 +345,15 @@ public struct PipelineSubstepState: Identifiable, Equatable, Sendable {
         let dotCount = id.filter { $0 == "." }.count
         return max(0, dotCount - 1)
     }
+
+    public var formattedElapsed: String? {
+        guard let ms = elapsedMs, ms > 0 else { return nil }
+        if ms < 1000 {
+            return "\(ms)ms"
+        } else {
+            return String(format: "%.1fs", Double(ms) / 1000.0)
+        }
+    }
 }
 
 /// Dynamic stage state populated directly from stream events (`plan_stream`, `plan_stage`, etc.).
@@ -333,6 +362,7 @@ public struct PipelineStageState: Identifiable, Equatable, Sendable {
     public let type: String
     public var label: String
     public var status: String
+    public var elapsedMs: Int?
     public var substeps: [PipelineSubstepState]
     public var isExpanded: Bool
     public var outputSummary: String?
@@ -344,6 +374,7 @@ public struct PipelineStageState: Identifiable, Equatable, Sendable {
         lhs.type == rhs.type &&
         lhs.label == rhs.label &&
         lhs.status == rhs.status &&
+        lhs.elapsedMs == rhs.elapsedMs &&
         lhs.substeps == rhs.substeps &&
         lhs.isExpanded == rhs.isExpanded &&
         lhs.outputSummary == rhs.outputSummary &&
@@ -355,6 +386,7 @@ public struct PipelineStageState: Identifiable, Equatable, Sendable {
         type: String,
         label: String,
         status: String = "pending",
+        elapsedMs: Int? = nil,
         substeps: [PipelineSubstepState] = [],
         isExpanded: Bool = false,
         outputSummary: String? = nil,
@@ -365,11 +397,21 @@ public struct PipelineStageState: Identifiable, Equatable, Sendable {
         self.type = type
         self.label = label
         self.status = status
+        self.elapsedMs = elapsedMs
         self.substeps = substeps
         self.isExpanded = isExpanded
         self.outputSummary = outputSummary
         self.outputPayload = outputPayload
         self.extraDetails = extraDetails
+    }
+
+    public var formattedElapsed: String? {
+        guard let ms = elapsedMs, ms > 0 else { return nil }
+        if ms < 1000 {
+            return "\(ms)ms"
+        } else {
+            return String(format: "%.1fs", Double(ms) / 1000.0)
+        }
     }
 
     public var stageTypeEnum: PipelineStageType? {

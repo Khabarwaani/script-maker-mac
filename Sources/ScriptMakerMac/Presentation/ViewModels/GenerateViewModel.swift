@@ -18,7 +18,9 @@ final class GenerateViewModel {
     var appConfig: AppConfig { config }
 
     var topic: String = ""
-    var sampleStory: String = ""
+    var sampleStory: String = "" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     var sessionID: String?
     var currentStage: PipelineStage?
     var stagePayloads: [PipelineStage: [String: Any]] = [:]
@@ -85,33 +87,59 @@ final class GenerateViewModel {
     var hashtagItems: [NewsHashtag] = []
     var selectedHashtag: String = ""
     var hashtagsErrorMessage: String?
-    var customHashtag: String = ""
+    var customHashtag: String = "" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     var isRefreshingHashtags = false
+
+    private var isApplyingConfig = false
 
     // Configuration — verified against Streamlit 2026-10-11.
     // AI_SOURCES order; default Antigravity (#464). AI_POWERS; default Default.
     var aiSources: [String] = []
-    var selectedAISource: String = "Antigravity"
+    var selectedAISource: String = "Antigravity" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     var aiModels: [String] = ["Default"]
-    var selectedAIModel: String = "Default"
+    var selectedAIModel: String = "Default" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     var aiPowers: [String] = []
-    var selectedAIPower: String = "Default"
+    var selectedAIPower: String = "Default" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     /// Duration options mirror the Streamlit step-5 number input (5–60s).
     var durations: [Int] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
-    var duration: Int = 10
+    var duration: Int = 10 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     // ALL_EMOTIONS, frozen order (#354); default Curiosity.
     var emotions: [String] = []
-    var selectedEmotion: String = "Curiosity"
-    var scriptCount: Int = 1
-    var maxRetries: Int = 3
-    var characterCount: Int = 3
+    var selectedEmotion: String = "Curiosity" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var scriptCount: Int = 1 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var maxRetries: Int = 3 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var characterCount: Int = 3 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     // CHARACTER_KINDS; default Human.
     var characterKinds: [String] = []
-    var selectedCharacterKind: String = "Human"
-    var characterKindDetail: String = ""
+    var selectedCharacterKind: String = "Human" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var characterKindDetail: String = "" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     // Format catalog names; default Normal Talk.
     var formats: [String] = []
-    var selectedFormat: String = "Normal Talk"
+    var selectedFormat: String = "Normal Talk" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
 
     // Generation mode: Continuous (run all stages) or Step-Wise (manual advance).
     enum WorkflowMode: String, CaseIterable, Identifiable {
@@ -129,6 +157,8 @@ final class GenerateViewModel {
         self.config = config
         self.repository = repository
         self.catalogProvider = catalogProvider
+        self.isApplyingConfig = true
+        defer { self.isApplyingConfig = false }
         loadCatalog()
         resetConfiguration()
         syncAIConfigurationFromConfig()
@@ -198,8 +228,14 @@ final class GenerateViewModel {
         }
     }
 
-    func resetConfiguration() {
+    func resetConfiguration(save: Bool = false) {
         guard let defaults = catalog?.defaults else { return }
+        let wasApplying = isApplyingConfig
+        isApplyingConfig = true
+        defer {
+            isApplyingConfig = wasApplying
+            if save { saveStudioConfig() }
+        }
         selectedAISource = defaults.aiSource
         selectedAIModel = defaults.aiModel
         selectedAIPower = defaults.aiPower
@@ -254,6 +290,8 @@ final class GenerateViewModel {
     /// Restore a saved Studio configuration. Stored values outside the current
     /// option lists (e.g. from an older build) are ignored, keeping defaults.
     private func applyStudioConfig(_ c: StudioConfig) {
+        isApplyingConfig = true
+        defer { isApplyingConfig = false }
         if aiSources.contains(c.ai.source) { selectedAISource = c.ai.source }
         updateAIOptions()
         if aiModels.contains(c.ai.model) { selectedAIModel = c.ai.model }
@@ -366,6 +404,7 @@ final class GenerateViewModel {
         topic = ""
         headlinesErrorMessage = nil
         hashtagsErrorMessage = nil
+        saveStudioConfig()
         if isHashtagSource {
             await refreshHashtags()
         } else if !isManualSource {
@@ -586,6 +625,9 @@ final class GenerateViewModel {
                     }
                     if let idx = streamStages.firstIndex(where: { $0.type == progress.stageType }) {
                         streamStages[idx].status = progress.status
+                        if let ms = progress.elapsedMs {
+                            streamStages[idx].elapsedMs = ms
+                        }
                         if progress.status.lowercased() == "running" {
                             streamStages[idx].isExpanded = true
                         }
@@ -603,18 +645,22 @@ final class GenerateViewModel {
                     if let sIdx = streamStages.firstIndex(where: { $0.type == progress.substepType }) {
                         if let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == progress.substep }) {
                             streamStages[sIdx].substeps[subIdx].status = progress.status
+                            if let ms = progress.elapsedMs {
+                                streamStages[sIdx].substeps[subIdx].elapsedMs = ms
+                            }
                         } else {
                             streamStages[sIdx].substeps.append(PipelineSubstepState(
                                 id: progress.substep,
                                 substepType: progress.substepType,
                                 name: "\(progress.substepType.capitalized) \(progress.substep)",
-                                status: progress.status
+                                status: progress.status,
+                                elapsedMs: progress.elapsedMs
                             ))
                         }
                         streamStages[sIdx].isExpanded = true
                     }
 
-                case .outputSubstep(let step, let substep, let substepType, let name, let status, let output):
+                case .outputSubstep(let step, let substep, let substepType, let name, let status, let elapsedMs, let output):
                     _ = step
                     let sub = SubstepEvent(
                         name: substep,
@@ -636,6 +682,7 @@ final class GenerateViewModel {
                     if let sIdx = streamStages.firstIndex(where: { $0.type == substepType }) {
                         if let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == substep }) {
                             streamStages[sIdx].substeps[subIdx].status = status
+                            if let ms = elapsedMs { streamStages[sIdx].substeps[subIdx].elapsedMs = ms }
                             if !name.isEmpty { streamStages[sIdx].substeps[subIdx].name = name }
                             streamStages[sIdx].substeps[subIdx].detail = detailText
                             streamStages[sIdx].substeps[subIdx].extraDetails = subExtra
@@ -646,12 +693,13 @@ final class GenerateViewModel {
                                 name: name.isEmpty ? substep : name,
                                 status: status,
                                 detail: detailText,
+                                elapsedMs: elapsedMs,
                                 extraDetails: subExtra
                             ))
                         }
                     }
 
-                case .outputStage(let step, let status, let outputType, let output, _):
+                case .outputStage(let step, let status, let outputType, let elapsedMs, let output, _):
                     _ = step
                     if let stageEnum = PipelineStageType(rawValue: outputType) {
                         stagePayloads[stageEnum] = output
@@ -678,6 +726,7 @@ final class GenerateViewModel {
 
                     if let sIdx = streamStages.firstIndex(where: { $0.type == outputType }) {
                         streamStages[sIdx].status = status
+                        if let ms = elapsedMs { streamStages[sIdx].elapsedMs = ms }
                         streamStages[sIdx].outputPayload = output
                         streamStages[sIdx].extraDetails = stageExtra
                         if let notes = output["notes"] as? String {

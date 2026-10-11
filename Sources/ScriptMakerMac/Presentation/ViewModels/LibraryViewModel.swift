@@ -63,6 +63,27 @@ final class LibraryViewModel {
         }
     }
 
+    /// Add a new story manually to the library.
+    func addStory(title: String, summary: String = "", screenplay: String = "", emotion: String = "", format: String = "", videoURL: String? = nil) async {
+        let newStory = Story(
+            id: UUID().uuidString,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Story" : title,
+            summary: summary,
+            headline: "",
+            createdAt: DateFormatting.iso8601Now(),
+            status: "completed",
+            emotion: emotion,
+            format: format,
+            videoURL: videoURL,
+            scriptText: screenplay.isEmpty ? nil : screenplay,
+            generationNumber: nil,
+            stageOutputs: nil
+        )
+        await repository.save(newStory)
+        stories.insert(newStory, at: 0)
+        selectedStoryID = newStory.id
+    }
+
     /// Delete a story (from local store; server deletion when API supports it).
     func deleteStory(id: String) async {
         let local = await repository.all()
