@@ -2,24 +2,43 @@ import Foundation
 
 // MARK: - Models
 
-/// A pipeline stage in the stepwise flow.
-enum PipelineStage: String, CaseIterable, Identifiable {
-    case verify, characters, dialogue, scenes, storyboard, validation
+/// A pipeline stage type according to Stream API Contract v1.
+public enum PipelineStageType: String, CaseIterable, Identifiable, Codable, Sendable {
+    case validation
+    case casting
+    case dialogue
+    case scenes
+    case storyboard
+    case script
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
-        case .verify: return "Verify facts"
-        case .characters: return "Characters"
-        case .dialogue: return "Dialogue"
-        case .scenes: return "Scenes"
-        case .storyboard: return "Storyboard"
-        case .validation: return "Integration & Final Validation"
+        case .validation: return "Instruction Decomposition & Wire Fact Validation"
+        case .casting: return "Viral Angles & Hindi Hooks"
+        case .dialogue: return "Spoken Dialogue Writing & Word Count Calibration"
+        case .scenes: return "Scene Derivation from Dialogue"
+        case .storyboard: return "Scene Storyboards & Cinematic Visual Direction"
+        case .script: return "Integration & Final Validation"
         }
     }
 }
 
+/// Backward compatibility alias for PipelineStage
+typealias PipelineStage = PipelineStageType
+
+/// An SSE event from POST /api/v1/stories/stream (Stream API Contract v1).
+public enum CreatorStreamEvent: Sendable {
+    case planStream(version: String, stages: [[String: Any]])
+    case planStage(position: Int, stageType: String, substeps: [[String: Any]])
+    case progressStage(position: Int, stageType: String, status: String)
+    case progressSubstep(position: Int, substep: String, stageType: String, status: String)
+    case outputSubstep(step: Int, substep: String, substepType: String, name: String, status: String, output: [String: Any])
+    case outputStage(step: Int, status: String, outputType: String, output: [String: Any], llmCalls: [[String: Any]]?)
+    case error(message: String, stage: Int?, failedSubstep: String?)
+    case end
+}
 enum PipelineJob: String {
     case render
 }

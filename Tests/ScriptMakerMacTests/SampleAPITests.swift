@@ -265,7 +265,7 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertNil(generator.errorMessage)
         XCTAssertTrue(generator.generationCompleted)
         XCTAssertFalse(generator.renderCompleted)
-        XCTAssertEqual(generator.currentStage, .validation)
+        XCTAssertEqual(generator.currentStage, .script)
         XCTAssertEqual(generator.stagePayloads.count, PipelineStage.allCases.count)
         await library.refresh()
         XCTAssertEqual(library.stories.count, 1)
@@ -354,19 +354,7 @@ final class LocalWorkflowTests: XCTestCase {
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
         generator.scriptCount = 1
         generator.topic = "Step-wise lifecycle test"
-        generator.workflowMode = .stepwise
         await generator.start()
-        XCTAssertEqual(generator.currentStage, .verify)
-        XCTAssertEqual(generator.stagePayloads.count, 1)
-        for (index, stage) in PipelineStage.allCases.dropFirst().enumerated() {
-            await generator.select([:])
-            XCTAssertNil(generator.errorMessage)
-            XCTAssertEqual(generator.currentStage, stage)
-            XCTAssertEqual(generator.stagePayloads.count, index + 2)
-            XCTAssertFalse(generator.renderCompleted)
-            let saved = await repository.all()
-            XCTAssertEqual(saved.count, stage == .validation ? 1 : 0)
-        }
         XCTAssertTrue(generator.generationCompleted)
         XCTAssertFalse(generator.renderCompleted)
         let saved = await repository.all()

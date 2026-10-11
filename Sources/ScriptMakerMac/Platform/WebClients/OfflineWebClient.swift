@@ -167,6 +167,81 @@ struct OfflineWebClient: WebClient {
         )
     }
 
+    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let stagesMeta = [
+                        ["id": 1, "type": "validation", "label": "Instruction Decomposition & Wire Fact Validation"],
+                        ["id": 2, "type": "casting", "label": "Viral Angles & Hindi Hooks"],
+                        ["id": 3, "type": "dialogue", "label": "Spoken Dialogue Writing & Word Count Calibration"],
+                        ["id": 4, "type": "scenes", "label": "Scene Derivation from Dialogue"],
+                        ["id": 5, "type": "storyboard", "label": "Scene Storyboards & Cinematic Visual Direction"],
+                        ["id": 6, "type": "script", "label": "Integration & Final Validation"]
+                    ]
+
+                    continuation.yield(.planStream(version: "5.1.2", stages: stagesMeta))
+                    try await pause()
+
+                    for (idx, meta) in stagesMeta.enumerated() {
+                        let position = idx + 1
+                        let stageType = meta["type"] as? String ?? ""
+                        let label = meta["label"] as? String ?? ""
+
+                        let substeps = [
+                            ["id": "\(position).1", "substep_type": stageType, "name": "\(label) - Step 1"],
+                            ["id": "\(position).2", "substep_type": stageType, "name": "\(label) - Step 2"]
+                        ]
+
+                        continuation.yield(.planStage(position: position, stageType: stageType, substeps: substeps))
+                        continuation.yield(.progressStage(position: position, stageType: stageType, status: "running"))
+
+                        for sub in substeps {
+                            let subId = sub["id"] ?? ""
+                            let subName = sub["name"] ?? ""
+                            continuation.yield(.progressSubstep(position: position, substep: subId, stageType: stageType, status: "running"))
+                            try await pause()
+                            continuation.yield(.outputSubstep(
+                                step: position,
+                                substep: subId,
+                                substepType: stageType,
+                                name: subName,
+                                status: "success",
+                                output: ["result": "OK"]
+                            ))
+                        }
+
+                        // Load sample output for this stage
+                        var stageSample = SampleData.json(for: stageType) ?? [:]
+                        let key = stageType == "dialogue" ? "scripts" : stageType == "storyboard" ? "storyboards" : (stageType == "script" || stageType == "validation") ? "scripts" : nil
+                        if let key, let templates = stageSample[key] as? [[String: Any]], !templates.isEmpty {
+                            let count = max(params["batch_size"] as? Int ?? templates.count, 1)
+                            stageSample[key] = (0..<count).map { index in
+                                var item = templates[index % templates.count]
+                                let title = item["title"] as? String ?? "Sample story"
+                                if index >= templates.count { item["title"] = "\(title) — Sample \(index + 1)" }
+                                return item
+                            }
+                        }
+
+                        continuation.yield(.outputStage(
+                            step: position,
+                            status: "success",
+                            outputType: stageType,
+                            output: stageSample,
+                            llmCalls: nil
+                        ))
+                    }
+
+                    continuation.yield(.end)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
     func verifyNewsEndpoints() async throws -> Bool {
         try await pause()
         return true

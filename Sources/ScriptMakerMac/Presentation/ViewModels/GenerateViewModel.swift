@@ -57,6 +57,7 @@ final class GenerateViewModel {
     var selectedStorySource: String = "🇮🇳 India Top Stories & Breaking"
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
     var trendingHashtags: [String] = []
+    var hashtagItems: [NewsHashtag] = []
     var selectedHashtag: String = ""
     var hashtagsErrorMessage: String?
     var customHashtag: String = ""
@@ -320,6 +321,19 @@ final class GenerateViewModel {
         config.saveLastSelectedHeadline(headline, forSource: cacheKey)
     }
 
+    /// User selected a trending hashtag.
+    func onHashtagChanged(_ tag: String) {
+        selectedHashtag = tag
+        if let match = hashtagItems.first(where: { $0.tag == tag }), let headline = match.headline, !headline.isEmpty {
+            selectedHeadline = headline
+            topic = headline
+        } else if !tag.isEmpty {
+            let derived = tag.replacingOccurrences(of: "#", with: "")
+            selectedHeadline = derived
+            topic = derived
+        }
+    }
+
     /// Handles story source selection change to load headlines or hashtags.
     func onStorySourceChanged() async {
         headlines = []
@@ -343,27 +357,32 @@ final class GenerateViewModel {
             let service = try api()
             // 1. Direct dedicated hashtags endpoint
             if let hashtagResponse = try? await service.fetchTrendingHashtags(n: 15), !hashtagResponse.hashtags.isEmpty {
+                hashtagItems = hashtagResponse.hashtags
                 trendingHashtags = hashtagResponse.hashtags.map(\.tag)
-                if let first = trendingHashtags.first, selectedHashtag.isEmpty {
-                    selectedHashtag = first
+                if let first = hashtagResponse.hashtags.first {
+                    onHashtagChanged(first.tag)
                 }
                 return
             }
 
             // 2. Fallback: extract hashtags from top titles
             let response = try await service.fetchTopTitles(category: "trending", n: 10, mode: nil)
-            var extracted: [String] = []
+            var extracted: [NewsHashtag] = []
             for item in response.titles {
                 let words = item.title.components(separatedBy: .whitespacesAndNewlines)
                 for w in words where w.hasPrefix("#") && w.count > 1 {
-                    if !extracted.contains(w) { extracted.append(w) }
+                    if !extracted.contains(where: { $0.tag == w }) {
+                        extracted.append(NewsHashtag(tag: w, headline: item.title, link: item.link, source: "Trending"))
+                    }
                 }
             }
-            trendingHashtags = extracted
-            if let first = trendingHashtags.first, selectedHashtag.isEmpty {
-                selectedHashtag = first
+            hashtagItems = extracted
+            trendingHashtags = extracted.map(\.tag)
+            if let first = extracted.first {
+                onHashtagChanged(first.tag)
             }
         } catch {
+            hashtagItems = []
             trendingHashtags = []
             if !isLocalJSON {
                 hashtagsErrorMessage = error.localizedDescription
@@ -452,7 +471,7 @@ final class GenerateViewModel {
 
     // MARK: - Flow
 
-    /// Start a new session and run the first stage.
+    /// Start story generation stream according to Contract v1.
     func start() async {
         guard !isRunning else { return }
         saveStudioConfig()
@@ -461,11 +480,92 @@ final class GenerateViewModel {
         defer { isRunning = false }
         do {
             let api = try api()
-            let sid = try await api.createSession()
-            sessionID = sid
-            listenForEvents(api: api, sessionID: sid)
-            try await runStage(.verify, api: api, inputs: stageInputs())
-            if workflowMode == .continuous { try await continueAutomatically(api: api) }
+            let streamParams: [String: Any] = [
+                "news_input": topic,
+                "ai_source": selectedAISource,
+                "ai_model": selectedAIModel,
+                "ai_power": selectedAIPower,
+                "batch_size": scriptCount,
+                "target_seconds": duration,
+                "max_retries": maxRetries,
+                "character_count": characterCount,
+                "character_kind": selectedCharacterKind,
+                "character_detail": characterKindDetail,
+                "scene_style": selectedFormat,
+                "preferred_emotion": selectedEmotion,
+                "sample_story": sampleStory,
+                "instruction": instructionText,
+                "mode": config.dataSource == .server ? "live" : "sample"
+            ]
+
+            sessionID = UUID().uuidString
+            for try await event in api.createAndStreamStory(params: streamParams) {
+                switch event {
+                case .planStream(_, _):
+                    break
+
+                case .planStage(let position, let stageType, _):
+                    if let stageEnum = PipelineStageType(rawValue: stageType) {
+                        currentStage = stageEnum
+                    } else if position >= 1 && position <= PipelineStageType.allCases.count {
+                        currentStage = PipelineStageType.allCases[position - 1]
+                    }
+
+                case .progressStage(let position, let stageType, let status):
+                    if let stageEnum = PipelineStageType(rawValue: stageType) {
+                        currentStage = stageEnum
+                    } else if position >= 1 && position <= PipelineStageType.allCases.count {
+                        currentStage = PipelineStageType.allCases[position - 1]
+                    }
+                    if let cur = currentStage {
+                        let sub = SubstepEvent(
+                            name: cur.rawValue,
+                            stage: cur.rawValue,
+                            label: cur.title,
+                            status: status,
+                            detail: "Status: \(status)"
+                        )
+                        events.append(sub)
+                    }
+
+                case .progressSubstep(_, let substep, let stageType, let status):
+                    let sub = SubstepEvent(
+                        name: substep,
+                        stage: stageType,
+                        label: "\(stageType.capitalized) substep \(substep)",
+                        status: status,
+                        detail: "Working..."
+                    )
+                    events.append(sub)
+
+                case .outputSubstep(_, let substep, let substepType, let name, let status, _):
+                    let sub = SubstepEvent(
+                        name: substep,
+                        stage: substepType,
+                        label: name.isEmpty ? substep : name,
+                        status: status,
+                        detail: status
+                    )
+                    events.append(sub)
+
+                case .outputStage(let step, _, let outputType, let output, _):
+                    if let stageEnum = PipelineStageType(rawValue: outputType) {
+                        stagePayloads[stageEnum] = output
+                        currentStage = stageEnum
+                    } else if step >= 1 && step <= PipelineStageType.allCases.count {
+                        let stageEnum = PipelineStageType.allCases[step - 1]
+                        stagePayloads[stageEnum] = output
+                        currentStage = stageEnum
+                    }
+
+                case .error(let message, _, _):
+                    errorMessage = message
+
+                case .end:
+                    generationCompleted = true
+                    await saveToLibrary()
+                }
+            }
         } catch {
             setError(error)
         }
@@ -644,7 +744,8 @@ final class GenerateViewModel {
 
     /// Save the completed generation to the Library via the repository.
     private func saveToLibrary() async {
-        let scripts = stagePayloads[.validation]?["scripts"] as? [[String: Any]]
+        let scripts = stagePayloads[.script]?["scripts"] as? [[String: Any]]
+            ?? stagePayloads[.validation]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.storyboard]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.dialogue]?["scripts"] as? [[String: Any]] ?? []
         for (index, script) in scripts.enumerated() {
@@ -663,7 +764,7 @@ final class GenerateViewModel {
             }
             let id = generatedStoryIDs[index] ?? UUID().uuidString
             generatedStoryIDs[index] = id
-            let title = script["title"] as? String ?? ""
+            let title = script["title"] as? String ?? topic
             let boards = stagePayloads[.storyboard]?["storyboards"] as? [[String: Any]] ?? []
             let board = boards.indices.contains(index) ? boards[index] : [:]
             let story = Story(

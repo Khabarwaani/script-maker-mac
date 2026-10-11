@@ -242,6 +242,112 @@ struct NetworkWebClient: WebClient {
         }
     }
 
+    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let url = baseURL.appendingPathComponent("api/v1/stories/stream")
+                    var req = URLRequest(url: url)
+                    req.httpMethod = "POST"
+                    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    req.httpBody = try JSONSerialization.data(withJSONObject: params)
+
+                    let (bytes, response) = try await httpClient.bytes(for: req)
+                    guard let http = response as? HTTPURLResponse else {
+                        throw APIError.transport("No HTTP response")
+                    }
+                    guard 200..<300 ~= http.statusCode else {
+                        throw APIError.badStatus(http.statusCode)
+                    }
+
+                    var eventName = "message"
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("event:") {
+                            eventName = line.dropFirst(6).trimmingCharacters(in: .whitespaces)
+                        } else if line.hasPrefix("data:") {
+                            let payloadStr = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+                            if let event = Self.parseCreatorEvent(name: eventName, json: payloadStr) {
+                                continuation.yield(event)
+                                if case .end = event {
+                                    continuation.finish()
+                                    return
+                                }
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    private static func parseCreatorEvent(name: String, json: String) -> CreatorStreamEvent? {
+        if name == "end" { return .end }
+        guard let data = json.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        let type = dict["type"] as? String ?? name
+
+        switch type {
+        case "plan_stream":
+            let version = dict["version"] as? String ?? "1.0.0"
+            let stages = dict["stages"] as? [[String: Any]] ?? []
+            return .planStream(version: version, stages: stages)
+
+        case "plan_stage":
+            let position = dict["position"] as? Int ?? 1
+            let stageType = dict["stage_type"] as? String ?? ""
+            let substeps = dict["substeps"] as? [[String: Any]] ?? []
+            return .planStage(position: position, stageType: stageType, substeps: substeps)
+
+        case "progress_stage":
+            let position = dict["position"] as? Int ?? 1
+            let stageType = dict["stage_type"] as? String ?? ""
+            let status = dict["status"] as? String ?? "running"
+            return .progressStage(position: position, stageType: stageType, status: status)
+
+        case "progress_substep":
+            let position = dict["position"] as? Int ?? 1
+            let substep = dict["substep"] as? String ?? ""
+            let stageType = dict["substep_type"] as? String ?? ""
+            let status = dict["status"] as? String ?? "running"
+            return .progressSubstep(position: position, substep: substep, stageType: stageType, status: status)
+
+        case "output_substep":
+            let step = dict["step"] as? Int ?? 1
+            let substep = dict["substep"] as? String ?? ""
+            let substepType = dict["substep_type"] as? String ?? ""
+            let name = dict["name"] as? String ?? ""
+            let status = dict["status"] as? String ?? "success"
+            let output = dict["output"] as? [String: Any] ?? [:]
+            return .outputSubstep(step: step, substep: substep, substepType: substepType, name: name, status: status, output: output)
+
+        case "output_stage":
+            let step = dict["step"] as? Int ?? 1
+            let status = dict["status"] as? String ?? "success"
+            let outputType = dict["output_type"] as? String ?? ""
+            let output = dict["output"] as? [String: Any] ?? [:]
+            let llmCalls = dict["llm_calls"] as? [[String: Any]]
+            return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
+
+        case "error":
+            let message = dict["error"] as? String ?? dict["message"] as? String ?? json
+            let stage = dict["stage"] as? Int
+            let failedSubstep = dict["failed_substep"] as? String
+            return .error(message: message, stage: stage, failedSubstep: failedSubstep)
+
+        case "end":
+            return .end
+
+        default:
+            return nil
+        }
+    }
+
     func verifyNewsEndpoints() async throws -> Bool {
         _ = try await fetchNewsCategories()
         _ = try await fetchTopTitles(category: nil, n: 1, mode: "sample")

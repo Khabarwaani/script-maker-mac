@@ -82,6 +82,10 @@ struct PipelineService: Sendable {
         try await client.fetchTrendingHashtags(n: n)
     }
 
+    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
+        client.createAndStreamStory(params: params)
+    }
+
     func verifyNewsEndpoints() async throws -> Bool {
         try await client.verifyNewsEndpoints()
     }

@@ -186,11 +186,11 @@ struct StudioDetailView: View {
     @ViewBuilder
     private func stageDetailView(for stage: PipelineStage, payload: [String: Any]) -> some View {
         switch stage {
-        case .verify:
+        case .validation:
             VerifyStageView(payload: payload) {
                 Task { await viewModel.select([:]) }
             }
-        case .characters:
+        case .casting:
             CharactersStageView(payload: payload) { selection in
                 Task { await viewModel.select(selection) }
             }
@@ -206,7 +206,7 @@ struct StudioDetailView: View {
             StoryboardStageView(payload: payload, config: viewModel.appConfig) {
                 Task { await viewModel.select([:]) }
             }
-        case .validation:
+        case .script:
             IntegrationStageView(payload: payload, viewModel: viewModel)
         }
     }

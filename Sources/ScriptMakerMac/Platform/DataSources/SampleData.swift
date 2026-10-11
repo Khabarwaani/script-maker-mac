@@ -19,9 +19,15 @@ struct BundledStudioCatalog: StudioCatalogProviding {
 enum SampleData {
     /// Raw JSON data for a sample file (e.g. "verify" -> verify.json).
     static func data(for name: String) -> Data? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "json", subdirectory: "Samples") else {
+        let mappedName: String
+        switch name {
+        case "casting": mappedName = "characters"
+        case "script": mappedName = "validation"
+        default: mappedName = name
+        }
+        guard let url = Bundle.main.url(forResource: mappedName, withExtension: "json", subdirectory: "Samples") else {
             // Fallback for unit tests / SwiftPM layouts.
-            return Bundle.main.url(forResource: name, withExtension: "json")
+            return Bundle.main.url(forResource: mappedName, withExtension: "json")
                 .flatMap { try? Data(contentsOf: $0) }
         }
         return try? Data(contentsOf: url)

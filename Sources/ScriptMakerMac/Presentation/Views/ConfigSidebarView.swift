@@ -73,6 +73,9 @@ struct ConfigSidebarView: View {
                         } else {
                             StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
                                 .disabled(viewModel.isRefreshingHashtags)
+                                .onChange(of: viewModel.selectedHashtag) { _, new in
+                                    viewModel.onHashtagChanged(new)
+                                }
                         }
                         StudioRefreshButton(
                             isRefreshing: viewModel.isRefreshingHashtags,
