@@ -72,6 +72,17 @@ struct FileStore: Sendable {
     func exists(at url: URL) -> Bool {
         fileManager.fileExists(atPath: url.path)
     }
+
+    func importMedia(_ source: URL) throws -> URL {
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("ScriptMakerMac/Media", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        let destination = root.appendingPathComponent(UUID().uuidString).appendingPathExtension(source.pathExtension)
+        try fileManager.copyItem(at: source, to: destination)
+        return destination
+    }
 }
 
 @MainActor

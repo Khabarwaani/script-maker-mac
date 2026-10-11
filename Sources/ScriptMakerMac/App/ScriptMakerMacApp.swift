@@ -31,10 +31,10 @@ enum CompositionRoot {
     static func makeContentViewModel() -> ContentViewModel {
         let config = AppConfig()
         let checker = ServerConnectionChecker(httpClient: HTTPClient())
-        let preferences = PreferencesViewModel(config: config, connectionChecker: checker)
+        let preferences = PreferencesViewModel(config: config, connectionChecker: checker, modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()))
         let repository = LocalStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
-        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()))
+        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()))
         return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library)
     }
 }

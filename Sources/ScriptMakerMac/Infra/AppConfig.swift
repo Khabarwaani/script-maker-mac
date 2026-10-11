@@ -43,6 +43,26 @@ final class AppConfig {
         didSet { UserDefaults.standard.set(localJSONDelay, forKey: "localJSONDelay") }
     }
 
+    var selectedAI: AIConfig {
+        didSet { UserDefaults.standard.set(selectedAI.identifier, forKey: "selectedAIIdentifier") }
+    }
+    var recentAIIdentifiers: [String] {
+        didSet { UserDefaults.standard.set(recentAIIdentifiers, forKey: "recentAIIdentifiers") }
+    }
+    var libraryAIEngine: String {
+        get { selectedAI.source == "None" ? "None" : selectedAI.identifier }
+        set { selectedAI = AIConfig(identifier: newValue) ?? AIConfig(source: newValue, model: "Default", power: "Default") }
+    }
+
+    func selectAI(_ selection: AIConfig) {
+        let previous = selectedAI.identifier
+        selectedAI = selection
+        var recent = [selection.identifier] + recentAIIdentifiers
+        if !recent.contains(previous) { recent.append(previous) }
+        var seen = Set<String>()
+        recentAIIdentifiers = Array(recent.filter { seen.insert($0).inserted }.prefix(5))
+    }
+
     var buildTitle: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
@@ -62,6 +82,9 @@ final class AppConfig {
     }
 
     init() {
+        let savedAI = UserDefaults.standard.data(forKey: "studioConfig").flatMap { try? JSONDecoder().decode(StudioConfig.self, from: $0) }?.ai
+        self.selectedAI = UserDefaults.standard.string(forKey: "selectedAIIdentifier").flatMap(AIConfig.init(identifier:)) ?? savedAI ?? AIConfig(source: "Antigravity", model: "Default", power: "Default")
+        self.recentAIIdentifiers = Array((UserDefaults.standard.stringArray(forKey: "recentAIIdentifiers") ?? []).filter { AIConfig(identifier: $0) != nil }.prefix(5))
         self.localJSONDelay = UserDefaults.standard.object(forKey: "localJSONDelay") as? Double ?? 1
         self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)

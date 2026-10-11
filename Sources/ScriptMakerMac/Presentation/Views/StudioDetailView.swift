@@ -71,8 +71,10 @@ struct StudioDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
                     .textSelection(.enabled)
             } else if viewModel.isRunning {
-                ProgressView("Generating \(viewModel.currentStage?.title.lowercased() ?? "story")…")
-                    .padding(24)
+                HStack {
+                    StudioActivityIndicator()
+                    Text("Generating \(viewModel.currentStage?.title.lowercased() ?? "story")…")
+                }.padding(24)
             }
 
             // Completed stages as collapsible output cards.
@@ -126,7 +128,7 @@ struct StudioDetailView: View {
             }
 
             if viewModel.isRunning && viewModel.currentStage == nil {
-                ProgressView().scaleEffect(0.8)
+                StudioActivityIndicator()
             }
         }
     }

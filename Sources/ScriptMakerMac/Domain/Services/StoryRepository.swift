@@ -21,3 +21,15 @@ protocol StoryRepository: Sendable {
 protocol ClipboardWriting {
     func write(_ text: String) -> Bool
 }
+
+protocol LibraryUpdating: Sendable {
+    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
+                localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult
+}
+
+enum LibraryMediaKind { case image, video }
+
+protocol LibraryMediaImporting: Sendable {
+    func importFile(_ url: URL) async throws -> URL
+    func imageData(at url: URL) async throws -> Data
+}

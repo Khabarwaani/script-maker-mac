@@ -17,6 +17,10 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var scriptText: String?
     var generationNumber: Int?
     var stageOutputs: [String: String]?
+    var imageURLs: [String]?
+    var scriptVersions: [StoryScriptVersion]?
+    var sourceStoryID: String?
+    var currentScriptVersionID: String?
 
     init(
         id: String = UUID().uuidString,
@@ -32,7 +36,11 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         sourceLinks: [StorySourceLink]? = nil,
         scriptText: String? = nil,
         generationNumber: Int? = nil,
-        stageOutputs: [String: String]? = nil
+        stageOutputs: [String: String]? = nil,
+        imageURLs: [String]? = nil,
+        scriptVersions: [StoryScriptVersion]? = nil,
+        sourceStoryID: String? = nil,
+        currentScriptVersionID: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -48,6 +56,46 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.scriptText = scriptText
         self.generationNumber = generationNumber
         self.stageOutputs = stageOutputs
+        self.imageURLs = imageURLs
+        self.scriptVersions = scriptVersions
+        self.sourceStoryID = sourceStoryID
+        self.currentScriptVersionID = currentScriptVersionID
+    }
+}
+
+struct StoryScriptVersion: Codable, Sendable, Hashable, Identifiable {
+    var id: String = UUID().uuidString
+    let number: Int
+    let text: String
+    let createdAt: String
+    let instruction: String?
+}
+
+enum LibraryUpdate: String, CaseIterable, Sendable, Hashable {
+    case hashtags, images, news, refine
+}
+
+enum LibraryRemovedItem {
+    case hashtag(String), image(String), news(StorySourceLink), video(String)
+}
+
+struct LibraryUpdateResult: Codable, Sendable {
+    var hashtags: [String]?
+    var images: [String]?
+    var news: [StorySourceLink]?
+    var script: String?
+}
+
+enum StoryCopyFormat: String, CaseIterable, Identifiable {
+    case script = "Script", tags = "Script + Tags", media = "Script + Media", all = "All"
+    var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .script: return "doc.text"
+        case .tags: return "number"
+        case .media: return "photo"
+        case .all: return "square.stack"
+        }
     }
 }
 

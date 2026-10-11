@@ -6,6 +6,7 @@
 	objectVersion = 56;
 	objects = {
 		/* Build files */
+        Blibrary /* library_updates.json in Resources */ = {isa = PBXBuildFile; fileRef = Jlibrary; };
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
         E013 = {isa = PBXBuildFile; fileRef = E003; };
@@ -127,6 +128,7 @@
 		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
 		Jheadlines /* headlines.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = headlines.json; sourceTree = "<group>"; };
 		Jservers /* servers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = servers.json; sourceTree = "<group>"; };
+		Jlibrary /* library_updates.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
@@ -332,6 +334,7 @@
 				Jstoryboard /* storyboard.json */,
 				Jrender /* validation.json */,
 				Jstories /* stories.json */,
+                Jlibrary /* library_updates.json */,
 				Jservers /* servers.json */,
 				Jheadlines /* headlines.json */,
 			);
@@ -499,7 +502,7 @@ P006 /* Build revision */ = {
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, );
+			files = ( Blibrary /* library_updates.json in Resources */, F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {

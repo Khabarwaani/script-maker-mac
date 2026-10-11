@@ -4,6 +4,24 @@ protocol StudioCatalogProviding {
     func load() throws -> StudioCatalog
 }
 
+protocol AIModelCatalogProviding {
+    func load(localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> AIModelCatalog
+}
+
+struct AIModelCatalog: Codable {
+    let providers: [Provider]
+    struct Provider: Codable {
+        let id: String
+        let label: String
+        let models: [Model]
+    }
+    struct Model: Codable {
+        let id: String
+        let label: String
+        let reasoning: [String]
+    }
+}
+
 struct StudioCatalog: Decodable {
     let storySources: [String]
     let aiSources: [String]
