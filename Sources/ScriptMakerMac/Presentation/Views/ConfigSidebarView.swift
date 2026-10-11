@@ -110,7 +110,7 @@ struct ConfigSidebarView: View {
             if let notice = viewModel.setupNotice { Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
             Button { Task { await viewModel.start() } } label: {
                 HStack {
-                    if viewModel.isRunning { ProgressView().controlSize(.small) }
+                    if viewModel.isRunning { StudioActivityIndicator() }
                     Text(viewModel.isRunning ? "Generating…" : "Generate")
                 }.frame(maxWidth: .infinity)
             }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)

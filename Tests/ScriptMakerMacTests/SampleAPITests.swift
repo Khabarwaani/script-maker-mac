@@ -328,13 +328,88 @@ final class LocalSimulationTests: XCTestCase {
 
 @MainActor
 final class LibraryDetailTests: XCTestCase {
-    func testRefinementPreviewRequiresAcceptanceAndVersionsKeepIdentity() async throws {
+    func testMultiSelectionDeletionKeepsUnselectedStoriesAndRejectsServerBatch() async {
+        let repo = WorkflowStoryRepository()
+        let stories = (1...4).map { Story(title: "Story \($0)", scriptText: "Script \($0)") }
+        for story in stories { await repo.save(story) }
+        let vm = LibraryViewModel(config: AppConfig(), repository: repo)
+        vm.stories = stories
+        vm.selectAllStories()
+        XCTAssertEqual(vm.selectedStoryIDs.count, 4)
+        vm.selectStories([stories[0].id, stories[2].id])
+        XCTAssertEqual(vm.selectedStoryIDs.count, 2)
+        XCTAssertTrue(vm.selectedStoryIDs.contains(vm.selectedStoryID ?? ""))
+        await vm.deleteStories(ids: vm.selectedStoryIDs)
+        XCTAssertEqual(Set(vm.stories.map(\.id)), Set([stories[1].id, stories[3].id]))
+        XCTAssertNotNil(vm.selectedStory)
+        let persisted = await repo.all()
+        XCTAssertEqual(persisted.count, 2)
+        vm.selectStories([])
+        XCTAssertNil(vm.selectedStoryID)
+        XCTAssertTrue(vm.selectedStoryIDs.isEmpty)
+        let remote = Story(title: "Server-only story")
+        vm.stories.append(remote)
+        vm.selectStories([stories[1].id, remote.id])
+        await vm.deleteStories(ids: vm.selectedStoryIDs)
+        XCTAssertEqual(vm.stories.count, 3)
+        let untouched = await repo.all()
+        XCTAssertEqual(untouched.count, 2)
+        XCTAssertTrue(vm.notice?.contains("No stories were deleted") ?? false)
+    }
+
+    func testCrossRemovalAndUndoPreserveStoryAndOtherItems() async throws {
+        let repo = WorkflowStoryRepository()
+        let link = StorySourceLink(title: "Wire", url: "https://example.com/news", source: "Wire")
+        let story = Story(title: "Removals", videoURL: "https://example.com/video.mp4", hashtags: ["#One", "#Two"], sourceLinks: [link], scriptText: "Keep script", imageURLs: ["sample://one", "sample://two"])
+        await repo.save(story)
+        let vm = LibraryViewModel(config: AppConfig(), repository: repo)
+        vm.stories = [story]; vm.selectedStoryID = story.id
+        await vm.remove(.hashtag("#One"), from: story.id)
+        XCTAssertEqual(vm.selectedStory?.hashtags, ["#Two"])
+        XCTAssertTrue(vm.canUndoRemoval)
+        await vm.undoRemoval()
+        XCTAssertEqual(Set(vm.selectedStory?.hashtags ?? []), Set(["#One", "#Two"]))
+        await vm.remove(.image("sample://one"), from: story.id)
+        XCTAssertEqual(vm.selectedStory?.imageURLs, ["sample://two"])
+        await vm.undoRemoval()
+        XCTAssertEqual(vm.selectedStory?.imageURLs?.count, 2)
+        await vm.remove(.news(link), from: story.id)
+        XCTAssertEqual(vm.selectedStory?.sourceLinks, [])
+        await vm.undoRemoval()
+        XCTAssertEqual(vm.selectedStory?.sourceLinks, [link])
+        await vm.remove(.video("https://example.com/video.mp4"), from: story.id)
+        XCTAssertNil(vm.selectedStory?.videoURL)
+        await vm.undoRemoval()
+        XCTAssertEqual(vm.selectedStory?.videoURL, "https://example.com/video.mp4")
+        XCTAssertEqual(vm.selectedStory?.id, story.id)
+        XCTAssertEqual(vm.selectedStory?.scriptText, "Keep script")
+    }
+
+    func testMediaImportPersistsAttachmentAndFailureKeepsStory() async {
+        let repo = WorkflowStoryRepository()
+        let story = Story(title: "Media", scriptText: "Keep script")
+        await repo.save(story)
+        let imported = URL(fileURLWithPath: "/tmp/imported-image.png")
+        let vm = LibraryViewModel(config: AppConfig(), repository: repo, mediaImporter: TestMediaImporter(destination: imported))
+        vm.stories = [story]; vm.selectedStoryID = story.id
+        await vm.importMedia(URL(fileURLWithPath: "/tmp/source.png"), kind: .image, storyID: story.id)
+        XCTAssertEqual(vm.selectedStory?.imageURLs, [imported.absoluteString])
+        XCTAssertNotNil(vm.imagePreviews[imported.absoluteString])
+        XCTAssertEqual(vm.selectedStory?.id, story.id)
+        let failing = LibraryViewModel(config: AppConfig(), repository: repo, mediaImporter: TestMediaImporter(destination: imported, fails: true))
+        failing.stories = vm.stories; failing.selectedStoryID = story.id
+        await failing.importMedia(URL(fileURLWithPath: "/tmp/source.mp4"), kind: .video, storyID: story.id)
+        XCTAssertNil(failing.selectedStory?.videoURL)
+        XCTAssertTrue(failing.actionNotice?.contains("Could not import media") ?? false)
+        XCTAssertFalse(failing.isImportingMedia)
+    }
+    func testRefinementPreviewRequiresAcceptanceAndSavesSeparateStory() async throws {
         let config = AppConfig()
         let originalSource = config.dataSource, originalEngine = config.libraryAIEngine
         let originalDelay = config.localJSONDelay
         defer { config.dataSource = originalSource; config.libraryAIEngine = originalEngine; config.localJSONDelay = originalDelay }
         config.dataSource = .offline; config.localJSONDelay = 0; config.libraryAIEngine = "Antigravity"
-        let original = Story(title: "Original title", scriptText: "Original script")
+        let original = Story(title: "Original title", createdAt: "2020-01-01T00:00:00Z", scriptText: "Original script")
         let other = Story(title: "Other story", scriptText: "Other script")
         let repo = WorkflowStoryRepository()
         await repo.save(original); await repo.save(other)
@@ -347,13 +422,16 @@ final class LibraryDetailTests: XCTestCase {
         vm.refinementInstruction = "A later draft instruction"
         await vm.acceptRefinement()
         let accepted = try XCTUnwrap(vm.selectedStory)
-        XCTAssertEqual(accepted.id, original.id)
-        XCTAssertEqual(accepted.createdAt, original.createdAt)
+        XCTAssertNotEqual(accepted.id, original.id)
+        XCTAssertEqual(accepted.title, original.title)
+        XCTAssertNotEqual(accepted.createdAt, original.createdAt)
+        XCTAssertEqual(accepted.sourceStoryID, original.id)
+        XCTAssertEqual(accepted.generationNumber, 2)
         XCTAssertEqual(accepted.scriptVersions?.count, 2)
         XCTAssertEqual(accepted.scriptVersions?.last?.instruction, "Tighten hook")
         XCTAssertNotEqual(accepted.scriptText, original.scriptText)
         let first = try XCTUnwrap(accepted.scriptVersions?.first)
-        await vm.useVersion(first, storyID: original.id)
+        await vm.useVersion(first, storyID: accepted.id)
         XCTAssertEqual(vm.selectedStory?.scriptText, original.scriptText)
         await vm.update(.refine)
         vm.selectedStoryID = other.id
@@ -361,26 +439,32 @@ final class LibraryDetailTests: XCTestCase {
         await vm.acceptRefinement()
         XCTAssertEqual(vm.selectedStory?.scriptText, other.scriptText)
         let saved = await repo.all()
-        let persisted = try XCTUnwrap(saved.first { $0.id == original.id })
+        XCTAssertEqual(saved.first { $0.id == original.id }?.scriptText, "Original script")
+        XCTAssertNil(saved.first { $0.id == original.id }?.scriptVersions)
+        let persisted = try XCTUnwrap(saved.first { $0.id == accepted.id })
         let encoded = try JSONEncoder().encode(persisted)
         XCTAssertEqual(try JSONDecoder().decode(Story.self, from: encoded).scriptVersions?.count, 2)
     }
 
-    func testEditingUpdatesSameStoryAndCopyFormatsUseCurrentContent() async throws {
+    func testEditingCreatesNewUUIDAndSubtitleWhileCopyUsesNewContent() async throws {
         let repo = WorkflowStoryRepository()
-        var story = Story(title: "Before", scriptText: "Old script")
+        var story = Story(title: "Before", createdAt: "2020-01-01T00:00:00Z", scriptText: "Old script")
         story.hashtags = ["#News"]; story.imageURLs = ["https://example.com/image.jpg"]
         story.sourceLinks = [StorySourceLink(title: "News", url: "https://example.com/news", source: "Wire")]
         await repo.save(story)
         let vm = LibraryViewModel(config: AppConfig(), repository: repo)
         vm.stories = [story]; vm.selectedStoryID = story.id
-        vm.prepareEdits(story); vm.editedTitle = "After"; vm.editedScript = "Current script"
+        vm.prepareEdits(story); vm.editedScript = "Current script"
         let saved = await vm.saveEdits(id: story.id)
         XCTAssertTrue(saved)
         let current = try XCTUnwrap(vm.selectedStory)
-        XCTAssertEqual(current.id, story.id)
-        XCTAssertEqual(current.createdAt, story.createdAt)
-        XCTAssertEqual(current.title, "After")
+        XCTAssertNotEqual(current.id, story.id)
+        XCTAssertNotEqual(current.createdAt, story.createdAt)
+        XCTAssertEqual(current.title, story.title)
+        XCTAssertEqual(current.generationNumber, 2)
+        XCTAssertEqual(current.sourceStoryID, story.id)
+        XCTAssertEqual(vm.stories.count, 2)
+        XCTAssertEqual(vm.stories.first { $0.id == story.id }, story)
         XCTAssertEqual(vm.copyText(for: current, format: .script), "Current script")
         XCTAssertEqual(vm.copyText(for: current, format: .tags), "Current script\n\n#News")
         XCTAssertTrue(vm.copyText(for: current, format: .media).contains("https://example.com/image.jpg"))
@@ -393,6 +477,15 @@ final class LibraryDetailTests: XCTestCase {
         XCTAssertNil(vm.selectedStory?.sourceLinks)
         XCTAssertEqual(vm.selectedStory?.scriptText, "Current script")
         XCTAssertEqual(vm.selectedStory?.scriptVersions?.count, 2)
+        vm.prepareEdits(current)
+        vm.editedScript = "Another edited copy"
+        let secondSave = await vm.saveEdits(id: current.id)
+        XCTAssertTrue(secondSave)
+        XCTAssertEqual(vm.stories.count, 3)
+        XCTAssertEqual(Set(vm.stories.map(\.id)).count, 3)
+        XCTAssertTrue(vm.stories.allSatisfy { $0.title == story.title })
+        XCTAssertEqual(vm.selectedStory?.generationNumber, 3)
+        XCTAssertEqual(vm.selectedStory?.sourceStoryID, story.id)
     }
 
     func testUpdatesPersistOnlyRequestedFields() async throws {
@@ -415,6 +508,16 @@ final class LibraryDetailTests: XCTestCase {
         XCTAssertEqual(vm.selectedStory?.id, story.id)
         XCTAssertTrue(vm.busyUpdates.isEmpty)
     }
+}
+
+private struct TestMediaImporter: LibraryMediaImporting {
+    let destination: URL
+    var fails = false
+    func importFile(_ url: URL) async throws -> URL {
+        if fails { throw APIError.transport("Test import failure") }
+        return destination
+    }
+    func imageData(at url: URL) async throws -> Data { Data([1, 2, 3]) }
 }
 
 final class LibraryNetworkContractTests: XCTestCase {

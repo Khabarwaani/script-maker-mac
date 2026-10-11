@@ -16,7 +16,13 @@ struct StoryDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     if let notice = viewModel.actionNotice {
-                        Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk)
+                        HStack {
+                            Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk)
+                            Spacer()
+                            if viewModel.canUndoRemoval {
+                                Button("Undo removal") { Task { await viewModel.undoRemoval() } }.buttonStyle(StudioButtonStyle())
+                            }
+                        }
                             .frame(maxWidth: .infinity, alignment: .leading).padding(12)
                             .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                     }
@@ -26,7 +32,7 @@ struct StoryDetailView: View {
                         Button {
                             viewModel.prepareEdits(story); showingEdit = true
                         } label: { Image(systemName: "pencil") }
-                        .buttonStyle(.plain).help("Edit title, summary and script")
+                        .buttonStyle(.plain).help("Edit and save as a new story")
                         .accessibilityLabel("Edit story")
                     }
                     if !story.summary.isEmpty {
@@ -52,6 +58,11 @@ struct StoryDetailView: View {
                         StoryDetailSection("Video") {
                             if let url = URL(string: videoURL) {
                                 StoryVideoPreview(url: url)
+                                    .overlay(alignment: .topTrailing) {
+                                        Button { Task { await viewModel.remove(.video(videoURL), from: story.id) } } label: {
+                                            Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)
+                                        }.buttonStyle(.plain).help("Remove video").accessibilityLabel("Remove video").padding(8)
+                                    }
                             }
                             Button("Merge closing clip") { onMerge(story.id) }
                                 .buttonStyle(StudioButtonStyle())
@@ -84,8 +95,7 @@ private struct StoryDetailToolbar: View {
     var body: some View {
         HStack(spacing: 12) {
             Button { Task { await viewModel.update(.images) } } label: {
-                LibraryActionLabel(icon: "photo.badge.arrow.down")
-                    .overlay { if viewModel.busyUpdates.contains(.images) { ProgressView().controlSize(.small) } }
+                LibraryActionLabel(icon: "photo.badge.arrow.down", isLoading: viewModel.busyUpdates.contains(.images))
             }.buttonStyle(.plain).help("Update images").accessibilityLabel("Update images")
                 .disabled(viewModel.busyUpdates.contains(.images))
             Divider().frame(height: 24)
@@ -96,7 +106,7 @@ private struct StoryDetailToolbar: View {
                 ShareLink(item: story.scriptText ?? "") { Label("Script", systemImage: "doc.text") }
                     .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
             } label: { Image(systemName: "square.and.arrow.up") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .menuStyle(.borderlessButton).menuIndicator(.hidden)
                 .modifier(LibraryActionFrame())
                 .help("Share story").accessibilityLabel("Share story")
             Menu {
@@ -111,14 +121,14 @@ private struct StoryDetailToolbar: View {
             } label: {
                 Image(systemName: "doc.on.doc")
             }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .menuStyle(.borderlessButton).menuIndicator(.hidden)
             .modifier(LibraryActionFrame())
             .help("Copy story content").accessibilityLabel("Copy story content")
             Menu {
                 Button("Add image…") { importKind = .image; showingImport = true }
                 Button("Add video…") { importKind = .video; showingImport = true }
             } label: { Image(systemName: "square.and.arrow.down") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().modifier(LibraryActionFrame())
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).modifier(LibraryActionFrame())
                 .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
             StudioOptionPicker("Library LLM", selection: $viewModel.selectedAIEngine, options: viewModel.aiEngines)
                 .frame(width: 190, height: 44).help("LLM for Library processing; None disables AI")
@@ -157,7 +167,7 @@ private struct StoryDetailHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(story.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")Generated \(DateFormatting.generationTime(story.createdAt))")
+            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? "Generated" : "Edited") \(DateFormatting.generationTime(story.createdAt))")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Text("UUID · \(story.id)").font(.caption.monospaced())
                 .foregroundStyle(AppTheme.secondaryInk).fixedSize(horizontal: false, vertical: true)
@@ -196,7 +206,13 @@ private struct StorySourcesSection: View {
                 if let tags = story.hashtags, !tags.isEmpty {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), alignment: .leading)], alignment: .leading, spacing: 8) {
                         ForEach(tags, id: \.self) { tag in
-                            Text(tag).font(.callout).padding(.horizontal, 8).padding(.vertical, 6)
+                            HStack(spacing: 6) {
+                                Text(tag).font(.callout)
+                                Button { Task { await viewModel.remove(.hashtag(tag), from: story.id) } } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }.buttonStyle(.plain).foregroundStyle(AppTheme.secondaryInk)
+                                    .help("Remove \(tag)").accessibilityLabel("Remove hashtag \(tag)")
+                            }.padding(.horizontal, 8).padding(.vertical, 6)
                                 .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
@@ -210,13 +226,20 @@ private struct StorySourcesSection: View {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(links, id: \.self) { link in
                             if let url = link.webURL {
-                                Link(destination: url) {
+                                HStack(alignment: .top, spacing: 8) {
+                                  Link(destination: url) {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(link.title).font(.callout)
                                         if !link.source.isEmpty {
                                             Text(link.source).font(.caption).foregroundStyle(AppTheme.secondaryInk)
                                         }
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                  }
+                                  Button { Task { await viewModel.remove(.news(link), from: story.id) } } label: {
+                                      Image(systemName: "xmark.circle.fill")
+                                  }.buttonStyle(.plain).foregroundStyle(AppTheme.secondaryInk)
+                                      .help("Remove source").accessibilityLabel("Remove news source \(link.title)")
                                 }
                             }
                         }
@@ -237,8 +260,10 @@ private struct LibraryUpdateButton: View {
     var body: some View {
         Button { Task { await viewModel.update(kind) } } label: {
             HStack(spacing: 8) {
-                if viewModel.busyUpdates.contains(kind) { ProgressView().controlSize(.small) }
-                else { Image(systemName: "arrow.clockwise") }
+                Group {
+                    if viewModel.busyUpdates.contains(kind) { StudioActivityIndicator() }
+                    else { Image(systemName: "arrow.clockwise") }
+                }.frame(width: 16, height: 16)
                 Text("Update \(kind.rawValue)")
             }
         }.buttonStyle(StudioButtonStyle()).disabled(viewModel.busyUpdates.contains(kind))
@@ -266,6 +291,12 @@ private struct StoryImagesSection: View {
                                 Link("Open image", destination: url)
                             }
                         }.padding(12).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(alignment: .topTrailing) {
+                                Button { Task { await viewModel.remove(.image(value), from: story.id) } } label: {
+                                    Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)
+                                }.buttonStyle(.plain).foregroundStyle(AppTheme.secondaryInk)
+                                    .help("Remove image").accessibilityLabel("Remove image").padding(4)
+                            }
                     }
                 }
             } else {
@@ -299,8 +330,11 @@ private struct StoryFineTuneSection: View {
                 .textFieldStyle(.roundedBorder).lineLimit(2...4).accessibilityLabel("Refinement instruction")
             Button { Task { await viewModel.update(.refine) } } label: {
                 HStack {
-                    if viewModel.busyUpdates.contains(.refine) { ProgressView().controlSize(.small) }
-                    Text(viewModel.busyUpdates.contains(.refine) ? "Fine tuning…" : "Fine tune script")
+                    Group {
+                        if viewModel.busyUpdates.contains(.refine) { StudioActivityIndicator() }
+                        else { Image(systemName: "sparkles") }
+                    }.frame(width: 16, height: 16)
+                    Text("Fine tune script")
                 }
             }.buttonStyle(StudioPrimaryButtonStyle())
                 .disabled(viewModel.busyUpdates.contains(.refine) || viewModel.selectedAIEngine == "None" || StringFormatting.isBlank(viewModel.refinementInstruction) || StringFormatting.isBlank(story.scriptText ?? ""))
@@ -312,8 +346,9 @@ private struct StoryFineTuneSection: View {
                     Text("Refinement preview").font(.headline)
                     Text(text).font(.body).lineSpacing(5).textSelection(.enabled)
                     HStack {
-                        Button("Add to current script") { Task { await viewModel.acceptRefinement() } }
+                        Button("Save as new story") { Task { await viewModel.acceptRefinement() } }
                             .buttonStyle(StudioPrimaryButtonStyle())
+                            .disabled(viewModel.isSavingEdits)
                         Button("Discard preview") { viewModel.refinement = nil }.buttonStyle(StudioButtonStyle())
                     }
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
@@ -336,11 +371,12 @@ private struct StoryVersionsSection: View {
                             if let instruction = version.instruction { Text(instruction).font(.callout) }
                             Text(version.text).lineSpacing(5).textSelection(.enabled)
                             Button("Use this version") { Task { await viewModel.useVersion(version, storyID: story.id) } }
-                                .buttonStyle(StudioButtonStyle()).disabled(story.scriptText == version.text)
+                                .buttonStyle(StudioButtonStyle()).disabled(viewModel.isCurrentVersion(version, in: story))
                         }.padding(.top, 12)
                     } label: {
-                        Text("Version \(version.number)\(story.scriptText == version.text ? " · Current" : "")")
-                    }.padding(12).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                        Text("Version \(version.number)\(viewModel.isCurrentVersion(version, in: story) ? " · Current" : "")")
+                    }.accessibilityLabel("Script version \(version.number)")
+                        .padding(12).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
@@ -355,18 +391,20 @@ private struct EditLibraryStoryView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Edit story").font(.title2.weight(.semibold))
             Text("Title").font(.headline)
-            TextField("Story title", text: $viewModel.editedTitle).textFieldStyle(.roundedBorder)
+            Text(viewModel.editedTitle).font(.body.weight(.medium)).textSelection(.enabled)
+            Text("The edited copy keeps this title and gets a new UUID and timestamp.")
+                .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Text("Summary").font(.headline)
             TextField("Summary", text: $viewModel.editedSummary, axis: .vertical).lineLimit(2...3).textFieldStyle(.roundedBorder)
             Text("Script").font(.headline)
             TextEditor(text: $viewModel.editedScript).font(.body).scrollContentBackground(.hidden).padding(8)
                 .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                 .background(ScrollBarConfiguration()).accessibilityLabel("Edit script")
-            Text("Saving a changed script creates a new version.").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+            Text("The original story remains in Library.").font(.caption).foregroundStyle(AppTheme.secondaryInk)
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(viewModel.isSavingEdits)
-                Button("Save changes") { Task { if await viewModel.saveEdits(id: storyID) { dismiss() } } }
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).buttonStyle(StudioButtonStyle()).disabled(viewModel.isSavingEdits)
+                Button("Save as new story") { Task { if await viewModel.saveEdits(id: storyID) { dismiss() } } }
                     .buttonStyle(StudioPrimaryButtonStyle()).keyboardShortcut(.defaultAction).disabled(!viewModel.canSaveEdits)
             }
         }.padding(24).frame(width: 620, height: 620).foregroundStyle(AppTheme.ink).background(AppTheme.card)

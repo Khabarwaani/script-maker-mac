@@ -16,7 +16,41 @@ final class LibraryViewModel {
     var selectedStoryID: String? {
         didSet {
             if selectedStoryID != oldValue { copyFeedback = nil; refinement = nil; refinementInstruction = ""; actionNotice = nil }
+            if let id = selectedStoryID, !selectedStoryIDs.contains(id) { selectedStoryIDs = [id] }
+            if selectedStoryID == nil { selectedStoryIDs = [] }
         }
+    }
+    private(set) var selectedStoryIDs: Set<String> = []
+    var isDeletingStories = false
+
+    func selectStories(_ ids: Set<String>) {
+        let previous = selectedStoryIDs
+        selectedStoryIDs = ids.intersection(Set(stories.map(\.id)))
+        if let added = stories.first(where: { selectedStoryIDs.contains($0.id) && !previous.contains($0.id) }) {
+            selectedStoryID = added.id
+        } else if !selectedStoryIDs.contains(selectedStoryID ?? "") {
+            selectedStoryID = stories.first { selectedStoryIDs.contains($0.id) }?.id
+        }
+    }
+
+    func selectAllStories() { selectStories(Set(stories.map(\.id))) }
+
+    func deleteStories(ids: Set<String>) async {
+        guard !ids.isEmpty, !isDeletingStories else { return }
+        isDeletingStories = true
+        defer { isDeletingStories = false }
+        let local = await repository.all()
+        guard ids.isSubset(of: Set(local.map(\.id))) else {
+            notice = "Server deletion is not available yet. No stories were deleted."
+            return
+        }
+        for id in ids { await repository.remove(id: id) }
+        stories.removeAll { ids.contains($0.id) }
+        selectedStoryIDs.subtract(ids)
+        if let selectedStoryID, ids.contains(selectedStoryID) {
+            self.selectedStoryID = stories.first { selectedStoryIDs.contains($0.id) }?.id ?? stories.first?.id
+        }
+        notice = nil
     }
     var isLoading = false
     var notice: String?
@@ -37,6 +71,35 @@ final class LibraryViewModel {
     var isSimulation: Bool { config.dataSource == .offline }
     var busyUpdates: Set<LibraryUpdate> = []
     var actionNotice: String?
+    private var removedItem: (storyID: String, item: LibraryRemovedItem)?
+    var canUndoRemoval: Bool { removedItem?.storyID == selectedStoryID && removedItem != nil }
+
+    func remove(_ item: LibraryRemovedItem, from storyID: String) async {
+        guard var story = stories.first(where: { $0.id == storyID }) else { return }
+        switch item {
+        case .hashtag(let value): story.hashtags?.removeAll { $0 == value }
+        case .image(let value): story.imageURLs?.removeAll { $0 == value }
+        case .news(let value): story.sourceLinks?.removeAll { $0 == value }
+        case .video: story.videoURL = nil
+        }
+        await persist(story)
+        removedItem = (storyID, item)
+        actionNotice = "Item removed"
+    }
+
+    func undoRemoval() async {
+        guard let removed = removedItem, removed.storyID == selectedStoryID,
+              var story = stories.first(where: { $0.id == removed.storyID }) else { return }
+        switch removed.item {
+        case .hashtag(let value): if !(story.hashtags ?? []).contains(value) { story.hashtags = (story.hashtags ?? []) + [value] }
+        case .image(let value): if !(story.imageURLs ?? []).contains(value) { story.imageURLs = (story.imageURLs ?? []) + [value] }
+        case .news(let value): if !(story.sourceLinks ?? []).contains(value) { story.sourceLinks = (story.sourceLinks ?? []) + [value] }
+        case .video(let value): story.videoURL = value
+        }
+        await persist(story)
+        removedItem = nil
+        actionNotice = "Item restored"
+    }
     var refinementInstruction = ""
     var refinement: String?
     private var refinementStoryID: String?
@@ -69,7 +132,8 @@ final class LibraryViewModel {
     func loadImagePreviews(for story: Story) async {
         guard let importer = mediaImporter else { return }
         for value in story.imageURLs ?? [] {
-            guard imagePreviews[value] == nil, let url = URL(string: value), url.isFileURL else { continue }
+            guard imagePreviews[value] == nil, let url = URL(string: value),
+                  url.isFileURL || (!isSimulation && ["http", "https"].contains(url.scheme?.lowercased() ?? "")) else { continue }
             do { imagePreviews[value] = try await importer.imageData(at: url) }
             catch { actionNotice = "Could not load image: \(error.localizedDescription)" }
         }
@@ -83,12 +147,10 @@ final class LibraryViewModel {
         guard canSaveEdits, var story = stories.first(where: { $0.id == id }) else { return false }
         isSavingEdits = true
         defer { isSavingEdits = false }
-        story.title = editedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         story.summary = editedSummary.trimmingCharacters(in: .whitespacesAndNewlines)
         let script = editedScript.trimmingCharacters(in: .whitespacesAndNewlines)
         if script != story.scriptText { appendVersion(script, instruction: nil, to: &story) }
-        await persist(story)
-        actionNotice = "Story updated"
+        await saveEditedCopy(story, originalID: id)
         return true
     }
 
@@ -135,17 +197,18 @@ final class LibraryViewModel {
     }
 
     func acceptRefinement() async {
-        guard let text = refinement, let id = refinementStoryID, id == selectedStoryID,
+        guard !isSavingEdits, let text = refinement, let id = refinementStoryID, id == selectedStoryID,
               var story = stories.first(where: { $0.id == id }) else { return }
+        isSavingEdits = true
+        defer { isSavingEdits = false }
         appendVersion(text, instruction: acceptedInstruction, to: &story)
-        await persist(story)
-        refinement = nil
-        actionNotice = "Refinement saved as a new script version"
+        await saveEditedCopy(story, originalID: id)
     }
 
     func useVersion(_ version: StoryScriptVersion, storyID: String) async {
         guard var story = stories.first(where: { $0.id == storyID }), story.scriptVersions?.contains(version) == true else { return }
         story.scriptText = version.text
+        story.currentScriptVersionID = version.id
         await persist(story)
         actionNotice = "Version \(version.number) is the current script"
     }
@@ -162,14 +225,35 @@ final class LibraryViewModel {
         if versions.isEmpty, let original = story.scriptText, !original.isEmpty {
             versions.append(StoryScriptVersion(number: 1, text: original, createdAt: story.createdAt, instruction: nil))
         }
-        versions.append(StoryScriptVersion(number: (versions.map(\.number).max() ?? 0) + 1, text: text, createdAt: DateFormatting.iso8601Now(), instruction: instruction))
+        let version = StoryScriptVersion(number: (versions.map(\.number).max() ?? 0) + 1, text: text, createdAt: DateFormatting.iso8601Now(), instruction: instruction)
+        versions.append(version)
         story.scriptVersions = versions
         story.scriptText = text
+        story.currentScriptVersionID = version.id
+    }
+
+    func isCurrentVersion(_ version: StoryScriptVersion, in story: Story) -> Bool {
+        if let id = story.currentScriptVersionID { return id == version.id }
+        return story.scriptText == version.text
     }
 
     private func persist(_ story: Story) async {
-        await repository.save(story)
         if let index = stories.firstIndex(where: { $0.id == story.id }) { stories[index] = story }
+        await repository.save(story)
+    }
+
+    private func saveEditedCopy(_ edited: Story, originalID: String) async {
+        var copy = edited
+        copy.id = UUID().uuidString
+        copy.createdAt = DateFormatting.iso8601Now()
+        copy.generationNumber = (stories.filter { $0.title == edited.title }.map { $0.generationNumber ?? 1 }.max() ?? 1) + 1
+        copy.sourceStoryID = edited.sourceStoryID ?? originalID
+        copy.stageOutputs = nil
+        copy.status = "saved"
+        await repository.save(copy)
+        stories.insert(copy, at: 0)
+        selectedStoryID = copy.id
+        actionNotice = "Edited copy saved as a new story"
     }
 
     func copyText(for story: Story, format: StoryCopyFormat) -> String {
@@ -275,30 +359,11 @@ final class LibraryViewModel {
 
     /// Delete a story (from local store; server deletion when API supports it).
     func deleteStory(id: String) async {
-        let local = await repository.all()
-        guard local.contains(where: { $0.id == id }) else {
-            notice = "This story is on the server. Server deletion is not available yet."
-            return
-        }
-        await repository.remove(id: id)
-        stories.removeAll { $0.id == id }
-        if selectedStoryID == id {
-            selectedStoryID = stories.first?.id
-        }
-        // TODO: server-side delete when the API provides it.
+        await deleteStories(ids: [id])
     }
 
     func deleteAllStories() async {
-        let local = await repository.all()
-        let localIDs = Set(local.map(\.id))
-        guard stories.allSatisfy({ localIDs.contains($0.id) }) else {
-            notice = "Server deletion is not available yet. No stories were deleted."
-            return
-        }
-        for story in local { await repository.remove(id: story.id) }
-        stories = []
-        selectedStoryID = nil
-        notice = nil
+        await deleteStories(ids: Set(stories.map(\.id)))
     }
 
     /// Merge the default closing clip at the end of the story's video.

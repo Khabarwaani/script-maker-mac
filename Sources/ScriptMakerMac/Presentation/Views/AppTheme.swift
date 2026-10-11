@@ -18,8 +18,19 @@ enum AppTheme {
 
 struct LibraryActionLabel: View {
     let icon: String
+    var isLoading = false
     var body: some View {
-        Image(systemName: icon).font(.system(size: 15)).modifier(LibraryActionFrame())
+        Group {
+            if isLoading { StudioActivityIndicator() }
+            else { Image(systemName: icon).font(.system(size: 15)) }
+        }.modifier(LibraryActionFrame())
+    }
+}
+
+struct StudioActivityIndicator: View {
+    var body: some View {
+        ProgressView().progressViewStyle(.circular).controlSize(.small)
+            .frame(width: 16, height: 16).accessibilityLabel("Loading")
     }
 }
 

@@ -19,6 +19,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var stageOutputs: [String: String]?
     var imageURLs: [String]?
     var scriptVersions: [StoryScriptVersion]?
+    var sourceStoryID: String?
+    var currentScriptVersionID: String?
 
     init(
         id: String = UUID().uuidString,
@@ -36,7 +38,9 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         generationNumber: Int? = nil,
         stageOutputs: [String: String]? = nil,
         imageURLs: [String]? = nil,
-        scriptVersions: [StoryScriptVersion]? = nil
+        scriptVersions: [StoryScriptVersion]? = nil,
+        sourceStoryID: String? = nil,
+        currentScriptVersionID: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -54,6 +58,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.stageOutputs = stageOutputs
         self.imageURLs = imageURLs
         self.scriptVersions = scriptVersions
+        self.sourceStoryID = sourceStoryID
+        self.currentScriptVersionID = currentScriptVersionID
     }
 }
 
@@ -67,6 +73,10 @@ struct StoryScriptVersion: Codable, Sendable, Hashable, Identifiable {
 
 enum LibraryUpdate: String, CaseIterable, Sendable, Hashable {
     case hashtags, images, news, refine
+}
+
+enum LibraryRemovedItem {
+    case hashtag(String), image(String), news(StorySourceLink), video(String)
 }
 
 struct LibraryUpdateResult: Codable, Sendable {

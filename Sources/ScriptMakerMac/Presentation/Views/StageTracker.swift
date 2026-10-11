@@ -22,8 +22,7 @@ struct StageTracker: View {
                     Text("— Running")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.secondaryInk)
-                    ProgressView()
-                        .scaleEffect(0.7)
+                    StudioActivityIndicator()
                 } else {
                     Text("— Complete")
                         .font(.subheadline)

@@ -12,9 +12,7 @@ struct ServerAddressBar: View {
                     .foregroundStyle(viewModel.isConnected ? AppTheme.success : Color.secondary)
                     .help(viewModel.isConnected ? "Server connected" : "Server not connected")
                 if viewModel.isChecking {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(width: 16)
+                    StudioActivityIndicator()
                 }
             }
             // Offline mode: no indicator needed — it's the default demo mode.

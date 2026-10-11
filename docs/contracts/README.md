@@ -12,13 +12,15 @@ the remaining server routes are implemented. No AI runs in the Mac app.
 | --- | --- | --- |
 | List stories | `GET /stories` | `{ "stories": [Story] }` |
 | Add story | `POST /stories`, full Story | persisted Story, HTTP 201 |
-| Edit story | `PATCH /stories/{id}`, full Story | persisted Story, same UUID and creation time |
+| Save edited script | `POST /stories`, copied Story with a new UUID, timestamp and subtitle number | new Story with the same title; original retained |
+| Save enrichment / active version | `PATCH /stories/{id}`, full Story | persisted snapshot, same UUID and creation time |
 | Delete story | `DELETE /stories/{id}` | HTTP 204 |
 | Delete all | `DELETE /stories`, `{ "ids": [uuid] }` | `{ "deletedIds": [uuid] }`; all-or-nothing |
 | Update hashtags | `POST /stories/{id}/updates/hashtags`, LibraryRequest | `{ "hashtags": [string] }` |
 | Update images | `POST /stories/{id}/updates/images`, LibraryRequest | `{ "images": [URL] }` |
 | Update news | `POST /stories/{id}/updates/news`, LibraryRequest | `{ "news": [{title,url,source}] }` |
 | Fine tune | `POST /stories/{id}/refinements`, LibraryRequest | `{ "script": "refined script" }` |
+| Upload media (future) | `POST /stories/{id}/media`, multipart `kind` and `file` | `{ "url": "https://...", "kind": "image|video", "filename": "...", "byteCount": 123 }` |
 
 All bodies use JSON, UTF-8 and camelCase Story properties. The request's `story`
 is the current saved snapshot, including the active/default `scriptText`. Its
@@ -30,9 +32,12 @@ Updates return replacement data for exactly the requested kind. Missing a
 required result field is an error; an empty array is a valid result with no
 items. Only the relevant field is persisted; title, UUID, creation time and
 script stay unchanged. Refinements return a preview and must never overwrite
-the script automatically. Explicit acceptance appends a script version and
-sets `scriptText` to that version. Choosing an earlier version changes only
-`scriptText`; history remains available.
+the script automatically. Explicit acceptance or manual edit/save creates a
+new Story with the same title, a new UUID, fresh creation time and next subtitle
+number. `sourceStoryID` points to the original/root story. The original stays
+unchanged. The edited copy retains script history and adds the changed script
+as a new version. Stale pipeline outputs are not copied. Choosing an earlier
+version changes only the copy's active `scriptText`; history remains available.
 
 HTTP 400 means invalid input; 404 means missing story or unavailable route;
 409 means conflicting revision; 422 means unusable engine/instruction; 500
@@ -41,14 +46,18 @@ means execution failed; 501 means the route is not implemented. Errors use
 partially overwrite story data. The native client presents the failure and
 retains the existing story.
 
-Local JSON reads `Resources/Samples/library_updates.json`, applies the configured
+Local JSON reads `Sources/ScriptMakerMac/Resources/Samples/library_updates.json`, applies the configured
 simulation delay, and labels its results as sample data. It does not invoke an
 LLM, fetch remote media, or interpret the instruction. `sample://` image values
 exist only in fixtures; real responses must use HTTP(S) media URLs. Server mode
 uses the configured server URL and never applies the simulation delay.
 
 Media imported with the native file picker is copied into the app's Application
-Support directory. It is a local attachment, not a server upload. Before remote
-uploads are enabled, define the storage, size limits, multipart body and URL
-lifetime in a separate upload contract. Secrets and external publishing are
-outside this Library API contract.
+Support directory. It is a local attachment, not a server upload. The future
+multipart upload route accepts one image (up to 50 MiB) or video (up to 500 MiB).
+Reject unsupported MIME types with HTTP 415 and oversized input with HTTP 413.
+Server storage must return a persistent HTTP(S) URL; do not return temporary
+signed URLs as permanent Story fields. The client then saves the attachment URL
+in the Story snapshot. Removing a URL from a Story does not purge shared media
+storage; backend storage cleanup is a separate operation. Secrets and external
+publishing are outside this Library API contract.

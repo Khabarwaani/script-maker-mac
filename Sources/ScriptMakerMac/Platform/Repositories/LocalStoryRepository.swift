@@ -68,6 +68,14 @@ struct MacClipboardWriter: ClipboardWriting {
 
 struct LibraryMediaStore: LibraryMediaImporting {
     let files: FileStore
+    let httpClient: HTTPClient
     func importFile(_ url: URL) async throws -> URL { try files.importMedia(url) }
-    func imageData(at url: URL) async throws -> Data { try files.contents(of: url) }
+    func imageData(at url: URL) async throws -> Data {
+        if url.isFileURL { return try files.contents(of: url) }
+        let (data, response) = try await httpClient.data(for: URLRequest(url: url))
+        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw APIError.transport("Image request failed")
+        }
+        return data
+    }
 }

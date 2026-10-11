@@ -18,6 +18,8 @@
     "sourceLinks": { "type": "array", "items": { "$ref": "library-result.schema.json#/properties/news/items" } },
     "scriptText": { "type": "string", "description": "Current/default screenplay used by display, Copy and Share." },
     "generationNumber": { "type": "integer", "minimum": 1 },
+    "sourceStoryID": { "type": "string", "minLength": 1, "description": "Root/original story ID for an edited copy. Copy has a separate UUID and fresh createdAt." },
+    "currentScriptVersionID": { "type": "string", "format": "uuid", "description": "Active script version. scriptText must equal this version's text." },
     "stageOutputs": { "type": "object", "additionalProperties": { "type": "string", "description": "Formatted stage JSON" } },
     "imageURLs": { "type": "array", "items": { "type": "string", "format": "uri" } },
     "scriptVersions": {

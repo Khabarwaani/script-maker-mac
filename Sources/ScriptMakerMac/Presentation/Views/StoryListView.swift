@@ -6,6 +6,7 @@ struct StoryListView: View {
     @State private var deletingAll = false
     @State private var isCollapsed = false
     @State private var showingAddStory = false
+    @State private var selectedDeletion: Set<String> = []
 
     var body: some View {
         VStack(spacing: 16) {
@@ -14,6 +15,9 @@ struct StoryListView: View {
                     Label("Stories · \(viewModel.stories.count)", systemImage: isCollapsed ? "chevron.right" : "chevron.down")
                         .font(.headline)
                 }.buttonStyle(.plain).help(isCollapsed ? "Expand stories" : "Collapse stories")
+                if viewModel.selectedStoryIDs.count > 1 {
+                    Text("\(viewModel.selectedStoryIDs.count) selected").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                }
                 Spacer()
                 Button {
                     viewModel.prepareNewStory()
@@ -22,12 +26,20 @@ struct StoryListView: View {
                 .buttonStyle(.plain)
                 .help("Add story from a script").accessibilityLabel("Add story")
                 Button { Task { await viewModel.refresh() } } label: {
-                    LibraryActionLabel(icon: "arrow.clockwise")
+                    LibraryActionLabel(icon: "arrow.clockwise", isLoading: viewModel.isLoading)
                 }.buttonStyle(.plain).help("Refresh library").disabled(viewModel.isLoading)
-                Button { deletingAll = true } label: {
-                    LibraryActionLabel(icon: "trash")
-                }.buttonStyle(.plain).help("Delete all stories").accessibilityLabel("Delete all stories")
-                    .disabled(viewModel.stories.isEmpty || viewModel.isLoading)
+                Menu {
+                    Button("Select all") { isCollapsed = false; viewModel.selectAllStories() }
+                    Button("Deselect all") { viewModel.selectStories([]) }.disabled(viewModel.selectedStoryIDs.isEmpty)
+                    Divider()
+                    Button("Delete selected stories (\(viewModel.selectedStoryIDs.count))", role: .destructive) {
+                        selectedDeletion = viewModel.selectedStoryIDs
+                    }.disabled(viewModel.selectedStoryIDs.isEmpty)
+                    Button("Delete all stories…", role: .destructive) { deletingAll = true }
+                } label: { Image(systemName: "trash") }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).modifier(LibraryActionFrame())
+                    .help("Select or delete stories").accessibilityLabel("Story selection and deletion")
+                    .disabled(viewModel.stories.isEmpty || viewModel.isLoading || viewModel.isDeletingStories)
             }
             Divider().overlay(AppTheme.line)
             if isCollapsed {
@@ -58,33 +70,42 @@ struct StoryListView: View {
         } message: {
             Text("All \(viewModel.stories.count) saved stories will be permanently deleted. This cannot be undone.")
         }
+        .alert("Delete \(selectedDeletion.count) selected stories?", isPresented: Binding(get: { !selectedDeletion.isEmpty }, set: { if !$0 { selectedDeletion = [] } })) {
+            Button("Cancel", role: .cancel) { selectedDeletion = [] }
+            Button("Delete selected stories", role: .destructive) {
+                let ids = selectedDeletion
+                selectedDeletion = []
+                Task { await viewModel.deleteStories(ids: ids) }
+            }
+        } message: { Text("Only the selected stories will be permanently deleted. This cannot be undone.") }
     }
 
     private func storyList() -> some View {
-        ScrollView {
-            LazyVStack(spacing: 4) {
+        List(selection: Binding(get: { viewModel.selectedStoryIDs }, set: { viewModel.selectStories($0) })) {
                 ForEach(viewModel.stories) { story in
-                    Button { viewModel.selectedStoryID = story.id } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(story.title).font(.body.weight(.medium)).lineLimit(2)
-                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")Generated \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? "Generated" : "Edited") \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                             Text(story.id).font(.caption2.monospaced()).foregroundStyle(AppTheme.secondaryInk).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                        .background(viewModel.selectedStoryID == story.id ? AppTheme.accentTint : Color.clear, in: RoundedRectangle(cornerRadius: 8))
                         .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityValue(viewModel.selectedStoryID == story.id ? "Selected" : "")
+                    .tag(story.id)
+                    .listRowInsets(EdgeInsets()).listRowSeparator(.hidden)
+                    .listRowBackground(viewModel.selectedStoryIDs.contains(story.id) ? AppTheme.accentTint : Color.clear)
                     .contextMenu {
                         Button("Copy script") { viewModel.copy(story.scriptText ?? "", label: "Script") }
                             .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
                         Divider()
+                        if viewModel.selectedStoryIDs.count > 1 {
+                            Button("Delete selected stories", role: .destructive) { selectedDeletion = viewModel.selectedStoryIDs }
+                        }
                         Button("Delete story", role: .destructive) { storyToDelete = story }
                     }
                 }
-            }
-        }.scrollIndicators(.visible).background(ScrollBarConfiguration())
+        }.listStyle(.sidebar).scrollContentBackground(.hidden)
+            .scrollIndicators(.visible).background(ScrollBarConfiguration())
+            .onDeleteCommand { selectedDeletion = viewModel.selectedStoryIDs }
     }
 
     @ViewBuilder
@@ -136,6 +157,7 @@ private struct AddLibraryStoryView: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                    .buttonStyle(StudioButtonStyle())
                     .disabled(viewModel.isAddingStory)
                 Button("Add story") {
                     Task { if await viewModel.addStory() { dismiss() } }
