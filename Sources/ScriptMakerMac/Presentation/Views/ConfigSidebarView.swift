@@ -17,6 +17,7 @@ struct ConfigSidebarView: View {
         .scrollIndicators(.visible)
         .background(ScrollBarConfiguration())
         .disabled(viewModel.isRunning)
+        .onChange(of: viewModel.selectedAIIdentifier) { _, _ in viewModel.updateInstruction() }
     }
 
     private var storySection: some View {
@@ -57,16 +58,12 @@ struct ConfigSidebarView: View {
         StudioSection("Configuration") {
             Button("Reset") { viewModel.resetConfiguration() }.help("Restore defaults")
         } content: {
-            StudioRow("AI Source", inset: 0) {
-                StudioOptionPicker("AI Source", selection: $viewModel.selectedAISource, options: viewModel.aiSources).onChange(of: viewModel.selectedAISource) { _, _ in viewModel.updateAIOptions(resetModel: true) }
+            StudioRow("AI Model", inset: 12) {
+                Text(viewModel.selectedAIIdentifier).lineLimit(1).truncationMode(.middle)
+                    .help(viewModel.selectedAIIdentifier)
             }
-            Button("Refresh AI models") { viewModel.refreshModels() }.help("Reload bundled provider options")
-            StudioRow("AI Model", inset: 0) {
-                StudioOptionPicker("AI Model", selection: $viewModel.selectedAIModel, options: viewModel.aiModels, label: viewModel.modelLabel).onChange(of: viewModel.selectedAIModel) { _, _ in viewModel.updateAIOptions() }
-            }
-            StudioRow("AI Power", inset: 0) {
-                StudioOptionPicker("AI Power", selection: $viewModel.selectedAIPower, options: viewModel.aiPowers).onChange(of: viewModel.selectedAIPower) { _, _ in viewModel.updateInstruction() }
-            }
+            SettingsLink { Label("Edit model in Settings", systemImage: "slider.horizontal.3") }
+                .buttonStyle(StudioButtonStyle())
             StudioRow("Duration (s)") {
                 StudioNumberInput("Duration", value: $viewModel.duration, range: 1...Int.max, step: 5)
                     .onChange(of: viewModel.duration) { _, _ in viewModel.updateInstruction() }

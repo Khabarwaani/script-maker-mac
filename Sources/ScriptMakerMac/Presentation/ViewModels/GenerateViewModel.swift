@@ -44,11 +44,12 @@ final class GenerateViewModel {
     // Configuration — verified against Streamlit 2026-10-11.
     // AI_SOURCES order; default Antigravity (#464). AI_POWERS; default Default.
     var aiSources: [String] = []
-    var selectedAISource: String = "Antigravity"
+    var selectedAISource: String { get { config.selectedAI.source } set { config.selectedAI = AIConfig(source: newValue, model: config.selectedAI.model, power: config.selectedAI.power) } }
     var aiModels: [String] = ["Default"]
-    var selectedAIModel: String = "Default"
+    var selectedAIModel: String { get { config.selectedAI.model } set { config.selectedAI = AIConfig(source: config.selectedAI.source, model: newValue, power: config.selectedAI.power) } }
     var aiPowers: [String] = []
-    var selectedAIPower: String = "Default"
+    var selectedAIPower: String { get { config.selectedAI.power } set { config.selectedAI = AIConfig(source: config.selectedAI.source, model: config.selectedAI.model, power: newValue) } }
+    var selectedAIIdentifier: String { config.selectedAI.identifier }
     /// Duration options mirror the Streamlit step-5 number input (5–60s).
     var durations: [Int] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
     var duration: Int = 10
@@ -108,9 +109,9 @@ final class GenerateViewModel {
 
     func updateAIOptions(resetModel: Bool = false) {
         aiModels = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.map(\.id) ?? [])
-        if resetModel || !aiModels.contains(selectedAIModel) { selectedAIModel = "Default" }
+        if resetModel { selectedAIModel = "Default" }
         aiPowers = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.first { $0.id == selectedAIModel }?.efforts.map { $0.capitalized } ?? [])
-        if !aiPowers.contains(selectedAIPower) { selectedAIPower = "Default" }
+        if resetModel { selectedAIPower = "Default" }
         updateInstruction()
     }
 
@@ -136,9 +137,6 @@ final class GenerateViewModel {
 
     func resetConfiguration() {
         guard let defaults = catalog?.defaults else { return }
-        selectedAISource = defaults.aiSource
-        selectedAIModel = defaults.aiModel
-        selectedAIPower = defaults.aiPower
         duration = defaults.duration
         selectedEmotion = defaults.emotion
         scriptCount = defaults.scriptCount
@@ -190,11 +188,6 @@ final class GenerateViewModel {
     /// Restore a saved Studio configuration. Stored values outside the current
     /// option lists (e.g. from an older build) are ignored, keeping defaults.
     private func applyStudioConfig(_ c: StudioConfig) {
-        if aiSources.contains(c.ai.source) { selectedAISource = c.ai.source }
-        updateAIOptions()
-        if aiModels.contains(c.ai.model) { selectedAIModel = c.ai.model }
-        updateAIOptions()
-        if aiPowers.contains(c.ai.power) { selectedAIPower = c.ai.power }
         if c.duration > 0 { duration = c.duration }
         if emotions.contains(c.emotion) { selectedEmotion = c.emotion }
         scriptCount = max(1, c.scriptCount)
@@ -240,7 +233,7 @@ final class GenerateViewModel {
         instructionText = """
         Generate a \(selectedFormat) video with \(characterCount) character(s) \
         (\(selectedCharacterKind)), emotion: \(selectedEmotion). \
-        Duration: \(duration)s. AI: \(selectedAISource) \(selectedAIModel) (\(selectedAIPower)). \
+        Duration: \(duration)s. AI: \(selectedAIIdentifier). \
         Sample story guides dialogue and scenes.
         """
     }
@@ -278,9 +271,10 @@ final class GenerateViewModel {
             "story_source": selectedStorySource,
             "trending_hashtag": customHashtag.isEmpty ? selectedHashtag : customHashtag,
             "ai_source": selectedAISource,
-            "ai_model": selectedAIModel,
+            "ai_model": selectedAIIdentifier,
+            "model_identifier": selectedAIIdentifier,
             "ai_power": selectedAIPower,
-            "ai": ["source": selectedAISource, "model": selectedAIModel, "power": selectedAIPower],
+            "ai": ["source": selectedAISource, "model": selectedAIModel, "power": selectedAIPower, "identifier": selectedAIIdentifier],
             "duration": duration,
             "emotion": selectedEmotion,
             "script_count": scriptCount,

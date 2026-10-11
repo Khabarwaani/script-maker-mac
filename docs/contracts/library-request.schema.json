@@ -2,18 +2,29 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "LibraryRequest",
   "type": "object",
-  "required": ["story", "engine", "instruction"],
+  "required": [
+    "story",
+    "engine",
+    "instruction",
+    "model_identifier"
+  ],
   "additionalProperties": false,
   "properties": {
-    "story": { "$ref": "library-story.schema.json" },
+    "story": {
+      "$ref": "library-story.schema.json"
+    },
     "engine": {
       "type": "string",
-      "description": "None disables AI. Fine tuning rejects None with HTTP 422.",
-      "enum": ["None", "Local First Then Antigravity", "Antigravity", "Codex", "Grok Low", "Grok Medium", "Grok High", "On-device"]
+      "description": "Compatibility alias of model_identifier. Exact canonical provider/model/reasoning identifier; legacy None disables AI."
     },
     "instruction": {
       "type": "string",
       "description": "Required nonblank for refinements; empty string for enrichment updates."
+    },
+    "model_identifier": {
+      "type": "string",
+      "description": "Shared Settings identifier; percent-encode each component before joining with slash. Do not infer provider from model name.",
+      "pattern": "^[^/]+/[^/]+/[^/]+$"
     }
   },
   "examples": [
@@ -29,8 +40,9 @@
         "format": "Normal Talk",
         "scriptText": "Narrator: Will odd-even restrictions help?"
       },
-      "engine": "Antigravity",
-      "instruction": "Tighten the hook while preserving the facts."
+      "engine": "Antigravity/Default/default",
+      "instruction": "Tighten the hook while preserving the facts.",
+      "model_identifier": "Antigravity/Default/default"
     }
   ]
 }

@@ -521,6 +521,22 @@ private struct TestMediaImporter: LibraryMediaImporting {
 }
 
 final class LibraryNetworkContractTests: XCTestCase {
+    func testServerModelCatalogUsesConfiguredURLWithoutDelayAndFailsLoud() async throws {
+        LibraryStubProtocol.status = 200
+        LibraryStubProtocol.body = Data(#"{"providers":[{"id":"provider","label":"Provider","models":[{"id":"model","label":"Model","reasoning":["high"]}]}]}"#.utf8)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LibraryStubProtocol.self]
+        let client = AIModelCatalogClient(httpClient: HTTPClient(session: URLSession(configuration: configuration)), bundled: BundledStudioCatalog())
+        let catalog = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test:8000/api"))
+        XCTAssertEqual(catalog.providers.first?.models.first?.id, "model")
+        XCTAssertEqual(LibraryStubProtocol.captured?.url?.absoluteString, "http://models.test:8000/api/ai/models")
+        LibraryStubProtocol.status = 501
+        do {
+            _ = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test"))
+            XCTFail("Server mode must not substitute local models")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("not implemented")) }
+    }
+
     private func client(status: Int = 200, body: String) -> LibraryUpdateClient {
         LibraryStubProtocol.status = status
         LibraryStubProtocol.body = Data(body.utf8)
@@ -593,4 +609,60 @@ private final class LibraryStubProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() { }
+}
+
+@MainActor
+final class SharedAISelectionTests: XCTestCase {
+    func testIdentifierEscapesSlashAndRoundTrips() throws {
+        let selection = AIConfig(source: "Provider A", model: "vendor/model", power: "High")
+        XCTAssertEqual(selection.identifier, "Provider%20A/vendor%2Fmodel/high")
+        let decoded = try XCTUnwrap(AIConfig(identifier: selection.identifier))
+        XCTAssertEqual(decoded.source, selection.source)
+        XCTAssertEqual(decoded.model, selection.model)
+        XCTAssertEqual(decoded.power, "High")
+        XCTAssertNil(AIConfig(identifier: "provider/model"))
+        XCTAssertNil(AIConfig(identifier: "provider//high"))
+    }
+
+    func testSelectionIsSharedPersistsAndKeepsFiveUniqueRecents() {
+        let config = AppConfig()
+        let original = config.selectedAI, recents = config.recentAIIdentifiers
+        defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
+        config.recentAIIdentifiers = []
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog())
+        let library = LibraryViewModel(config: config)
+        for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
+        config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
+        XCTAssertEqual(config.recentAIIdentifiers.count, 5)
+        XCTAssertEqual(Set(config.recentAIIdentifiers).count, 5)
+        XCTAssertEqual(config.recentAIIdentifiers.first, "Provider/model-3/high")
+        XCTAssertEqual(generator.selectedAIIdentifier, library.selectedAIEngine)
+        generator.resetConfiguration()
+        XCTAssertEqual(generator.selectedAIIdentifier, "Provider/model-3/high")
+        XCTAssertEqual(AppConfig().selectedAI.identifier, config.selectedAI.identifier)
+    }
+
+    func testEditorLoadsThreeControlsAndAppliesOnlyOnSave() async throws {
+        let config = AppConfig()
+        let original = config.selectedAI, recents = config.recentAIIdentifiers
+        let source = config.dataSource, delay = config.localJSONDelay
+        defer { config.selectedAI = original; config.recentAIIdentifiers = recents; config.dataSource = source; config.localJSONDelay = delay }
+        config.dataSource = .offline; config.localJSONDelay = 0
+        let vm = PreferencesViewModel(config: config, connectionChecker: ModelTestChecker(), modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()))
+        await vm.editModel()
+        XCTAssertNil(vm.modelError)
+        vm.draftProvider = "Codex"; vm.updateModelOptions()
+        vm.draftModel = try XCTUnwrap(vm.modelOptions.last); vm.updateModelOptions()
+        vm.draftReasoning = try XCTUnwrap(vm.reasoningOptions.last)
+        XCTAssertEqual(config.selectedAI.identifier, original.identifier)
+        let identifier = vm.draftIdentifier
+        vm.saveModelSelection()
+        XCTAssertEqual(config.selectedAI.identifier, identifier)
+        XCTAssertEqual(config.recentAIIdentifiers.first, identifier)
+        XCTAssertFalse(vm.isEditingModel)
+    }
+}
+
+private struct ModelTestChecker: ServerConnectionChecking {
+    func isReachable(at url: URL) async -> Bool { false }
 }

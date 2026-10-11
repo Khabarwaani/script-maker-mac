@@ -61,3 +61,30 @@ signed URLs as permanent Story fields. The client then saves the attachment URL
 in the Story snapshot. Removing a URL from a Story does not purge shared media
 storage; backend storage cleanup is a separate operation. Secrets and external
 publishing are outside this Library API contract.
+
+## Shared AI selection
+
+Settings owns one AI selection for Studio and Library. The editor has Provider,
+Model and Reasoning controls. Only explicitly applying a selection adds it to
+recent history; keep five unique selections, newest first. Cancel changes nothing.
+Existing saved Studio AI configuration migrates once when no shared selection exists.
+
+`model_identifier` is `provider/model/reasoning`. Percent-encode UTF-8 components
+using RFC 3986 unreserved characters before joining; split on `/` before decoding.
+Provider and model IDs are case-sensitive; reasoning IDs are lowercase. Example:
+`Codex/gpt-5.4/high`; a model ID containing slash becomes `vendor%2Fmodel`.
+The selected one-line identifier is displayed identically throughout the app.
+
+Pipeline inputs send `model_identifier` and `ai_model` with this identifier, plus
+`ai: {source, model, power, identifier}` for compatibility and tracing. Library
+requests send `model_identifier` and the identical `engine` compatibility alias.
+Servers must validate IDs against their catalog, resolve defaults themselves,
+reject unsupported combinations with 422, and echo the effective identifier in
+result metadata/logs. Never infer a provider from a model ID.
+
+The proposed `GET /ai/models` response is defined in `ai-models.schema.json`.
+It is served by the configured pipeline server, without simulation delay.
+Local JSON uses the bundled Studio model catalog and configured simulation delay.
+Labels are for display; requests use IDs. The catalog endpoint and backend model
+routing are future server work. An unavailable catalog preserves the saved model
+and surfaces an error; the client does not substitute local options in Server mode.

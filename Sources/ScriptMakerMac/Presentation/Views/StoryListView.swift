@@ -19,6 +19,9 @@ struct StoryListView: View {
                     Text("\(viewModel.selectedStoryIDs.count) selected").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                 }
                 Spacer()
+                if viewModel.selectedStoryIDs.count > 1 {
+                    Text("\(viewModel.selectedStoryIDs.count) selected").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                }
                 Button {
                     viewModel.prepareNewStory()
                     showingAddStory = true

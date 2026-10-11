@@ -6,6 +6,20 @@ info:
 servers:
   - url: http://localhost:8000
 paths:
+  /ai/models:
+    get:
+      operationId: listAIModels
+      summary: List available providers, model IDs and supported reasoning levels
+      description: Proposed backend endpoint. No input body. IDs are stable, labels are display-only. No simulation delay on server requests.
+      responses:
+        '200':
+          description: Available AI model catalog
+          content:
+            application/json:
+              schema:
+                $ref: ai-models.schema.json
+        '501':
+          description: Backend model catalog is not implemented yet
   /stories:
     get:
       operationId: listStories

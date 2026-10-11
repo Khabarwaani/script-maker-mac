@@ -130,8 +130,8 @@ private struct StoryDetailToolbar: View {
             } label: { Image(systemName: "square.and.arrow.down") }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).modifier(LibraryActionFrame())
                 .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
-            StudioOptionPicker("Library LLM", selection: $viewModel.selectedAIEngine, options: viewModel.aiEngines)
-                .frame(width: 190, height: 44).help("LLM for Library processing; None disables AI")
+            SettingsLink { Text(viewModel.selectedAIEngine).lineLimit(1).truncationMode(.middle) }.buttonStyle(StudioButtonStyle())
+                .frame(width: 190, height: 44).help("Shared AI model · edit in Settings")
             Divider().frame(height: 24)
             Spacer(minLength: 0)
             Button { showingReset = true } label: { LibraryActionLabel(icon: "arrow.counterclockwise") }

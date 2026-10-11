@@ -65,7 +65,7 @@ final class LibraryViewModel {
 
     let aiEngines = ["None", "Local First Then Antigravity", "Antigravity", "Codex", "Grok Low", "Grok Medium", "Grok High", "On-device"]
     var selectedAIEngine: String {
-        get { aiEngines.contains(config.libraryAIEngine) ? config.libraryAIEngine : "None" }
+        get { config.libraryAIEngine }
         set { config.libraryAIEngine = newValue }
     }
     var isSimulation: Bool { config.dataSource == .offline }
@@ -322,6 +322,7 @@ final class LibraryViewModel {
         isLoading = true
         defer {
             isLoading = false
+            selectedStoryIDs.formIntersection(Set(stories.map(\.id)))
             if !stories.contains(where: { $0.id == selectedStoryID }) {
                 selectedStoryID = stories.first?.id
             }
