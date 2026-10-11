@@ -48,11 +48,28 @@ struct ConfigSidebarView: View {
                 StudioRow("Trending hashtag", inset: 0) {
                     HStack(spacing: 8) {
                         if viewModel.trendingHashtags.isEmpty {
-                            Text(viewModel.isRefreshingHashtags ? "Loading hashtags…" : "No data")
-                                .font(.callout)
-                                .foregroundStyle(AppTheme.secondaryInk)
-                                .padding(.horizontal, 10)
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingHashtags {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading hashtags…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.hashtagsErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No hashtags found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         } else {
                             StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
                                 .disabled(viewModel.isRefreshingHashtags)
@@ -72,11 +89,28 @@ struct ConfigSidebarView: View {
                 StudioRow("Headline", inset: 0) {
                     HStack(spacing: 8) {
                         if viewModel.headlines.isEmpty {
-                            Text(viewModel.isRefreshingHeadlines ? "Loading headlines…" : "No data")
-                                .font(.callout)
-                                .foregroundStyle(AppTheme.secondaryInk)
-                                .padding(.horizontal, 10)
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingHeadlines {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading headlines…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.headlinesErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No headlines found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         } else {
                             StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
                                 .disabled(viewModel.isRefreshingHeadlines)
@@ -113,16 +147,6 @@ struct ConfigSidebarView: View {
         StudioSection("Configuration") {
             Button("Reset") { viewModel.resetConfiguration() }.help("Restore defaults")
         } content: {
-            StudioRow("AI Source", inset: 0) {
-                StudioOptionPicker("AI Source", selection: $viewModel.selectedAISource, options: viewModel.aiSources).onChange(of: viewModel.selectedAISource) { _, _ in viewModel.updateAIOptions(resetModel: true) }
-            }
-            Button("Refresh AI models") { viewModel.refreshModels() }.help("Reload bundled provider options")
-            StudioRow("AI Model", inset: 0) {
-                StudioOptionPicker("AI Model", selection: $viewModel.selectedAIModel, options: viewModel.aiModels, label: viewModel.modelLabel).onChange(of: viewModel.selectedAIModel) { _, _ in viewModel.updateAIOptions() }
-            }
-            StudioRow("AI Power", inset: 0) {
-                StudioOptionPicker("AI Power", selection: $viewModel.selectedAIPower, options: viewModel.aiPowers).onChange(of: viewModel.selectedAIPower) { _, _ in viewModel.updateInstruction() }
-            }
             StudioRow("Duration (s)") {
                 StudioNumberInput("Duration", value: $viewModel.duration, range: 1...Int.max, step: 5)
                     .onChange(of: viewModel.duration) { _, _ in viewModel.updateInstruction() }

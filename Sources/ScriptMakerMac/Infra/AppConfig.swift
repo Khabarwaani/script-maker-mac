@@ -52,6 +52,22 @@ final class AppConfig {
         didSet { defaults.set(newsPageSize, forKey: Self.newsPageSizeKey) }
     }
 
+    private static let aiSourceKey = "aiSource"
+    private static let aiModelKey = "aiModel"
+    private static let aiPowerKey = "aiPower"
+
+    var aiSource: String {
+        didSet { defaults.set(aiSource, forKey: Self.aiSourceKey) }
+    }
+
+    var aiModel: String {
+        didSet { defaults.set(aiModel, forKey: Self.aiModelKey) }
+    }
+
+    var aiPower: String {
+        didSet { defaults.set(aiPower, forKey: Self.aiPowerKey) }
+    }
+
     var buildTitle: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
@@ -78,6 +94,9 @@ final class AppConfig {
         self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
         let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
         self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
+        self.aiSource = defaults.string(forKey: Self.aiSourceKey) ?? "Antigravity"
+        self.aiModel = defaults.string(forKey: Self.aiModelKey) ?? "Default"
+        self.aiPower = defaults.string(forKey: Self.aiPowerKey) ?? "Default"
         self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
@@ -108,6 +127,9 @@ final class AppConfig {
         serverURL = Self.defaultServerURL
         dataSource = .offline
         newsPageSize = Self.defaultNewsPageSize
+        aiSource = "Antigravity"
+        aiModel = "Default"
+        aiPower = "Default"
     }
 
     // MARK: - Studio config (smart save on Generate, like Streamlit #563)

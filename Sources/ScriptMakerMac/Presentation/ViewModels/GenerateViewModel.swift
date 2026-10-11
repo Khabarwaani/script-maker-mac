@@ -48,6 +48,7 @@ final class GenerateViewModel {
     // Headlines from sample data (or server when live).
     var headlines: [String] = []
     var selectedHeadline: String = ""
+    var headlinesErrorMessage: String?
 
     // Story & Topic — verified against Streamlit (ai-script-maker) 2026-10-11.
     // Order: STORY_SECTION_ORDER; labels: SECTION_LABELS.
@@ -57,6 +58,7 @@ final class GenerateViewModel {
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
     var trendingHashtags: [String] = []
     var selectedHashtag: String = ""
+    var hashtagsErrorMessage: String?
     var customHashtag: String = ""
     var isRefreshingHashtags = false
 
@@ -103,12 +105,29 @@ final class GenerateViewModel {
         self.catalogProvider = catalogProvider
         loadCatalog()
         resetConfiguration()
+        syncAIConfigurationFromConfig()
         if config.dataSource == .offline {
             loadSampleLists()
         }
         if let saved = config.loadStudioConfig() {
             applyStudioConfig(saved)
         }
+    }
+
+    /// Sync AI engine options from AppConfig (Preferences).
+    func syncAIConfigurationFromConfig() {
+        if aiSources.contains(config.aiSource) {
+            selectedAISource = config.aiSource
+        }
+        updateAIOptions()
+        if aiModels.contains(config.aiModel) {
+            selectedAIModel = config.aiModel
+        }
+        updateAIOptions()
+        if aiPowers.contains(config.aiPower) {
+            selectedAIPower = config.aiPower
+        }
+        updateInstruction()
     }
 
     var isLocalJSON: Bool { config.dataSource != .server }
@@ -251,6 +270,7 @@ final class GenerateViewModel {
     /// If forceFresh is false, uses 24-hour cache when available.
     func refreshHeadlines(forceFresh: Bool = false) async {
         isRefreshingHeadlines = true
+        headlinesErrorMessage = nil
         defer { isRefreshingHeadlines = false }
 
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
@@ -279,7 +299,7 @@ final class GenerateViewModel {
             if isLocalJSON {
                 loadSampleLists()
             } else {
-                setError(error)
+                headlinesErrorMessage = error.localizedDescription
             }
         }
     }
@@ -306,6 +326,11 @@ final class GenerateViewModel {
 
     /// Handles story source selection change to load headlines or hashtags.
     func onStorySourceChanged() async {
+        headlines = []
+        selectedHeadline = ""
+        topic = ""
+        headlinesErrorMessage = nil
+        hashtagsErrorMessage = nil
         if isHashtagSource {
             await refreshHashtags()
         } else if !isManualSource {
@@ -316,6 +341,7 @@ final class GenerateViewModel {
     /// Refresh trending hashtags dynamically from top titles / trending news.
     func refreshHashtags() async {
         isRefreshingHashtags = true
+        hashtagsErrorMessage = nil
         defer { isRefreshingHashtags = false }
         do {
             let service = try api()
@@ -335,7 +361,7 @@ final class GenerateViewModel {
         } catch {
             trendingHashtags = []
             if !isLocalJSON {
-                setError(error)
+                hashtagsErrorMessage = error.localizedDescription
             }
         }
     }
@@ -381,6 +407,7 @@ final class GenerateViewModel {
 
     /// Populates data on startup or view appearance.
     func initialLoad() async {
+        syncAIConfigurationFromConfig()
         if config.dataSource == .server {
             await loadNewsCategories()
             if isHashtagSource {

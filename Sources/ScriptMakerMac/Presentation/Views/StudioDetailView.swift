@@ -15,6 +15,9 @@ struct StudioDetailView: View {
                     .tracking(0.7)
                     .foregroundStyle(AppTheme.secondaryInk)
                     .frame(height: 34, alignment: .leading)
+                if viewModel.errorMessage != nil {
+                    errorBannerView
+                }
                 if viewModel.sessionID == nil {
                     emptyDetail
                 } else {
@@ -27,6 +30,73 @@ struct StudioDetailView: View {
         .background(AppTheme.paper)
         .scrollIndicators(.visible)
         .background(ScrollBarConfiguration())
+    }
+
+    // MARK: - Error Banner
+
+    private var errorBannerView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.danger)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(viewModel.errorTitle ?? "Error")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.ink)
+                    if let detail = viewModel.errorDetail, !detail.isEmpty {
+                        Text(detail)
+                            .font(.callout)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
+                Button {
+                    viewModel.errorMessage = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+                .buttonStyle(.plain)
+                .help("Dismiss error")
+            }
+
+            HStack(spacing: 8) {
+                if viewModel.currentStage != nil {
+                    Button("Retry stage") {
+                        Task { await viewModel.retryStage() }
+                    }
+                    .buttonStyle(StudioPrimaryButtonStyle())
+
+                    Button("Retry fresh") {
+                        Task { await viewModel.retryFresh() }
+                    }
+                    .buttonStyle(StudioButtonStyle())
+
+                    Button("Skip stage") {
+                        Task { await viewModel.skipStage() }
+                    }
+                    .buttonStyle(StudioButtonStyle())
+                } else {
+                    Button("Retry") {
+                        Task { await viewModel.retryFresh() }
+                    }
+                    .buttonStyle(StudioPrimaryButtonStyle())
+                }
+                Spacer()
+                Button("Dismiss") {
+                    viewModel.errorMessage = nil
+                }
+                .buttonStyle(StudioButtonStyle())
+            }
+        }
+        .padding(16)
+        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.danger.opacity(0.35), lineWidth: 1)
+        )
     }
 
     // MARK: - Empty state
