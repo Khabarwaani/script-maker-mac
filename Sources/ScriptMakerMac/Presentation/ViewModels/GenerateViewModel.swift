@@ -22,6 +22,10 @@ final class GenerateViewModel {
     var sessionID: String?
     var currentStage: PipelineStage?
     var stagePayloads: [PipelineStage: [String: Any]] = [:]
+    /// Dynamic stages received from stream events with their substeps and dropdown state.
+    var streamStages: [PipelineStageState] = []
+    /// Extra unread stream details captured from output or unknown stream events.
+    var streamExtraDetails: [ExtraDetailItem] = []
     var events: [SubstepEvent] = []
     var isRunning = false
     var errorTitle: String?
@@ -34,6 +38,27 @@ final class GenerateViewModel {
         }
     }
     var jobProgress: Double?
+    /// True after completed generation is automatically saved to the local library.
+    var isSavedToLibrary: Bool = false
+    /// Callback triggered to navigate to the Library tab.
+    var onNavigateToLibrary: (() -> Void)?
+
+    func goToLibrary() {
+        onNavigateToLibrary?()
+    }
+
+    func toggleStageExpansion(id: Int) {
+        if let idx = streamStages.firstIndex(where: { $0.id == id }) {
+            streamStages[idx].isExpanded.toggle()
+        }
+    }
+
+    func toggleSubstepExpansion(stageID: Int, substepID: String) {
+        if let sIdx = streamStages.firstIndex(where: { $0.id == stageID }),
+           let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == substepID }) {
+            streamStages[sIdx].substeps[subIdx].isExpanded.toggle()
+        }
+    }
 
     func setError(_ error: Error) {
         if let apiError = error as? APIError {
@@ -501,21 +526,53 @@ final class GenerateViewModel {
             sessionID = UUID().uuidString
             for try await event in api.createAndStreamStory(params: streamParams) {
                 switch event {
-                case .planStream:
-                    break
+                case .planStream(let plan):
+                    self.streamStages = plan.stages.enumerated().map { (index, stagePlan) in
+                        PipelineStageState(
+                            id: stagePlan.id,
+                            type: stagePlan.type,
+                            label: stagePlan.label,
+                            status: "pending",
+                            substeps: [],
+                            isExpanded: index == 0
+                        )
+                    }
 
                 case .planStage(let plan):
                     if let stageEnum = PipelineStageType(rawValue: plan.stageType) {
                         currentStage = stageEnum
-                    } else if plan.position >= 1 && plan.position <= PipelineStageType.allCases.count {
-                        currentStage = PipelineStageType.allCases[plan.position - 1]
+                    }
+                    if let idx = streamStages.firstIndex(where: { $0.type == plan.stageType }) {
+                        let existingSubsteps = streamStages[idx].substeps
+                        streamStages[idx].substeps = plan.substeps.map { sub in
+                            if let found = existingSubsteps.first(where: { $0.id == sub.id }) {
+                                return found
+                            }
+                            return PipelineSubstepState(
+                                id: sub.id,
+                                substepType: sub.substepType,
+                                name: sub.name,
+                                status: "pending"
+                            )
+                        }
+                        streamStages[idx].isExpanded = true
+                    } else {
+                        let newStage = PipelineStageState(
+                            id: plan.position,
+                            type: plan.stageType,
+                            label: plan.stageType.capitalized,
+                            status: "pending",
+                            substeps: plan.substeps.map { sub in
+                                PipelineSubstepState(id: sub.id, substepType: sub.substepType, name: sub.name, status: "pending")
+                            },
+                            isExpanded: true
+                        )
+                        streamStages.append(newStage)
                     }
 
                 case .progressStage(let progress):
                     if let stageEnum = PipelineStageType(rawValue: progress.stageType) {
                         currentStage = stageEnum
-                    } else if progress.position >= 1 && progress.position <= PipelineStageType.allCases.count {
-                        currentStage = PipelineStageType.allCases[progress.position - 1]
                     }
                     if let cur = currentStage {
                         let sub = SubstepEvent(
@@ -527,6 +584,12 @@ final class GenerateViewModel {
                         )
                         events.append(sub)
                     }
+                    if let idx = streamStages.firstIndex(where: { $0.type == progress.stageType }) {
+                        streamStages[idx].status = progress.status
+                        if progress.status.lowercased() == "running" {
+                            streamStages[idx].isExpanded = true
+                        }
+                    }
 
                 case .progressSubstep(let progress):
                     let sub = SubstepEvent(
@@ -537,8 +600,21 @@ final class GenerateViewModel {
                         detail: "Working..."
                     )
                     events.append(sub)
+                    if let sIdx = streamStages.firstIndex(where: { $0.type == progress.substepType }) {
+                        if let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == progress.substep }) {
+                            streamStages[sIdx].substeps[subIdx].status = progress.status
+                        } else {
+                            streamStages[sIdx].substeps.append(PipelineSubstepState(
+                                id: progress.substep,
+                                substepType: progress.substepType,
+                                name: "\(progress.substepType.capitalized) \(progress.substep)",
+                                status: progress.status
+                            ))
+                        }
+                        streamStages[sIdx].isExpanded = true
+                    }
 
-                case .outputSubstep(let step, let substep, let substepType, let name, let status, _):
+                case .outputSubstep(let step, let substep, let substepType, let name, let status, let output):
                     _ = step
                     let sub = SubstepEvent(
                         name: substep,
@@ -548,23 +624,107 @@ final class GenerateViewModel {
                         detail: status
                     )
                     events.append(sub)
+                    let detailText = output["detail"] as? String ?? (output.isEmpty ? nil : "\(output)")
 
-                case .outputStage(let step, _, let outputType, let output, _):
+                    let knownSubstepKeys: Set<String> = ["detail"]
+                    var subExtra: [ExtraDetailItem] = []
+                    for (k, v) in output where !knownSubstepKeys.contains(k) {
+                        subExtra.append(ExtraDetailItem(key: k, value: ExtraDetailItem.formatValue(v)))
+                    }
+                    subExtra.sort { $0.key < $1.key }
+
+                    if let sIdx = streamStages.firstIndex(where: { $0.type == substepType }) {
+                        if let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == substep }) {
+                            streamStages[sIdx].substeps[subIdx].status = status
+                            if !name.isEmpty { streamStages[sIdx].substeps[subIdx].name = name }
+                            streamStages[sIdx].substeps[subIdx].detail = detailText
+                            streamStages[sIdx].substeps[subIdx].extraDetails = subExtra
+                        } else {
+                            streamStages[sIdx].substeps.append(PipelineSubstepState(
+                                id: substep,
+                                substepType: substepType,
+                                name: name.isEmpty ? substep : name,
+                                status: status,
+                                detail: detailText,
+                                extraDetails: subExtra
+                            ))
+                        }
+                    }
+
+                case .outputStage(let step, let status, let outputType, let output, _):
+                    _ = step
                     if let stageEnum = PipelineStageType(rawValue: outputType) {
-                        stagePayloads[stageEnum] = output
-                        currentStage = stageEnum
-                    } else if step >= 1 && step <= PipelineStageType.allCases.count {
-                        let stageEnum = PipelineStageType.allCases[step - 1]
                         stagePayloads[stageEnum] = output
                         currentStage = stageEnum
                     }
 
+                    let recognizedStageKeys: Set<String> = {
+                        switch outputType {
+                        case "validation": return ["status", "confidence", "notes", "bypassed"]
+                        case "casting": return ["finalized_characters", "selected_angles"]
+                        case "dialogue": return ["scenes", "background_music"]
+                        case "scenes": return ["scenes"]
+                        case "storyboard": return ["scripts", "storyboards"]
+                        case "script": return ["scripts"]
+                        default: return []
+                        }
+                    }()
+
+                    var stageExtra: [ExtraDetailItem] = []
+                    for (k, v) in output where !recognizedStageKeys.contains(k) {
+                        stageExtra.append(ExtraDetailItem(key: k, value: ExtraDetailItem.formatValue(v)))
+                    }
+                    stageExtra.sort { $0.key < $1.key }
+
+                    if let sIdx = streamStages.firstIndex(where: { $0.type == outputType }) {
+                        streamStages[sIdx].status = status
+                        streamStages[sIdx].outputPayload = output
+                        streamStages[sIdx].extraDetails = stageExtra
+                        if let notes = output["notes"] as? String {
+                            streamStages[sIdx].outputSummary = notes
+                        } else if let chars = output["finalized_characters"] as? [[String: Any]] {
+                            streamStages[sIdx].outputSummary = "\(chars.count) character(s) defined"
+                        } else if let scripts = output["scripts"] as? [[String: Any]] {
+                            streamStages[sIdx].outputSummary = "\(scripts.count) script(s) generated"
+                        } else if let scenes = output["scenes"] as? [[String: Any]] {
+                            streamStages[sIdx].outputSummary = "\(scenes.count) scene(s) derived"
+                        }
+                    }
+
+                case .unknown(let type, let data):
+                    var unhandled: [ExtraDetailItem] = []
+                    for (k, v) in data {
+                        unhandled.append(ExtraDetailItem(key: "\(type): \(k)", value: ExtraDetailItem.formatValue(v)))
+                    }
+                    unhandled.sort { $0.key < $1.key }
+                    streamExtraDetails.append(contentsOf: unhandled)
+
                 case .error(let errorPayload):
                     errorMessage = errorPayload.error
+                    if let st = errorPayload.stage, let sIdx = streamStages.firstIndex(where: { $0.id == st }) {
+                        streamStages[sIdx].status = "failed"
+                        streamStages[sIdx].isExpanded = true
+                        if let fs = errorPayload.failedSubstep, let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == fs }) {
+                            streamStages[sIdx].substeps[subIdx].status = "failed"
+                            streamStages[sIdx].substeps[subIdx].detail = errorPayload.error
+                        }
+                    }
 
-                case .end:
-                    generationCompleted = true
-                    await saveToLibrary()
+                case .end(let endPayload):
+                    if let endPayload, endPayload.result == "failure" {
+                        errorMessage = endPayload.error ?? "Generation failed on server."
+                        if let lastRunning = streamStages.lastIndex(where: { $0.status == "running" }) {
+                            streamStages[lastRunning].status = "failed"
+                        }
+                    } else {
+                        for idx in streamStages.indices {
+                            if streamStages[idx].status == "running" {
+                                streamStages[idx].status = "success"
+                            }
+                        }
+                        generationCompleted = true
+                        await saveToLibrary()
+                    }
                 }
             }
         } catch {
@@ -731,12 +891,15 @@ final class GenerateViewModel {
         sessionID = nil
         currentStage = nil
         stagePayloads = [:]
+        streamStages = []
+        streamExtraDetails = []
         events = []
         errorMessage = nil
         jobProgress = nil
         renderJobID = nil
         renderCompleted = false
         generationCompleted = false
+        isSavedToLibrary = false
         generatedStoryIDs = [:]
         generationCreatedAt = DateFormatting.iso8601Now()
     }
@@ -783,9 +946,20 @@ final class GenerateViewModel {
             )
             await repository.save(story)
         }
+        isSavedToLibrary = true
     }
 
     private func nextStage(after stage: PipelineStage?) -> PipelineStage? {
+        if !streamStages.isEmpty {
+            guard let stage else {
+                return streamStages.first?.stageTypeEnum
+            }
+            if let idx = streamStages.firstIndex(where: { $0.type == stage.rawValue }),
+               idx + 1 < streamStages.count {
+                return streamStages[idx + 1].stageTypeEnum
+            }
+            return nil
+        }
         let all = PipelineStage.allCases
         guard let stage, let idx = all.firstIndex(of: stage), idx + 1 < all.count else {
             return stage == nil ? all.first : nil
@@ -794,6 +968,14 @@ final class GenerateViewModel {
     }
 
     private func previousStage(before stage: PipelineStage?) -> PipelineStage? {
+        if !streamStages.isEmpty {
+            guard let stage,
+                  let idx = streamStages.firstIndex(where: { $0.type == stage.rawValue }),
+                  idx > 0 else {
+                return nil
+            }
+            return streamStages[idx - 1].stageTypeEnum
+        }
         let all = PipelineStage.allCases
         guard let stage, let idx = all.firstIndex(of: stage), idx > 0 else {
             return nil

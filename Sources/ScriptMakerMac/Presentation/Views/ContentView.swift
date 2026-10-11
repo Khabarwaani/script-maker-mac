@@ -11,8 +11,15 @@ struct ContentView: View {
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
+        let genVM = viewModel.generateViewModel
+        genVM.onNavigateToLibrary = { [weak viewModel] in
+            viewModel?.selectedTab = .library
+            Task {
+                await viewModel?.libraryViewModel.refresh()
+            }
+        }
         _generateViewModel = State(
-            wrappedValue: viewModel.generateViewModel
+            wrappedValue: genVM
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
@@ -44,7 +51,7 @@ struct ContentView: View {
                     Spacer(minLength: 0)
                     Button { showingPreferences = true } label: { Image(systemName: "gearshape") }
                         .controlSize(.large)
-                        .help("Settings… (⌘,)")
+                        .help(Text(verbatim: "Settings… (⌘,)"))
                         .accessibilityLabel("Settings")
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)

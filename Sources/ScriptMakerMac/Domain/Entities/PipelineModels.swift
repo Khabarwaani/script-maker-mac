@@ -198,6 +198,20 @@ public struct StreamErrorPayload: Codable, Sendable, Equatable {
     }
 }
 
+public struct StreamEndPayload: Codable, Sendable, Equatable {
+    public let type: String?
+    public let result: String?
+    public let error: String?
+    public let code: String?
+
+    public init(result: String? = "success", error: String? = nil, code: String? = nil, type: String? = "end") {
+        self.type = type
+        self.result = result
+        self.error = error
+        self.code = code
+    }
+}
+
 /// An SSE event from POST /api/v1/stories/stream (Stream API Contract v1).
 public enum CreatorStreamEvent: Sendable, Decodable {
     case planStream(StreamPlanStreamPayload)
@@ -207,7 +221,8 @@ public enum CreatorStreamEvent: Sendable, Decodable {
     case outputSubstep(step: Int, substep: String, substepType: String, name: String, status: String, output: [String: Any])
     case outputStage(step: Int, status: String, outputType: String, output: [String: Any], llmCalls: [StreamLLMCall]?)
     case error(StreamErrorPayload)
-    case end
+    case end(StreamEndPayload?)
+    case unknown(type: String, data: [String: Any])
 
     private enum CodingKeys: String, CodingKey {
         case type
@@ -215,7 +230,7 @@ public enum CreatorStreamEvent: Sendable, Decodable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
+        let type = (try? container.decode(String.self, forKey: .type)) ?? "end"
         let single = try decoder.singleValueContainer()
 
         switch type {
@@ -236,10 +251,129 @@ public enum CreatorStreamEvent: Sendable, Decodable {
         case "error":
             self = .error(try single.decode(StreamErrorPayload.self))
         case "end":
-            self = .end
+            let endPayload = try? single.decode(StreamEndPayload.self)
+            self = .end(endPayload)
         default:
-            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown stream event type \(type)")
+            self = .unknown(type: type, data: [:])
         }
+    }
+}
+
+// MARK: - Dynamic Stream Progress Models
+
+/// Represents an unread or extra key-value pair from streaming output.
+public struct ExtraDetailItem: Identifiable, Equatable, Sendable {
+    public var id: String { key }
+    public let key: String
+    public let value: String
+
+    public init(key: String, value: String) {
+        self.key = key
+        self.value = value
+    }
+
+    public static func formatValue(_ value: Any) -> String {
+        if let str = value as? String {
+            return str
+        } else if let num = value as? NSNumber {
+            return num.stringValue
+        } else if let bool = value as? Bool {
+            return bool ? "true" : "false"
+        } else if let dict = value as? [String: Any],
+                  let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+                  let json = String(data: data, encoding: .utf8) {
+            return json
+        } else if let arr = value as? [Any],
+                  let data = try? JSONSerialization.data(withJSONObject: arr, options: [.prettyPrinted, .withoutEscapingSlashes]),
+                  let json = String(data: data, encoding: .utf8) {
+            return json
+        }
+        return String(describing: value)
+    }
+}
+
+/// Dynamic substep state inside a stage populated from stream events.
+public struct PipelineSubstepState: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let substepType: String
+    public var name: String
+    public var status: String
+    public var detail: String?
+    public var isExpanded: Bool
+    public var extraDetails: [ExtraDetailItem]
+
+    public init(
+        id: String,
+        substepType: String,
+        name: String,
+        status: String = "pending",
+        detail: String? = nil,
+        isExpanded: Bool = false,
+        extraDetails: [ExtraDetailItem] = []
+    ) {
+        self.id = id
+        self.substepType = substepType
+        self.name = name
+        self.status = status
+        self.detail = detail
+        self.isExpanded = isExpanded
+        self.extraDetails = extraDetails
+    }
+
+    /// Substep nesting level based on dot-separated identifier (e.g. "2.1" -> 0, "2.2.1" -> 1).
+    public var nestingLevel: Int {
+        let dotCount = id.filter { $0 == "." }.count
+        return max(0, dotCount - 1)
+    }
+}
+
+/// Dynamic stage state populated directly from stream events (`plan_stream`, `plan_stage`, etc.).
+public struct PipelineStageState: Identifiable, Equatable, Sendable {
+    public let id: Int
+    public let type: String
+    public var label: String
+    public var status: String
+    public var substeps: [PipelineSubstepState]
+    public var isExpanded: Bool
+    public var outputSummary: String?
+    public var outputPayload: [String: Any]?
+    public var extraDetails: [ExtraDetailItem]
+
+    public static func == (lhs: PipelineStageState, rhs: PipelineStageState) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.type == rhs.type &&
+        lhs.label == rhs.label &&
+        lhs.status == rhs.status &&
+        lhs.substeps == rhs.substeps &&
+        lhs.isExpanded == rhs.isExpanded &&
+        lhs.outputSummary == rhs.outputSummary &&
+        lhs.extraDetails == rhs.extraDetails
+    }
+
+    public init(
+        id: Int,
+        type: String,
+        label: String,
+        status: String = "pending",
+        substeps: [PipelineSubstepState] = [],
+        isExpanded: Bool = false,
+        outputSummary: String? = nil,
+        outputPayload: [String: Any]? = nil,
+        extraDetails: [ExtraDetailItem] = []
+    ) {
+        self.id = id
+        self.type = type
+        self.label = label
+        self.status = status
+        self.substeps = substeps
+        self.isExpanded = isExpanded
+        self.outputSummary = outputSummary
+        self.outputPayload = outputPayload
+        self.extraDetails = extraDetails
+    }
+
+    public var stageTypeEnum: PipelineStageType? {
+        PipelineStageType(rawValue: type)
     }
 }
 

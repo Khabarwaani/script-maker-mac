@@ -216,7 +216,18 @@ struct NetworkWebClient: WebClient {
                         throw APIError.transport("No HTTP response")
                     }
                     guard 200..<300 ~= http.statusCode else {
-                        throw APIError.badStatus(http.statusCode)
+                        var errorBody = ""
+                        for try await line in bytes.lines {
+                            errorBody += line
+                            if errorBody.count > 500 { break }
+                        }
+                        if http.statusCode == 404 || http.statusCode == 501 {
+                            throw APIError.notImplemented("POST \(path) — endpoint unavailable on server")
+                        } else if !errorBody.isEmpty {
+                            throw APIError.server(http.statusCode, errorBody)
+                        } else {
+                            throw APIError.badStatus(http.statusCode)
+                        }
                     }
 
                     var eventName = "message"

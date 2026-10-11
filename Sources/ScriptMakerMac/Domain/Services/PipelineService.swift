@@ -118,22 +118,28 @@ struct PipelineService: Sendable {
     }
 
     private static func parseCreatorEvent(name: String, json: String) -> CreatorStreamEvent? {
-        if name == "end" { return .end }
-        guard let data = json.data(using: .utf8) else { return nil }
+        guard let data = json.data(using: .utf8) else {
+            if name == "end" { return .end(nil) }
+            return nil
+        }
+        let rawDict = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
 
         // Use typed JSONDecoder for Stream API Contract v1
         if let decoded = try? JSONDecoder().decode(CreatorStreamEvent.self, from: data) {
             // Extract raw dictionaries for stage/substep output payloads
             if case .outputStage(let step, let status, let outputType, _, let llmCalls) = decoded,
-               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let output = dict["output"] as? [String: Any] {
+               let output = rawDict["output"] as? [String: Any] {
                 return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
             } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, _) = decoded,
-                      let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let output = dict["output"] as? [String: Any] {
+                      let output = rawDict["output"] as? [String: Any] {
                 return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, output: output)
+            } else if case .unknown(let type, _) = decoded {
+                return .unknown(type: type, data: rawDict)
             }
             return decoded
+        } else if !rawDict.isEmpty {
+            let type = rawDict["type"] as? String ?? name
+            return .unknown(type: type, data: rawDict)
         }
         return nil
     }

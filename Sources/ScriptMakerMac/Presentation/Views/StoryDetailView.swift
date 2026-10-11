@@ -17,9 +17,9 @@ struct StoryDetailView: View {
                     Spacer()
                     ShareLink(item: story.scriptText ?? (story.summary.isEmpty ? story.title : "\(story.title)\n\n\(story.summary)")) {
                         Image(systemName: "square.and.arrow.up")
-                    }.help("Share story")
+                    }.help(Text(verbatim: "Share story"))
                     Button(action: onDelete) { Image(systemName: "trash") }
-                        .help("Delete this story").accessibilityLabel("Delete story")
+                        .help(Text(verbatim: "Delete this story")).accessibilityLabel("Delete story")
                 }
                 HStack(spacing: 12) {
                     Label(story.status.capitalized, systemImage: "checkmark.circle")

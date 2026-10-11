@@ -213,10 +213,55 @@ struct OfflineWebClient: WebClient {
                         let stageType = meta.type
                         let label = meta.label
 
-                        let substeps = [
-                            StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "\(label) - Step 1"),
-                            StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "\(label) - Step 2")
-                        ]
+                        let substeps: [StreamSubstepPlan] = {
+                            switch stageType {
+                            case "validation":
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "Fact verification & dossier"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "Verification gate overview"),
+                                    StreamSubstepPlan(id: "\(position).2.1", substepType: stageType, name: "News claim check"),
+                                    StreamSubstepPlan(id: "\(position).2.2", substepType: stageType, name: "Confidence threshold check"),
+                                    StreamSubstepPlan(id: "\(position).3", substepType: stageType, name: "Confidence retry")
+                                ]
+                            case "casting":
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "Character generation"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "Character validation overview"),
+                                    StreamSubstepPlan(id: "\(position).2.1", substepType: stageType, name: "Character count check"),
+                                    StreamSubstepPlan(id: "\(position).2.2", substepType: stageType, name: "Specificity & attire check"),
+                                    StreamSubstepPlan(id: "\(position).3", substepType: stageType, name: "Viral angles & hooks")
+                                ]
+                            case "dialogue":
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "Dialogue generation"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "Dialogue validation")
+                                ]
+                            case "scenes":
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "Scene derivation"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "Scene validation overview"),
+                                    StreamSubstepPlan(id: "\(position).2.1", substepType: stageType, name: "Location completeness check")
+                                ]
+                            case "storyboard":
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "Storyboard generation"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "Realism & coherence gate"),
+                                    StreamSubstepPlan(id: "\(position).2.1", substepType: stageType, name: "Realism & coherence check")
+                                ]
+                            case "script":
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "Integration"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "Validation gate overview"),
+                                    StreamSubstepPlan(id: "\(position).2.1", substepType: stageType, name: "Integration checks"),
+                                    StreamSubstepPlan(id: "\(position).2.2", substepType: stageType, name: "Retry audit check")
+                                ]
+                            default:
+                                return [
+                                    StreamSubstepPlan(id: "\(position).1", substepType: stageType, name: "\(label) - Step 1"),
+                                    StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "\(label) - Step 2")
+                                ]
+                            }
+                        }()
 
                         let planStageData = try JSONEncoder().encode(StreamPlanStagePayload(position: position, stageType: stageType, substeps: substeps))
                         continuation.yield(ServerSSEEvent(event: "plan_stage", data: String(data: planStageData, encoding: .utf8) ?? "{}"))
@@ -236,7 +281,7 @@ struct OfflineWebClient: WebClient {
                                 "substep_type": stageType,
                                 "name": sub.name,
                                 "status": "success",
-                                "output": ["result": "OK"]
+                                "output": ["detail": "Sample substep complete"]
                             ]
                             let outSubData = try JSONSerialization.data(withJSONObject: outSubDict)
                             continuation.yield(ServerSSEEvent(event: "output_substep", data: String(data: outSubData, encoding: .utf8) ?? "{}"))
@@ -266,7 +311,7 @@ struct OfflineWebClient: WebClient {
                         continuation.yield(ServerSSEEvent(event: "output_stage", data: String(data: outStageData, encoding: .utf8) ?? "{}"))
                     }
 
-                    continuation.yield(ServerSSEEvent(event: "end", data: "{}"))
+                    continuation.yield(ServerSSEEvent(event: "end", data: "{\"type\": \"end\", \"result\": \"success\"}"))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)

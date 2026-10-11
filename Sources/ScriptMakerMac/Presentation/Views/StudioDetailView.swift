@@ -59,7 +59,7 @@ struct StudioDetailView: View {
                     .foregroundStyle(AppTheme.secondaryInk)
             }
             .buttonStyle(.plain)
-            .help("Dismiss")
+            .help(Text(verbatim: "Dismiss"))
         }
         .padding(14)
         .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
@@ -86,41 +86,53 @@ struct StudioDetailView: View {
     // MARK: - Stage flow
 
     private var stageFlow: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Progress through stages — tap a completed stage to revisit it.
+        VStack(alignment: .leading, spacing: 14) {
+            // Dynamic stage navigation chips
             ScrollView(.horizontal, showsIndicators: true) {
-                HStack {
-                    ForEach(PipelineStage.allCases) { stage in
-                        Button { viewModel.goToStage(stage) } label: {
-                            stageChip(stage)
+                HStack(spacing: 8) {
+                    if !viewModel.streamStages.isEmpty {
+                        ForEach(viewModel.streamStages) { stage in
+                            Button {
+                                if let stageEnum = stage.stageTypeEnum {
+                                    viewModel.goToStage(stageEnum)
+                                }
+                                viewModel.toggleStageExpansion(id: stage.id)
+                            } label: {
+                                dynamicStageChip(stage)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.stagePayloads[stage] == nil)
+                    } else {
+                        ForEach(PipelineStage.allCases) { stage in
+                            Button { viewModel.goToStage(stage) } label: {
+                                stageChip(stage)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.stagePayloads[stage] == nil)
+                        }
                     }
                 }
             }
 
-            // Active stage detail view with live tracker.
+            // Dynamic stream progress accordion with stage & substep dropboxes
+            StreamProgressAccordionView(viewModel: viewModel)
+
+            // Active stage detail view when stage output is available
             if let stage = viewModel.currentStage,
                let payload = viewModel.stagePayloads[stage] {
-                StageTracker(stage: stage, events: viewModel.events, isRunning: viewModel.isRunning)
-                stageDetailView(for: stage, payload: payload)
-                    .disabled(viewModel.isRunning || (viewModel.workflowMode == .continuous && viewModel.generationCompleted))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
-                    .textSelection(.enabled)
-            } else if viewModel.isRunning {
-                ProgressView("Generating \(viewModel.currentStage?.title.lowercased() ?? "story")…")
-                    .padding(24)
-            }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Stage Detail: \(stage.title)")
+                        .font(.caption.weight(.bold))
+                        .textCase(.uppercase)
+                        .tracking(0.7)
+                        .foregroundStyle(AppTheme.secondaryInk)
 
-            // Completed stages as collapsible output cards.
-            ForEach(PipelineStage.allCases) { stage in
-                if stage != viewModel.currentStage, let payload = viewModel.stagePayloads[stage] {
-                    OutputCard(stage: stage) {
-                        stageDetailView(for: stage, payload: payload).disabled(true)
-                    }
+                    stageDetailView(for: stage, payload: payload)
+                        .disabled(viewModel.isRunning || (viewModel.workflowMode == .continuous && viewModel.generationCompleted))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+                        .textSelection(.enabled)
                 }
             }
 
@@ -144,42 +156,58 @@ struct StudioDetailView: View {
             }
             .padding(.top, 8)
 
-            if viewModel.generationCompleted && !viewModel.isLocalJSON {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Video rendering").font(.headline)
-                    if viewModel.renderCompleted {
-                        Label("Render complete", systemImage: "checkmark.circle.fill")
-                    } else if viewModel.renderJobID == nil {
-                        Button("Render video") { Task { await viewModel.startRender() } }
-                            .buttonStyle(StudioPrimaryButtonStyle())
-                            .disabled(viewModel.isRunning)
+            if viewModel.generationCompleted {
+                HStack(alignment: .center, spacing: 14) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(AppTheme.success)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Story Saved to Library")
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.ink)
+
+                        Text("Generation finished and automatically saved to your local library.")
+                            .font(.callout)
+                            .foregroundStyle(AppTheme.secondaryInk)
                     }
-                }
-                .padding()
-            }
-            // Render progress.
 
-            if let progress = viewModel.jobProgress {
-                ProgressView(value: progress) {
-                    Text("Rendering video…")
-                }
-            }
+                    Spacer()
 
-            if viewModel.isRunning && viewModel.currentStage == nil {
-                ProgressView().scaleEffect(0.8)
+                    Button {
+                        viewModel.goToLibrary()
+                    } label: {
+                        Label("Go to Library", systemImage: "books.vertical.fill")
+                    }
+                    .buttonStyle(StudioPrimaryButtonStyle())
+                }
+                .padding(16)
+                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppTheme.success.opacity(0.35), lineWidth: 1)
+                )
             }
         }
     }
 
     private var canGoBack: Bool {
-        guard let current = viewModel.currentStage,
-              let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
+        guard let current = viewModel.currentStage else { return false }
+        if !viewModel.streamStages.isEmpty {
+            guard let idx = viewModel.streamStages.firstIndex(where: { $0.type == current.rawValue }) else { return false }
+            return idx > 0
+        }
+        guard let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
         return idx > 0 && viewModel.stagePayloads[PipelineStage.allCases[idx - 1]] != nil
     }
 
     private var canGoForward: Bool {
-        guard let current = viewModel.currentStage,
-              let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
+        guard let current = viewModel.currentStage else { return false }
+        if !viewModel.streamStages.isEmpty {
+            guard let idx = viewModel.streamStages.firstIndex(where: { $0.type == current.rawValue }) else { return false }
+            return idx + 1 < viewModel.streamStages.count
+        }
+        guard let idx = PipelineStage.allCases.firstIndex(of: current) else { return false }
         return idx + 1 < PipelineStage.allCases.count
     }
 
@@ -220,5 +248,24 @@ struct StudioDetailView: View {
             .padding(10)
             .background(current ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.line, lineWidth: 1))
+    }
+
+    private func dynamicStageChip(_ stage: PipelineStageState) -> some View {
+        let isDone = stage.status.lowercased() == "success" || stage.status.lowercased() == "complete"
+        let isRunning = stage.status.lowercased() == "running"
+        let isSelected = viewModel.currentStage?.rawValue == stage.type
+        return HStack(spacing: 5) {
+            if isRunning {
+                ProgressView().scaleEffect(0.55).frame(width: 12, height: 12)
+            } else {
+                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+            }
+            Text("Stage \(stage.id): \(stage.label)")
+        }
+        .font(.caption)
+        .foregroundStyle(isSelected ? AppTheme.accent : isDone ? AppTheme.success : isRunning ? AppTheme.accent : AppTheme.secondaryInk)
+        .padding(10)
+        .background(isSelected ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.line, lineWidth: 1))
     }
 }

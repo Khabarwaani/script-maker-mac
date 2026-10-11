@@ -74,7 +74,7 @@ struct VerifyStageView: View {
         )
         .font(.headline)
         .foregroundStyle(verified ? AppTheme.success : AppTheme.warning)
-        .help("Confidence \(confText)")
+        .help(Text(verbatim: "Confidence \(confText)"))
     }
 
     @ViewBuilder

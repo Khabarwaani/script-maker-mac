@@ -12,14 +12,14 @@ struct StoryListView: View {
                 Button { isCollapsed.toggle() } label: {
                     Label("Stories · \(viewModel.stories.count)", systemImage: isCollapsed ? "chevron.right" : "chevron.down")
                         .font(.headline)
-                }.buttonStyle(.plain).help(isCollapsed ? "Expand stories" : "Collapse stories")
+                }.buttonStyle(.plain).help(Text(verbatim: isCollapsed ? "Expand stories" : "Collapse stories"))
                 Spacer()
                 Button { Task { await viewModel.refresh() } } label: {
                     Image(systemName: "arrow.clockwise")
-                }.help("Refresh library").disabled(viewModel.isLoading)
+                }.help(Text(verbatim: "Refresh library")).disabled(viewModel.isLoading)
                 Button { deletingAll = true } label: {
                     Image(systemName: "trash")
-                }.help("Delete all stories").accessibilityLabel("Delete all stories")
+                }.help(Text(verbatim: "Delete all stories")).accessibilityLabel("Delete all stories")
                     .disabled(viewModel.stories.isEmpty || viewModel.isLoading)
             }
             Divider().overlay(AppTheme.line)
