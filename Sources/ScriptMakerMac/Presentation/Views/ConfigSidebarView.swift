@@ -183,7 +183,6 @@ struct StudioOptionPicker: View {
     @Binding var selection: String
     let options: [String]
     var label: (String) -> String = { $0 }
-    @State private var showingOptions = false
 
     init(_ title: String, selection: Binding<String>, options: [String], label: @escaping (String) -> String = { $0 }) {
         self.title = title
@@ -193,39 +192,16 @@ struct StudioOptionPicker: View {
     }
 
     var body: some View {
-        Button { showingOptions.toggle() } label: {
-            HStack(spacing: 8) {
-                Text(label(selection)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.down").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+        Picker(title, selection: $selection) {
+            ForEach(options, id: \.self) { option in
+                Text(label(option)).tag(option)
             }
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.large)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .padding(.horizontal, 10)
         .accessibilityLabel(title)
-        .accessibilityValue(label(selection))
-        .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
-            ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(options, id: \.self) { option in
-                        Button {
-                            selection = option
-                            showingOptions = false
-                        } label: {
-                            HStack {
-                                Text(label(option)).frame(maxWidth: .infinity, alignment: .leading)
-                                Image(systemName: "checkmark").opacity(selection == option ? 1 : 0)
-                            }
-                            .padding(10).contentShape(Rectangle())
-                            .background(selection == option ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(8)
-            }
-            .frame(width: 340, height: min(CGFloat(options.count) * 42 + 16, 400))
-            .foregroundStyle(AppTheme.ink).background(AppTheme.card)
-            .scrollIndicators(.visible)
-        }
     }
 }

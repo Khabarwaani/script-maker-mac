@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 /// Infra layer: dumb framework wrappers.
 /// No business logic, no app-specific types. Just thin adapters.
@@ -70,5 +71,13 @@ struct FileStore: Sendable {
 
     func exists(at url: URL) -> Bool {
         fileManager.fileExists(atPath: url.path)
+    }
+}
+
+@MainActor
+struct PasteboardStore {
+    func write(_ text: String) -> Bool {
+        NSPasteboard.general.clearContents()
+        return NSPasteboard.general.setString(text, forType: .string)
     }
 }

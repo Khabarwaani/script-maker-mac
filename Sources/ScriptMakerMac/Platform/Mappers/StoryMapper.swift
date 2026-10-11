@@ -19,6 +19,10 @@ enum StoryMapper {
             emotion: metadata["emotion"] as? String ?? metadata["tone"] as? String ?? "",
             format: dict["format"] as? String ?? "",
             videoURL: dict["video_url"] as? String,
+            hashtags: metadata["hashtags"] as? [String],
+            sourceLinks: (metadata["news_links"] as? [[String: Any]])?.map { link in
+                StorySourceLink(title: link["title"] as? String ?? "Source", url: link["url"] as? String ?? link["link"] as? String ?? "", source: link["source"] as? String ?? "")
+            },
             scriptText: dict["script_md"] as? String ?? dict["script"] as? String,
             generationNumber: metadata["generation_number"] as? Int
         )
@@ -36,6 +40,10 @@ enum StoryMapper {
             "emotion": story.emotion,
             "format": story.format,
         ]
+        if let hashtags = story.hashtags { dict["hashtags"] = hashtags }
+        if let links = story.sourceLinks {
+            dict["news_links"] = links.map { ["title": $0.title, "url": $0.url, "source": $0.source] }
+        }
         if let script = story.scriptText { dict["script_md"] = script }
         if let number = story.generationNumber { dict["generation_number"] = number }
         if let videoURL = story.videoURL {

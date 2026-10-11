@@ -474,6 +474,10 @@ final class GenerateViewModel {
                 status: "completed",
                 emotion: selectedEmotion,
                 format: selectedFormat,
+                hashtags: script["hashtags"] as? [String],
+                sourceLinks: (stagePayloads[.verify]?["sources"] as? [[String: Any]])?.map { link in
+                    StorySourceLink(title: link["title"] as? String ?? "Source", url: link["url"] as? String ?? "", source: link["source"] as? String ?? "")
+                },
                 scriptText: script["script_md"] as? String ?? script["script"] as? String ?? board["script_md"] as? String,
                 generationNumber: index + 1,
                 stageOutputs: outputs

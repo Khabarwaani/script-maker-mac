@@ -34,7 +34,7 @@ enum CompositionRoot {
         let preferences = PreferencesViewModel(config: config, connectionChecker: checker)
         let repository = LocalStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
-        let library = LibraryViewModel(config: config, repository: repository)
+        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()))
         return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library)
     }
 }

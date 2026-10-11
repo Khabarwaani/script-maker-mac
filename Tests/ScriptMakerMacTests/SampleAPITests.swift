@@ -10,13 +10,18 @@ final class SampleAPITests: XCTestCase {
     func testServerStoryPreservesIdentityAndScreenplay() {
         let id = UUID().uuidString
         let story = StoryMapper.from([
-            "meta": ["id": id, "title": "Server title", "created_at": "2026-10-11T03:00:00Z", "generation_number": 3, "tone": "Curiosity", "source_headline": "Verified headline"],
-            "script": "Full server screenplay\nSpoken dialogue"
+            "meta": ["id": id, "title": "Server title", "created_at": "2026-10-11T03:00:00Z", "generation_number": 3, "tone": "Curiosity", "source_headline": "Verified headline", "hashtags": ["#Delhi"], "news_links": [["title": "Source story", "url": "https://example.com/story", "source": "Wire"]]],
+            "script": "Full server screenplay\nSpoken dialogue",
+            "hashtags": ["#Delhi"]
         ])
         XCTAssertEqual(story.id, id)
         XCTAssertEqual(story.title, "Server title")
         XCTAssertEqual(story.generationNumber, 3)
         XCTAssertEqual(story.createdAt, "2026-10-11T03:00:00Z")
+        XCTAssertEqual(story.hashtags, ["#Delhi"])
+        XCTAssertEqual(story.sourceLinks?.first?.title, "Source story")
+        XCTAssertNotNil(story.sourceLinks?.first?.webURL)
+        XCTAssertNil(StorySourceLink(title: "Invalid", url: "javascript:alert(1)", source: "").webURL)
         XCTAssertEqual(story.emotion, "Curiosity")
         XCTAssertEqual(story.headline, "Verified headline")
         XCTAssertEqual(story.scriptText, "Full server screenplay\nSpoken dialogue")
@@ -73,6 +78,17 @@ final class SampleAPITests: XCTestCase {
     }
 }
 
+@MainActor
+private final class TestClipboard: ClipboardWriting {
+    var contents: String?
+    var succeeds = true
+    func write(_ text: String) -> Bool {
+        guard succeeds else { return false }
+        contents = text
+        return true
+    }
+}
+
 private actor WorkflowStoryRepository: StoryRepository {
     private var stories: [Story] = []
     func all() async -> [Story] { stories }
@@ -85,6 +101,22 @@ private actor WorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class LocalWorkflowTests: XCTestCase {
+    func testCopyUsesSelectedContentAndReportsFailures() {
+        let clipboard = TestClipboard()
+        let library = LibraryViewModel(config: AppConfig(), repository: WorkflowStoryRepository(), clipboard: clipboard)
+        library.copy("First screenplay", label: "Screenplay")
+        XCTAssertEqual(clipboard.contents, "First screenplay")
+        XCTAssertEqual(library.copyFeedback, "Screenplay copied")
+        library.copy("Second story UUID", label: "Story UUID")
+        XCTAssertEqual(clipboard.contents, "Second story UUID")
+        library.copy("   ", label: "Summary")
+        XCTAssertEqual(library.copyFeedback, "No summary to copy.")
+        XCTAssertEqual(clipboard.contents, "Second story UUID")
+        clipboard.succeeds = false
+        library.copy("Failed content", label: "Screenplay")
+        XCTAssertEqual(library.copyFeedback, "Could not copy screenplay.")
+    }
+
     func testSourceLabelsEnableManualAndHashtagInputs() throws {
         let config = AppConfig()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())

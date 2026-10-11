@@ -7,6 +7,7 @@ import Observation
 @MainActor
 final class LibraryViewModel {
     private let config: AppConfig
+    private let clipboard: (any ClipboardWriting)?
     private let repository: any StoryRepository
 
     var stories: [Story] = []
@@ -14,13 +15,24 @@ final class LibraryViewModel {
     var isLoading = false
     var notice: String?
 
-    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil) {
         self.config = config
         self.repository = repository
+        self.clipboard = clipboard
     }
 
     var selectedStory: Story? {
         stories.first { $0.id == selectedStoryID }
+    }
+
+    var copyFeedback: String?
+
+    func copy(_ text: String, label: String) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            copyFeedback = "No \(label.lowercased()) to copy."
+            return
+        }
+        copyFeedback = clipboard?.write(text) == true ? "\(label) copied" : "Could not copy \(label.lowercased())."
     }
 
     func refresh() async {

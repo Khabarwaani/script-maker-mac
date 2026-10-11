@@ -59,3 +59,9 @@ final class LocalStoryRepository: StoryRepository, @unchecked Sendable {
         dataSource.save(stories)
     }
 }
+
+@MainActor
+struct MacClipboardWriter: ClipboardWriting {
+    let store: PasteboardStore
+    func write(_ text: String) -> Bool { store.write(text) }
+}

@@ -12,6 +12,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var emotion: String
     var format: String
     var videoURL: String?
+    var hashtags: [String]?
+    var sourceLinks: [StorySourceLink]?
     var scriptText: String?
     var generationNumber: Int?
     var stageOutputs: [String: String]?
@@ -26,6 +28,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         emotion: String = "",
         format: String = "",
         videoURL: String? = nil,
+        hashtags: [String]? = nil,
+        sourceLinks: [StorySourceLink]? = nil,
         scriptText: String? = nil,
         generationNumber: Int? = nil,
         stageOutputs: [String: String]? = nil
@@ -39,8 +43,21 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.emotion = emotion
         self.format = format
         self.videoURL = videoURL
+        self.hashtags = hashtags
+        self.sourceLinks = sourceLinks
         self.scriptText = scriptText
         self.generationNumber = generationNumber
         self.stageOutputs = stageOutputs
+    }
+}
+
+struct StorySourceLink: Codable, Sendable, Hashable {
+    let title: String
+    let url: String
+    let source: String
+
+    var webURL: URL? {
+        guard let value = URL(string: url), ["http", "https"].contains(value.scheme?.lowercased() ?? "") else { return nil }
+        return value
     }
 }

@@ -16,3 +16,8 @@ protocol StoryRepository: Sendable {
     func all() async -> [Story]
     func remove(id: String) async
 }
+
+@MainActor
+protocol ClipboardWriting {
+    func write(_ text: String) -> Bool
+}

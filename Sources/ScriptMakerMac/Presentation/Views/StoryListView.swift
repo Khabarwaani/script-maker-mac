@@ -85,7 +85,7 @@ struct StoryListView: View {
     @ViewBuilder
     private var detail: some View {
         if let story = viewModel.selectedStory {
-            StoryDetailView(story: story, onDelete: { storyToDelete = story }) { storyID in
+            StoryDetailView(story: story, viewModel: viewModel, onDelete: { storyToDelete = story }) { storyID in
                 Task { await viewModel.mergeClip(storyID: storyID) }
             }
             .id(story.id).frame(maxWidth: .infinity, maxHeight: .infinity)
