@@ -15,7 +15,7 @@ struct StoryDetailView: View {
                         Text(story.id).font(.caption.monospaced()).foregroundStyle(AppTheme.secondaryInk)
                     }
                     Spacer()
-                    ShareLink(item: story.summary.isEmpty ? story.title : "\(story.title)\n\n\(story.summary)") {
+                    ShareLink(item: story.scriptText ?? (story.summary.isEmpty ? story.title : "\(story.title)\n\n\(story.summary)")) {
                         Image(systemName: "square.and.arrow.up")
                     }.help("Share story")
                     Button(action: onDelete) { Image(systemName: "trash") }
@@ -34,6 +34,13 @@ struct StoryDetailView: View {
                 }
                 if !story.headline.isEmpty {
                     DisclosureGroup("Original headline") { Text(story.headline).padding(.top, 8) }
+                }
+                if let script = story.scriptText, !script.isEmpty {
+                    Text("Screenplay").font(.headline)
+                    Text(script).font(.body).frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("No screenplay content was included in this story.")
+                        .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 }
                 if let outputs = story.stageOutputs, !outputs.isEmpty {
                     Text("Generation outputs").font(.headline)

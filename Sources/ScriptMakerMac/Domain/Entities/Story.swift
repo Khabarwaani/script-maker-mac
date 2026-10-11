@@ -12,6 +12,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var emotion: String
     var format: String
     var videoURL: String?
+    var scriptText: String?
     var generationNumber: Int?
     var stageOutputs: [String: String]?
 
@@ -25,6 +26,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         emotion: String = "",
         format: String = "",
         videoURL: String? = nil,
+        scriptText: String? = nil,
         generationNumber: Int? = nil,
         stageOutputs: [String: String]? = nil
     ) {
@@ -37,6 +39,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.emotion = emotion
         self.format = format
         self.videoURL = videoURL
+        self.scriptText = scriptText
         self.generationNumber = generationNumber
         self.stageOutputs = stageOutputs
     }

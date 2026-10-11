@@ -7,6 +7,22 @@ final class SampleAPITests: XCTestCase {
         PipelineService(client: OfflineWebClient(), baseURL: URL(string: AppConfig.defaultServerURL)!)
     }
 
+    func testServerStoryPreservesIdentityAndScreenplay() {
+        let id = UUID().uuidString
+        let story = StoryMapper.from([
+            "meta": ["id": id, "title": "Server title", "created_at": "2026-10-11T03:00:00Z", "generation_number": 3, "tone": "Curiosity", "source_headline": "Verified headline"],
+            "script": "Full server screenplay\nSpoken dialogue"
+        ])
+        XCTAssertEqual(story.id, id)
+        XCTAssertEqual(story.title, "Server title")
+        XCTAssertEqual(story.generationNumber, 3)
+        XCTAssertEqual(story.createdAt, "2026-10-11T03:00:00Z")
+        XCTAssertEqual(story.emotion, "Curiosity")
+        XCTAssertEqual(story.headline, "Verified headline")
+        XCTAssertEqual(story.scriptText, "Full server screenplay\nSpoken dialogue")
+        XCTAssertEqual(StoryMapper.from(StoryMapper.toDict(story)).scriptText, story.scriptText)
+    }
+
     func testPingReturnsTrue() async {
         let reachable = await service().ping()
         XCTAssertTrue(reachable)
@@ -152,6 +168,7 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertEqual(Set(stories.map(\.title)).count, 3)
         XCTAssertEqual(Set(stories.compactMap(\.generationNumber)), Set([1, 2, 3]))
         for story in stories {
+            XCTAssertTrue(story.scriptText?.contains("Kallu:") == true)
             XCTAssertNotNil(UUID(uuidString: story.id))
             XCTAssertNotEqual(story.id, generator.sessionID)
             XCTAssertNotEqual(story.title, generator.topic)
