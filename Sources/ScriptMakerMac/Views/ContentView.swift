@@ -123,13 +123,13 @@ struct LibraryView: View {
     private var storyList: some View {
         NavigationSplitView {
             List(selection: $viewModel.selectedStoryID) {
-                ForEach(viewModel.stories.indices, id: \.self) { idx in
-                    storyRow(viewModel.stories[idx])
-                        .tag(viewModel.stories[idx]["id"] as? String ?? "")
+                ForEach(viewModel.stories) { story in
+                    storyRow(story)
+                        .tag(story.id)
                 }
                 .onDelete { offsets in
                     for idx in offsets {
-                        let id = viewModel.stories[idx]["id"] as? String ?? ""
+                        let id = viewModel.stories[idx].id
                         Task { await viewModel.deleteStory(id: id) }
                     }
                 }
@@ -156,39 +156,51 @@ struct LibraryView: View {
         }
     }
 
-    private func storyRow(_ story: [String: Any]) -> some View {
+    private func storyRow(_ story: Story) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(story["title"] as? String ?? "Untitled")
+            Text(story.title)
                 .font(.headline)
                 .lineLimit(1)
-            if let date = story["created_at"] as? String {
-                Text(date)
+            if !story.createdAt.isEmpty {
+                Text(story.createdAt)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
-        .tag(story["id"] as? String ?? "")
+        .tag(story.id)
     }
 
-    private func storyDetail(_ story: [String: Any]) -> some View {
+    private func storyDetail(_ story: Story) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text(story["title"] as? String ?? "Untitled")
+                Text(story.title)
                     .font(.largeTitle)
-                if let date = story["created_at"] as? String, !date.isEmpty {
-                    Text(date)
+                if !story.createdAt.isEmpty {
+                    Text(story.createdAt)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if let summary = story["summary"] as? String, !summary.isEmpty {
-                    Text(summary)
+                if !story.summary.isEmpty {
+                    Text(story.summary)
                         .font(.callout)
                 }
 
+                // Metadata
+                if !story.headline.isEmpty {
+                    detailField("Headline", value: story.headline)
+                }
+                if !story.emotion.isEmpty {
+                    detailField("Emotion", value: story.emotion)
+                }
+                if !story.format.isEmpty {
+                    detailField("Format", value: story.format)
+                }
+                detailField("Status", value: story.status)
+
                 // Video section
                 Section("Video") {
-                    if let videoURL = story["video_url"] as? String, !videoURL.isEmpty {
+                    if let videoURL = story.videoURL, !videoURL.isEmpty {
                         Text("Video attached")
                             .font(.callout)
                             .foregroundStyle(.secondary)
@@ -209,27 +221,24 @@ struct LibraryView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Merge closing clip") {
-                        Task { await viewModel.mergeClip(storyID: story["id"] as? String ?? "") }
+                        Task { await viewModel.mergeClip(storyID: story.id) }
                     }
-                    .disabled((story["video_url"] as? String)?.isEmpty ?? true)
+                    .disabled(story.videoURL?.isEmpty ?? true)
                     .help("Merge the default ending clip at the video's end")
-                }
-
-                // Render all other fields from the story JSON.
-                ForEach(story.keys.sorted(), id: \.self) { key in
-                    if !["id", "title", "summary", "created_at", "video_url"].contains(key) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(StringFormatting.displayKey(key))
-                                .font(.headline)
-                            Text("\(story[key] ?? "")")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.top, 8)
-                    }
                 }
             }
             .padding()
         }
+    }
+
+    private func detailField(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.headline)
+            Text(value)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 8)
     }
 }

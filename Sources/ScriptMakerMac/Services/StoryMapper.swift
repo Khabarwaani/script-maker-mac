@@ -1,0 +1,41 @@
+import Foundation
+
+/// Platform mapper: converts between `[String: Any]` dictionaries (from JSON/server)
+/// and the typed `Story` domain entity.
+///
+/// Dictionaries arrive from bundled JSON samples and the server API;
+/// the Domain layer works with `Story`.
+enum StoryMapper {
+    /// Dictionary → Story (tolerant: missing keys get defaults).
+    static func from(_ dict: [String: Any]) -> Story {
+        Story(
+            id: dict["id"] as? String ?? UUID().uuidString,
+            title: dict["title"] as? String ?? "Untitled",
+            summary: dict["summary"] as? String ?? "",
+            headline: dict["headline"] as? String ?? "",
+            createdAt: dict["created_at"] as? String ?? DateFormatting.iso8601Now(),
+            status: dict["status"] as? String ?? "completed",
+            emotion: dict["emotion"] as? String ?? "",
+            format: dict["format"] as? String ?? "",
+            videoURL: dict["video_url"] as? String
+        )
+    }
+
+    /// Story → Dictionary (for persistence).
+    static func toDict(_ story: Story) -> [String: Any] {
+        var dict: [String: Any] = [
+            "id": story.id,
+            "title": story.title,
+            "summary": story.summary,
+            "headline": story.headline,
+            "created_at": story.createdAt,
+            "status": story.status,
+            "emotion": story.emotion,
+            "format": story.format,
+        ]
+        if let videoURL = story.videoURL {
+            dict["video_url"] = videoURL
+        }
+        return dict
+    }
+}

@@ -8,6 +8,7 @@
 		/* Build files */
 		F001 /* ScriptMakerMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = R001 /* ScriptMakerMacApp.swift */; };
 		F035 /* CoreUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = R039 /* CoreUtilities.swift */; };
+		F036 /* Story.swift in Sources */ = {isa = PBXBuildFile; fileRef = R040 /* Story.swift */; };
 		F002 /* PipelineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = R002 /* PipelineModels.swift */; };
 		F003 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = R003 /* AppConfig.swift */; };
 		F005 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R005 /* ContentViewModel.swift */; };
@@ -18,6 +19,7 @@
 		F030 /* StoryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = R033 /* StoryDataSource.swift */; };
 		F031 /* ImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R034 /* ImageService.swift */; };
 		F033 /* LocalStoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = R036 /* LocalStoryRepository.swift */; };
+		F037 /* StoryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = R041 /* StoryMapper.swift */; };
 		F034 /* InfraStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = R037 /* InfraStore.swift */; };
 		F008 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R008 /* ContentView.swift */; };
 		F009 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R009 /* PreferencesView.swift */; };
@@ -58,6 +60,7 @@
 		/* File references */
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
 		R039 /* CoreUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreUtilities.swift; sourceTree = "<group>"; };
+		R040 /* Story.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Story.swift; sourceTree = "<group>"; };
 		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
 		R003 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		R005 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
@@ -83,6 +86,7 @@
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
 		R032 /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
 		R033 /* StoryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDataSource.swift; sourceTree = "<group>"; };
+		R041 /* StoryMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryMapper.swift; sourceTree = "<group>"; };
 		R037 /* InfraStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfraStore.swift; sourceTree = "<group>"; };
 		R036 /* LocalStoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoryRepository.swift; sourceTree = "<group>"; };
 		R034 /* ImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageService.swift; sourceTree = "<group>"; };
@@ -146,7 +150,7 @@
 		};
 		G005 /* Models */ = {
 			isa = PBXGroup;
-			children = ( R002 /* PipelineModels.swift */, );
+			children = ( R002 /* PipelineModels.swift */, R040 /* Story.swift */, );
 			path = Models;
 			sourceTree = "<group>";
 		};
@@ -171,6 +175,7 @@
 				R034 /* ImageService.swift */,
 				R036 /* LocalStoryRepository.swift */,
 				R037 /* InfraStore.swift */,
+				R041 /* StoryMapper.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -314,6 +319,7 @@
 			files = (
 				F001 /* ScriptMakerMacApp.swift in Sources */,
 				F035 /* CoreUtilities.swift in Sources */,
+				F036 /* Story.swift in Sources */,
 				F002 /* PipelineModels.swift in Sources */,
 				F003 /* AppConfig.swift in Sources */,
 				F022 /* WebClient.swift in Sources */,
@@ -331,6 +337,7 @@
 				F030 /* StoryDataSource.swift in Sources */,
 				F031 /* ImageService.swift in Sources */,
 				F033 /* LocalStoryRepository.swift in Sources */,
+				F037 /* StoryMapper.swift in Sources */,
 				F034 /* InfraStore.swift in Sources */,
 				F008 /* ContentView.swift in Sources */,
 				F009 /* PreferencesView.swift in Sources */,

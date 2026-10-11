@@ -1,6 +1,6 @@
 import Foundation
 
-/// Data layer: repository implementation.
+/// Platform layer: repository implementation (stateful).
 /// Implements the domain's StoryRepository protocol using platform data sources.
 ///
 ///   Domain (StoryRepository protocol)
@@ -15,23 +15,20 @@ final class LocalStoryRepository: StoryRepository, @unchecked Sendable {
         self.dataSource = dataSource
     }
 
-    func save(_ story: [String: Any]) async {
+    func save(_ story: Story) async {
         var stories = dataSource.load()
-        let id = story["id"] as? String ?? UUID().uuidString
-        var s = story
-        s["id"] = id
-        stories.removeAll { ($0["id"] as? String) == id }
-        stories.insert(s, at: 0) // newest first
+        stories.removeAll { $0.id == story.id }
+        stories.insert(story, at: 0) // newest first
         dataSource.save(stories)
     }
 
-    func all() async -> [[String: Any]] {
+    func all() async -> [Story] {
         dataSource.load()
     }
 
     func remove(id: String) async {
         var stories = dataSource.load()
-        stories.removeAll { ($0["id"] as? String) == id }
+        stories.removeAll { $0.id == id }
         dataSource.save(stories)
     }
 }
