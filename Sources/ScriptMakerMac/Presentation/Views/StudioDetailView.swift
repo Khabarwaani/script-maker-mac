@@ -35,68 +35,33 @@ struct StudioDetailView: View {
     // MARK: - Error Banner
 
     private var errorBannerView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title3)
-                    .foregroundStyle(AppTheme.danger)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.errorTitle ?? "Error")
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.ink)
-                    if let detail = viewModel.errorDetail, !detail.isEmpty {
-                        Text(detail)
-                            .font(.callout)
-                            .foregroundStyle(AppTheme.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                Spacer()
-                Button {
-                    viewModel.errorMessage = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title3)
+                .foregroundStyle(AppTheme.danger)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.errorTitle ?? "Error")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.ink)
+                if let detail = viewModel.errorDetail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.callout)
                         .foregroundStyle(AppTheme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.plain)
-                .help("Dismiss error")
             }
-
-            HStack(spacing: 8) {
-                if viewModel.isNetworkError {
-                    Button("Retry") {
-                        Task { await viewModel.retryFresh() }
-                    }
-                    .buttonStyle(StudioPrimaryButtonStyle())
-                } else if viewModel.currentStage != nil {
-                    Button("Retry stage") {
-                        Task { await viewModel.retryStage() }
-                    }
-                    .buttonStyle(StudioPrimaryButtonStyle())
-
-                    Button("Retry fresh") {
-                        Task { await viewModel.retryFresh() }
-                    }
-                    .buttonStyle(StudioButtonStyle())
-
-                    Button("Skip stage") {
-                        Task { await viewModel.skipStage() }
-                    }
-                    .buttonStyle(StudioButtonStyle())
-                } else {
-                    Button("Retry") {
-                        Task { await viewModel.retryFresh() }
-                    }
-                    .buttonStyle(StudioPrimaryButtonStyle())
-                }
-                Spacer()
-                Button("Dismiss") {
-                    viewModel.errorMessage = nil
-                }
-                .buttonStyle(StudioButtonStyle())
+            Spacer()
+            Button {
+                viewModel.errorMessage = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
+            .buttonStyle(.plain)
+            .help("Dismiss")
         }
-        .padding(16)
+        .padding(14)
         .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)

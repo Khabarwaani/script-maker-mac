@@ -33,24 +33,15 @@ final class GenerateViewModel {
             errorDetail = newValue
         }
     }
-    var isNetworkError: Bool = false
     var jobProgress: Double?
 
     func setError(_ error: Error) {
         if let apiError = error as? APIError {
             errorTitle = apiError.errorDescription ?? "Error"
             errorDetail = apiError.failureReason ?? apiError.localizedDescription
-            switch apiError {
-            case .unreachable, .transport:
-                isNetworkError = true
-            default:
-                isNetworkError = false
-            }
         } else {
             errorTitle = "Error"
             errorDetail = error.localizedDescription
-            let nsError = error as NSError
-            isNetworkError = (nsError.domain == NSURLErrorDomain)
         }
     }
 
