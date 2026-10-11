@@ -14,32 +14,36 @@ struct GenerateView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            // Master: configuration sidebar (like Streamlit's sidebar).
-            configSidebar
-                .navigationTitle("Configuration")
-        } detail: {
-            // Detail: stage flow results (Preview column like Streamlit).
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Preview")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                if viewModel.sessionID == nil {
-                    emptyDetail
-                } else {
-                    stageFlow
+        GeometryReader { geo in
+            let widths = SplitWidths.sidebar(totalWidth: geo.size.width)
+            NavigationSplitView {
+                // Master: configuration sidebar (like Streamlit's sidebar).
+                configSidebar
+                    .navigationTitle("Configuration")
+                    .navigationSplitViewColumnWidth(min: widths.min, ideal: widths.ideal, max: widths.max)
+            } detail: {
+                // Detail: stage flow results (Preview column like Streamlit, 40%).
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Preview")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    if viewModel.sessionID == nil {
+                        emptyDetail
+                    } else {
+                        stageFlow
+                    }
                 }
+                .padding()
+                .navigationTitle("Studio")
             }
-            .padding()
-            .navigationTitle("Studio")
-        }
-        .alert("Something went wrong", isPresented: errorBinding) {
-            Button("Retry stage") { Task { await viewModel.retryStage() } }
-            Button("Retry fresh") { Task { await viewModel.retryFresh() } }
-            Button("Skip stage") { Task { await viewModel.skipStage() } }
-            Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
+            .alert("Something went wrong", isPresented: errorBinding) {
+                Button("Retry stage") { Task { await viewModel.retryStage() } }
+                Button("Retry fresh") { Task { await viewModel.retryFresh() } }
+                Button("Skip stage") { Task { await viewModel.skipStage() } }
+                Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
         }
     }
 

@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Native macOS layout (HIG):
-/// - Sidebar: Studio | Library navigation (like Mail/Finder)
-/// - Toolbar: title, connection status, Preferences
-/// - Detail: selected section's content
+/// Native macOS layout:
+/// - Top tabs: Studio | Library. Each tab owns exactly ONE NavigationSplitView;
+///   nesting split views throws inside AppKit layout (+[NSApplication _crashOnException:]).
+/// - Toolbar: connection status, Preferences.
+/// - Master-detail per tab defaults to 60/40 (Streamlit's settings/output [6,4]).
 struct ContentView: View {
     @ObservedObject var viewModel: ContentViewModel
     @StateObject private var generateViewModel: GenerateViewModel
@@ -26,25 +27,18 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            // Sidebar: app sections (HIG: sidebar navigation for macOS)
-            List(selection: $viewModel.selectedTab) {
-                ForEach(ContentViewModel.Tab.allCases) { tab in
-                    NavigationLink(value: tab) {
-                        Label(tab.title, systemImage: tab == .studio ? "wand.and.stars" : "books.vertical")
-                    }
+        TabView(selection: $viewModel.selectedTab) {
+            GenerateView(viewModel: generateViewModel)
+                .tabItem {
+                    Label("Studio", systemImage: "wand.and.stars")
                 }
-            }
-            .listStyle(.sidebar)
-            .navigationTitle("Script Maker")
-        } detail: {
-            // Detail: selected section
-            switch viewModel.selectedTab {
-            case .studio:
-                GenerateView(viewModel: generateViewModel)
-            case .library:
-                LibraryView(config: viewModel.config)
-            }
+                .tag(ContentViewModel.Tab.studio)
+
+            LibraryView(config: viewModel.config)
+                .tabItem {
+                    Label("Library", systemImage: "books.vertical")
+                }
+                .tag(ContentViewModel.Tab.library)
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -57,6 +51,7 @@ struct ContentView: View {
                     Image(systemName: "gearshape")
                 }
                 .help("Preferences… (⌘,)")
+                .accessibilityLabel("Preferences")
             }
         }
         .sheet(isPresented: $showingPreferences) {
@@ -121,37 +116,41 @@ struct LibraryView: View {
     }
 
     private var storyList: some View {
-        NavigationSplitView {
-            List(selection: $viewModel.selectedStoryID) {
-                ForEach(viewModel.stories) { story in
-                    storyRow(story)
-                        .tag(story.id)
-                }
-                .onDelete { offsets in
-                    for idx in offsets {
-                        let id = viewModel.stories[idx].id
-                        Task { await viewModel.deleteStory(id: id) }
+        GeometryReader { geo in
+            let widths = SplitWidths.sidebar(totalWidth: geo.size.width, min: 220)
+            NavigationSplitView {
+                List(selection: $viewModel.selectedStoryID) {
+                    ForEach(viewModel.stories) { story in
+                        storyRow(story)
+                            .tag(story.id)
+                    }
+                    .onDelete { offsets in
+                        for idx in offsets {
+                            let id = viewModel.stories[idx].id
+                            Task { await viewModel.deleteStory(id: id) }
+                        }
                     }
                 }
-            }
-            .listStyle(.sidebar)
-            .navigationTitle("Stories · \(viewModel.stories.count)")
-            .toolbar {
-                ToolbarItem {
-                    Button {
-                        Task { await viewModel.refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+                .listStyle(.sidebar)
+                .navigationTitle("Stories · \(viewModel.stories.count)")
+                .navigationSplitViewColumnWidth(min: widths.min, ideal: widths.ideal, max: widths.max)
+                .toolbar {
+                    ToolbarItem {
+                        Button {
+                            Task { await viewModel.refresh() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .help("Refresh")
                     }
-                    .help("Refresh")
                 }
-            }
-        } detail: {
-            if let story = viewModel.selectedStory {
-                storyDetail(story)
-            } else {
-                Text("Select a story")
-                    .foregroundStyle(.secondary)
+            } detail: {
+                if let story = viewModel.selectedStory {
+                    storyDetail(story)
+                } else {
+                    Text("Select a story")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
