@@ -149,35 +149,48 @@ struct ConfigSidebarView: View {
         } content: {
             StudioRow("Duration (s)") {
                 StudioNumberInput("Duration", value: $viewModel.duration, range: 1...Int.max, step: 5)
-                    .onChange(of: viewModel.duration) { _, _ in viewModel.updateInstruction() }
             }
             StudioRow("Emotion", inset: 0) {
-                StudioOptionPicker("Emotion", selection: $viewModel.selectedEmotion, options: viewModel.emotions).onChange(of: viewModel.selectedEmotion) { _, _ in viewModel.updateInstruction() }
+                StudioOptionPicker("Emotion", selection: $viewModel.selectedEmotion, options: viewModel.emotions)
             }
             StudioRow("Scripts") { StudioNumberInput("Scripts", value: $viewModel.scriptCount, range: 1...Int.max) }
             StudioRow("Retries") { StudioNumberInput("Retries", value: $viewModel.maxRetries, range: viewModel.retryRange) }
             StudioRow("Characters") {
                 StudioNumberInput("Characters", value: $viewModel.characterCount, range: 1...Int.max)
-                    .onChange(of: viewModel.characterCount) { _, _ in viewModel.updateInstruction() }
             }
             StudioRow("Character Kind", inset: 0) {
-                StudioOptionPicker("Character Kind", selection: $viewModel.selectedCharacterKind, options: viewModel.characterKinds).onChange(of: viewModel.selectedCharacterKind) { _, _ in viewModel.updateInstruction() }
+                StudioOptionPicker("Character Kind", selection: $viewModel.selectedCharacterKind, options: viewModel.characterKinds)
             }
             StudioRow("Kind Detail") { TextField("e.g. lion, Shiva, talking SIM card", text: $viewModel.characterKindDetail) }
             StudioRow("Format", inset: 0) {
-                StudioOptionPicker("Format", selection: $viewModel.selectedFormat, options: viewModel.formats).onChange(of: viewModel.selectedFormat) { _, _ in viewModel.updateInstruction() }
+                StudioOptionPicker("Format", selection: $viewModel.selectedFormat, options: viewModel.formats)
             }
         }
     }
 
     private var instructionSection: some View {
         StudioSection("Instruction") {
-            Button { viewModel.updateInstruction() } label: { Image(systemName: "arrow.clockwise") }
-                .help("Refresh instruction from current configuration")
+            HStack(spacing: 8) {
+                if !viewModel.instructionText.isEmpty {
+                    Button { viewModel.instructionText = "" } label: { Image(systemName: "xmark") }
+                        .help("Clear instruction")
+                }
+                Button { viewModel.updateInstruction() } label: { Image(systemName: "sparkles") }
+                    .help("Generate instruction from current configuration")
+            }
         } content: {
-            TextEditor(text: $viewModel.instructionText).font(.body).scrollContentBackground(.hidden)
-                .frame(height: 120).padding(8)
-                .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
+            ZStack(alignment: .topLeading) {
+                if viewModel.instructionText.isEmpty {
+                    Text("Add custom instructions or tap ✨ to generate from configuration…")
+                        .font(.body)
+                        .foregroundStyle(AppTheme.secondaryInk.opacity(0.8))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                }
+                TextEditor(text: $viewModel.instructionText).font(.body).scrollContentBackground(.hidden)
+                    .frame(height: 120).padding(4)
+            }
+            .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 

@@ -127,7 +127,6 @@ final class GenerateViewModel {
         if aiPowers.contains(config.aiPower) {
             selectedAIPower = config.aiPower
         }
-        updateInstruction()
     }
 
     var isLocalJSON: Bool { config.dataSource != .server }
@@ -151,7 +150,6 @@ final class GenerateViewModel {
         if resetModel || !aiModels.contains(selectedAIModel) { selectedAIModel = "Default" }
         aiPowers = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.first { $0.id == selectedAIModel }?.efforts.map { $0.capitalized } ?? [])
         if !aiPowers.contains(selectedAIPower) { selectedAIPower = "Default" }
-        updateInstruction()
     }
 
     func checkSetup() {
@@ -252,7 +250,6 @@ final class GenerateViewModel {
         if storySources.contains(source) { selectedStorySource = source }
         topic = c.topic
         sampleStory = c.sampleStory
-        updateInstruction()
     }
     /// Load headline dropdowns from sample data.
     func loadSampleLists() {
@@ -263,7 +260,6 @@ final class GenerateViewModel {
             // so Generate is enabled on launch (Streamlit parity).
             if StringFormatting.isBlank(topic) { topic = selectedHeadline }
         }
-        updateInstruction()
     }
 
     /// Refresh headlines (re-load from sample data / server).
