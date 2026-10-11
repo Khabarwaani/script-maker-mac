@@ -315,6 +315,11 @@ final class GenerateViewModel {
             guard validation["passed"] as? Bool == true else {
                 throw APIError.malformed("Final validation failed. Review the issues and retry.")
             }
+            guard let scripts = stagePayloads[.validation]?["scripts"] as? [[String: Any]]
+                ?? stagePayloads[.storyboard]?["scripts"] as? [[String: Any]]
+                ?? stagePayloads[.dialogue]?["scripts"] as? [[String: Any]], !scripts.isEmpty else {
+                throw APIError.malformed("Final validation returned no generated stories.")
+            }
             generationCompleted = true
             await saveToLibrary()
         }
@@ -357,6 +362,8 @@ final class GenerateViewModel {
 
     /// Long render job with progress.
 
+    private var generatedStoryIDs: [Int: String] = [:]
+    private var generationCreatedAt = DateFormatting.iso8601Now()
     var generationCompleted = false
     var renderJobID: String?
     var renderCompleted = false
@@ -428,30 +435,48 @@ final class GenerateViewModel {
         renderJobID = nil
         renderCompleted = false
         generationCompleted = false
+        generatedStoryIDs = [:]
+        generationCreatedAt = DateFormatting.iso8601Now()
     }
 
     // MARK: - Helpers
 
     /// Save the completed generation to the Library via the repository.
     private func saveToLibrary() async {
-        var outputs: [String: String] = [:]
-        for (stage, payload) in stagePayloads {
-            if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
-               let json = String(data: data, encoding: .utf8) {
-                outputs[stage.rawValue] = json
+        let scripts = stagePayloads[.validation]?["scripts"] as? [[String: Any]]
+            ?? stagePayloads[.storyboard]?["scripts"] as? [[String: Any]]
+            ?? stagePayloads[.dialogue]?["scripts"] as? [[String: Any]] ?? []
+        for (index, script) in scripts.enumerated() {
+            var outputs: [String: String] = [:]
+            for (stage, payload) in stagePayloads {
+                var storyPayload = payload
+                for key in ["scripts", "storyboards"] {
+                    if let items = payload[key] as? [[String: Any]], items.indices.contains(index) {
+                        storyPayload[key] = [items[index]]
+                    }
+                }
+                if let data = try? JSONSerialization.data(withJSONObject: storyPayload, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+                   let json = String(data: data, encoding: .utf8) {
+                    outputs[stage.rawValue] = json
+                }
             }
+            let id = generatedStoryIDs[index] ?? UUID().uuidString
+            generatedStoryIDs[index] = id
+            let title = script["title"] as? String ?? ""
+            let story = Story(
+                id: id,
+                title: StringFormatting.isBlank(title) ? "Untitled story \(index + 1)" : title,
+                summary: script["summary"] as? String ?? script["narration"] as? String ?? "",
+                headline: selectedHeadline,
+                createdAt: generationCreatedAt,
+                status: "completed",
+                emotion: selectedEmotion,
+                format: selectedFormat,
+                generationNumber: index + 1,
+                stageOutputs: outputs
+            )
+            await repository.save(story)
         }
-        let story = Story(
-            id: sessionID ?? UUID().uuidString,
-            title: StringFormatting.isBlank(topic) ? "Untitled" : topic,
-            summary: stagePayloads[.verify]?["summary"] as? String ?? sampleStory,
-            headline: selectedHeadline,
-            status: "completed",
-            emotion: selectedEmotion,
-            format: selectedFormat,
-            stageOutputs: outputs
-        )
-        await repository.save(story)
     }
 
     private func nextStage(after stage: PipelineStage?) -> PipelineStage? {

@@ -95,6 +95,7 @@ final class LocalWorkflowTests: XCTestCase {
         let library = LibraryViewModel(config: config, repository: repository)
         await library.refresh()
         XCTAssertTrue(library.stories.isEmpty)
+        generator.scriptCount = 1
         generator.topic = "Generated lifecycle test"
         generator.workflowMode = .continuous
         await generator.start()
@@ -105,7 +106,7 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertEqual(generator.stagePayloads.count, PipelineStage.allCases.count)
         await library.refresh()
         XCTAssertEqual(library.stories.count, 1)
-        XCTAssertEqual(library.selectedStory?.title, "Generated lifecycle test")
+        XCTAssertEqual(library.selectedStory?.title, "The Odd Day")
         XCTAssertEqual(library.selectedStory?.stageOutputs?.count, PipelineStage.allCases.count)
         let id = try XCTUnwrap(library.selectedStoryID)
         await library.deleteStory(id: id)
@@ -124,6 +125,54 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertNil(library.selectedStoryID)
     }
 
+    func testThreeGeneratedStoriesHaveUUIDsTitlesAndGenerationTime() async throws {
+        let store = KeyValueStore()
+        let original = store.data(forKey: "studioConfig")
+        defer {
+            if let original { store.set(original, forKey: "studioConfig") }
+            else { store.remove(forKey: "studioConfig") }
+        }
+        let config = AppConfig()
+        let originalDelay = config.localJSONDelay
+        let originalSource = config.dataSource
+        defer { config.localJSONDelay = originalDelay; config.dataSource = originalSource }
+        config.dataSource = .offline
+        config.localJSONDelay = 0
+        let repository = WorkflowStoryRepository()
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        generator.topic = "Input topic is not the story title"
+        generator.scriptCount = 3
+        generator.workflowMode = .continuous
+        let started = Date().addingTimeInterval(-1)
+        await generator.start()
+        XCTAssertNil(generator.errorMessage)
+        let stories = await repository.all()
+        XCTAssertEqual(stories.count, 3)
+        XCTAssertEqual(Set(stories.map(\.id)).count, 3)
+        XCTAssertEqual(Set(stories.map(\.title)).count, 3)
+        XCTAssertEqual(Set(stories.compactMap(\.generationNumber)), Set([1, 2, 3]))
+        for story in stories {
+            XCTAssertNotNil(UUID(uuidString: story.id))
+            XCTAssertNotEqual(story.id, generator.sessionID)
+            XCTAssertNotEqual(story.title, generator.topic)
+            let createdAt = try XCTUnwrap(ISO8601DateFormatter().date(from: story.createdAt))
+            XCTAssertGreaterThanOrEqual(createdAt, started)
+            XCTAssertLessThanOrEqual(createdAt, Date())
+            let json = try XCTUnwrap(story.stageOutputs?["dialogue"]?.data(using: .utf8))
+            let output = try XCTUnwrap(JSONSerialization.jsonObject(with: json) as? [String: Any])
+            let scripts = try XCTUnwrap(output["scripts"] as? [[String: Any]])
+            XCTAssertEqual(scripts.count, 1)
+            XCTAssertEqual(scripts.first?["title"] as? String, story.title)
+        }
+        await generator.runStage(.validation)
+        let repeated = await repository.all()
+        XCTAssertEqual(Set(repeated.map(\.id)), Set(stories.map(\.id)))
+        await generator.start()
+        let regenerated = await repository.all()
+        XCTAssertEqual(regenerated.count, 6)
+        XCTAssertEqual(Set(regenerated.map(\.id)).count, 6)
+    }
+
     func testStepWisePausesUntilEachStageIsConfirmed() async {
         let store = KeyValueStore()
         let original = store.data(forKey: "studioConfig")
@@ -139,6 +188,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.localJSONDelay = 0
         let repository = WorkflowStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        generator.scriptCount = 1
         generator.topic = "Step-wise lifecycle test"
         generator.workflowMode = .stepwise
         await generator.start()

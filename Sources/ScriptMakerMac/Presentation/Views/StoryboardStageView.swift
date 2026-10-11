@@ -25,7 +25,7 @@ struct StoryboardStageView: View {
                     storyboardCard(storyboards[idx], index: idx)
                 }
 
-                Button("Continue to render") { onContinue() }
+                Button("Continue to final validation") { onContinue() }
                     .buttonStyle(StudioPrimaryButtonStyle())
                     .disabled(storyboards.isEmpty)
                     .padding(.top, 8)

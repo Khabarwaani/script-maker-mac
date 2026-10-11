@@ -17,7 +17,8 @@ enum StoryMapper {
             status: dict["status"] as? String ?? "completed",
             emotion: dict["emotion"] as? String ?? "",
             format: dict["format"] as? String ?? "",
-            videoURL: dict["video_url"] as? String
+            videoURL: dict["video_url"] as? String,
+            generationNumber: dict["generation_number"] as? Int
         )
     }
 
@@ -33,6 +34,7 @@ enum StoryMapper {
             "emotion": story.emotion,
             "format": story.format,
         ]
+        if let number = story.generationNumber { dict["generation_number"] = number }
         if let videoURL = story.videoURL {
             dict["video_url"] = videoURL
         }

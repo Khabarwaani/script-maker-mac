@@ -11,7 +11,8 @@ struct StoryDetailView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(story.title).font(.title2.weight(.semibold))
-                        Text(story.createdAt).font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                        Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")Generated \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                        Text(story.id).font(.caption.monospaced()).foregroundStyle(AppTheme.secondaryInk)
                     }
                     Spacer()
                     ShareLink(item: story.summary.isEmpty ? story.title : "\(story.title)\n\n\(story.summary)") {

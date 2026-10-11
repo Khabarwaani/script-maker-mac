@@ -65,7 +65,8 @@ struct StoryListView: View {
                     Button { viewModel.selectedStoryID = story.id } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(story.title).font(.body.weight(.medium)).lineLimit(2)
-                            Text(story.createdAt).font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")Generated \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                            Text(story.id).font(.caption2.monospaced()).foregroundStyle(AppTheme.secondaryInk).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding(12)
                         .background(viewModel.selectedStoryID == story.id ? AppTheme.accentTint : Color.clear, in: RoundedRectangle(cornerRadius: 8))

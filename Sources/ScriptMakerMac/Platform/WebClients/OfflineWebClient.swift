@@ -27,8 +27,19 @@ struct OfflineWebClient: WebClient {
 
     func runStage(sessionID: String, stage: PipelineStage, inputs: [String: Any]) async throws -> [String: Any] {
         try await pause()
-        guard let sample = SampleData.json(for: stage.rawValue) else {
+        guard var sample = SampleData.json(for: stage.rawValue) else {
             throw APIError.notImplemented("sample data for stage \(stage.rawValue)")
+        }
+        // Expand the fixture to exercise the requested story count without generation work.
+        let key = stage == .dialogue ? "scripts" : stage == .storyboard ? "storyboards" : nil
+        if let key, let templates = sample[key] as? [[String: Any]], !templates.isEmpty {
+            let count = max(inputs["script_count"] as? Int ?? templates.count, 1)
+            sample[key] = (0..<count).map { index in
+                var item = templates[index % templates.count]
+                let title = item["title"] as? String ?? "Sample story"
+                if index >= templates.count { item["title"] = "\(title) — Sample \(index + 1)" }
+                return item
+            }
         }
         return sample
     }

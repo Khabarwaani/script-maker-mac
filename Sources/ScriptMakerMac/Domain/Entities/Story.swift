@@ -12,6 +12,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var emotion: String
     var format: String
     var videoURL: String?
+    var generationNumber: Int?
     var stageOutputs: [String: String]?
 
     init(
@@ -24,6 +25,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         emotion: String = "",
         format: String = "",
         videoURL: String? = nil,
+        generationNumber: Int? = nil,
         stageOutputs: [String: String]? = nil
     ) {
         self.id = id
@@ -35,6 +37,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.emotion = emotion
         self.format = format
         self.videoURL = videoURL
+        self.generationNumber = generationNumber
         self.stageOutputs = stageOutputs
     }
 }
