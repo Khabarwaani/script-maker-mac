@@ -227,36 +227,67 @@ final class GenerateViewModel {
     }
 
     /// Refresh headlines (re-load from sample data / server).
-    func refreshHeadlines() async {
+    /// If forceFresh is false, uses 24-hour cache when available.
+    func refreshHeadlines(forceFresh: Bool = false) async {
         isRefreshingHeadlines = true
         defer { isRefreshingHeadlines = false }
+
+        let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
+        let cacheKey = categoryParam ?? "default"
+
+        if !forceFresh, let cached = config.getCachedHeadlines(forSource: cacheKey), !cached.isEmpty {
+            applyHeadlines(cached, forSource: cacheKey)
+            return
+        }
+
         do {
             let service = try api()
-            let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
             let response = try await service.fetchTopTitles(category: categoryParam, n: 16, mode: nil)
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
-                headlines = loadedHeadlines
-                if selectedHeadline.isEmpty || !headlines.contains(selectedHeadline) {
-                    selectedHeadline = headlines.first ?? ""
-                }
-                if StringFormatting.isBlank(topic) || headlines.contains(topic) {
-                    topic = selectedHeadline
-                }
+                config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
+                applyHeadlines(loadedHeadlines, forSource: cacheKey)
+            } else {
+                headlines = []
+                selectedHeadline = ""
             }
         } catch {
             if isLocalJSON {
                 loadSampleLists()
+            } else if let cached = config.getCachedHeadlines(forSource: cacheKey, maxAge: .infinity), !cached.isEmpty {
+                applyHeadlines(cached, forSource: cacheKey)
             } else {
+                headlines = []
+                selectedHeadline = ""
                 errorMessage = error.localizedDescription
             }
         }
     }
 
+    private func applyHeadlines(_ loadedHeadlines: [String], forSource cacheKey: String) {
+        headlines = loadedHeadlines
+        let lastSelected = config.getLastSelectedHeadline(forSource: cacheKey)
+        if let lastSelected, loadedHeadlines.contains(lastSelected) {
+            selectedHeadline = lastSelected
+        } else if let first = loadedHeadlines.first {
+            selectedHeadline = first
+            config.saveLastSelectedHeadline(first, forSource: cacheKey)
+        }
+        topic = selectedHeadline
+    }
+
+    /// Persist headline selection for the current source when chosen by user.
+    func onHeadlineChanged(_ headline: String) {
+        topic = headline
+        let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
+        let cacheKey = categoryParam ?? "default"
+        config.saveLastSelectedHeadline(headline, forSource: cacheKey)
+    }
+
     /// Handles story source selection change to load headlines for the selected news category.
     func onStorySourceChanged() async {
         guard !isManualSource && !isHashtagSource else { return }
-        await refreshHeadlines()
+        await refreshHeadlines(forceFresh: false)
     }
 
     var isRefreshingCategories = false
@@ -290,7 +321,7 @@ final class GenerateViewModel {
                     }
                 }
                 if !isManualSource && !isHashtagSource {
-                    await refreshHeadlines()
+                    await refreshHeadlines(forceFresh: false)
                 }
             }
         } catch {
@@ -303,7 +334,7 @@ final class GenerateViewModel {
         if config.dataSource == .server {
             await loadNewsCategories()
             if headlines.isEmpty {
-                await refreshHeadlines()
+                await refreshHeadlines(forceFresh: false)
             }
         } else {
             loadSampleLists()

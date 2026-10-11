@@ -37,4 +37,25 @@ final class AppConfigTests: XCTestCase {
     func testLocalserverName() {
         XCTAssertEqual(AppConfig.localserverName, "localserver")
     }
+
+    func testHeadlinesCaching24HourExpiry() {
+        let config = AppConfig()
+        let testSource = "test_source_\(UUID().uuidString)"
+        let sample = ["Headline A", "Headline B"]
+
+        config.cacheHeadlines(sample, forSource: testSource)
+        let cached = config.getCachedHeadlines(forSource: testSource, maxAge: 86400)
+        XCTAssertEqual(cached, sample)
+
+        // Expired cache check
+        let expired = config.getCachedHeadlines(forSource: testSource, maxAge: -1)
+        XCTAssertNil(expired)
+    }
+
+    func testLastSelectedHeadlinePersistence() {
+        let config = AppConfig()
+        let testSource = "test_source_\(UUID().uuidString)"
+        config.saveLastSelectedHeadline("Important Breaking News", forSource: testSource)
+        XCTAssertEqual(config.getLastSelectedHeadline(forSource: testSource), "Important Breaking News")
+    }
 }

@@ -94,6 +94,8 @@ final class AppConfig {
     // MARK: - Studio config (smart save on Generate, like Streamlit #563)
 
     private static let studioConfigKey = "studioConfig"
+    private static let headlinesCacheKeyPrefix = "headlinesCache_"
+    private static let selectedHeadlineKeyPrefix = "selectedHeadline_"
 
     func saveStudioConfig(_ config: StudioConfig) {
         if let data = try? JSONEncoder().encode(config) {
@@ -104,6 +106,39 @@ final class AppConfig {
     func loadStudioConfig() -> StudioConfig? {
         guard let data = UserDefaults.standard.data(forKey: Self.studioConfigKey) else { return nil }
         return try? JSONDecoder().decode(StudioConfig.self, from: data)
+    }
+
+    // MARK: - 24-Hour Headlines Cache & Selection Persistence
+
+    struct CachedHeadlinesPayload: Codable {
+        let headlines: [String]
+        let timestamp: Date
+    }
+
+    func cacheHeadlines(_ headlines: [String], forSource source: String) {
+        let payload = CachedHeadlinesPayload(headlines: headlines, timestamp: Date())
+        if let data = try? JSONEncoder().encode(payload) {
+            UserDefaults.standard.set(data, forKey: Self.headlinesCacheKeyPrefix + source)
+        }
+    }
+
+    func getCachedHeadlines(forSource source: String, maxAge: TimeInterval = 86400) -> [String]? {
+        guard let data = UserDefaults.standard.data(forKey: Self.headlinesCacheKeyPrefix + source),
+              let payload = try? JSONDecoder().decode(CachedHeadlinesPayload.self, from: data) else {
+            return nil
+        }
+        if Date().timeIntervalSince(payload.timestamp) > maxAge {
+            return nil
+        }
+        return payload.headlines
+    }
+
+    func saveLastSelectedHeadline(_ headline: String, forSource source: String) {
+        UserDefaults.standard.set(headline, forKey: Self.selectedHeadlineKeyPrefix + source)
+    }
+
+    func getLastSelectedHeadline(forSource source: String) -> String? {
+        UserDefaults.standard.string(forKey: Self.selectedHeadlineKeyPrefix + source)
     }
 
     // MARK: - Normalization

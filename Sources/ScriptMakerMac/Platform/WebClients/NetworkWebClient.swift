@@ -179,6 +179,7 @@ struct NetworkWebClient: WebClient {
         }
         var req = URLRequest(url: finalURL)
         req.httpMethod = "GET"
+        req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         do {
             let (data, response) = try await httpClient.data(for: req)

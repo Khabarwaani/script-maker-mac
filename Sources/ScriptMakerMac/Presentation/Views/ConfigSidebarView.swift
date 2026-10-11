@@ -31,16 +31,12 @@ struct ConfigSidebarView: View {
                         .onChange(of: viewModel.selectedStorySource) { _, _ in
                             Task { await viewModel.onStorySourceChanged() }
                         }
-                    Button {
+                    StudioRefreshButton(
+                        isRefreshing: viewModel.isRefreshingCategories,
+                        helpText: "Refresh news categories"
+                    ) {
                         Task { await viewModel.loadNewsCategories() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.callout)
-                            .foregroundStyle(viewModel.isRefreshingCategories ? AppTheme.secondaryInk : AppTheme.ink)
                     }
-                    .buttonStyle(.plain)
-                    .help("Refresh news categories")
-                    .disabled(viewModel.isRefreshingCategories)
                     .padding(.trailing, 10)
                 }
             }
@@ -54,25 +50,24 @@ struct ConfigSidebarView: View {
                 StudioRow("Headline", inset: 0) {
                     HStack(spacing: 8) {
                         if viewModel.headlines.isEmpty {
-                            Text(viewModel.isRefreshingHeadlines ? "Loading headlines…" : "No headlines loaded")
+                            Text(viewModel.isRefreshingHeadlines ? "Loading headlines…" : "No data")
                                 .font(.callout)
                                 .foregroundStyle(AppTheme.secondaryInk)
                                 .padding(.leading, 10)
                             Spacer()
                         } else {
                             StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
-                                .onChange(of: viewModel.selectedHeadline) { _, new in viewModel.topic = new }
+                                .onChange(of: viewModel.selectedHeadline) { _, new in
+                                    viewModel.selectedHeadline = new
+                                    viewModel.onHeadlineChanged(new)
+                                }
                         }
-                        Button {
-                            Task { await viewModel.refreshHeadlines() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.callout)
-                                .foregroundStyle(viewModel.isRefreshingHeadlines ? AppTheme.secondaryInk : AppTheme.ink)
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingHeadlines,
+                            helpText: "Refresh headlines"
+                        ) {
+                            Task { await viewModel.refreshHeadlines(forceFresh: true) }
                         }
-                        .buttonStyle(.plain)
-                        .help("Refresh headlines")
-                        .disabled(viewModel.isRefreshingHeadlines)
                         .padding(.trailing, 10)
                     }
                 }
@@ -268,3 +263,30 @@ struct StudioOptionPicker: View {
         }
     }
 }
+
+struct StudioRefreshButton: View {
+    let isRefreshing: Bool
+    let helpText: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.callout)
+                        .foregroundStyle(AppTheme.ink)
+                }
+            }
+            .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.plain)
+        .help(helpText)
+        .disabled(isRefreshing)
+    }
+}
+
