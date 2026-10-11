@@ -260,7 +260,7 @@ final class GenerateViewModel: ObservableObject {
             "title": topic.isEmpty ? "Untitled" : topic,
             "summary": sampleStory,
             "headline": selectedHeadline,
-            "created_at": ISO8601DateFormatter().string(from: Date()),
+            "created_at": DateFormatting.iso8601Now(),
             "status": "completed",
             "emotion": selectedEmotion,
             "format": selectedFormat,

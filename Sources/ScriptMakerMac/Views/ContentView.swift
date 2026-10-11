@@ -219,7 +219,7 @@ struct LibraryView: View {
                 ForEach(story.keys.sorted(), id: \.self) { key in
                     if !["id", "title", "summary", "created_at", "video_url"].contains(key) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(key.replacingOccurrences(of: "_", with: " ").capitalized)
+                            Text(StringFormatting.displayKey(key))
                                 .font(.headline)
                             Text("\(story[key] ?? "")")
                                 .font(.callout)
