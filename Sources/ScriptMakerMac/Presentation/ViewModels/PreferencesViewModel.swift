@@ -33,6 +33,7 @@ final class PreferencesViewModel {
     }
 
     var currentURL: String { config.serverURL }
+    var currentDataSource: DataSource { config.dataSource }
     var appearance: AppAppearance {
         get { config.appearance }
         set { config.appearance = newValue }

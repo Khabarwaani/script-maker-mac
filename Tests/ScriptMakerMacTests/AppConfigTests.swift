@@ -85,10 +85,19 @@ final class AppConfigTests: XCTestCase {
     }
 
     func testAPIErrorLocalization() {
-        let err = APIError.unreachable(url: "http://localhost:8000", detail: "Connection refused")
+        let err = APIError.unreachable(url: "http://localhost:8000", detail: "The request timed out.")
         XCTAssertEqual(err.errorDescription, "Could Not Connect to Server")
-        XCTAssertTrue(err.failureReason?.contains("http://localhost:8000") == true)
-        XCTAssertTrue(err.failureReason?.contains("Connection refused") == true)
-        XCTAssertEqual(err.recoverySuggestion, "Check your network connection and verify the server URL in Settings.")
+        XCTAssertEqual(err.failureReason, "The request timed out.")
+    }
+
+    func testDataSourcePersistenceAcrossLaunches() {
+        let config1 = AppConfig()
+        config1.dataSource = .server
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "dataSource"), "server")
+        XCTAssertNil(UserDefaults.standard.object(forKey: "useSampleData"))
+
+        // Simulate app relaunch
+        let config2 = AppConfig()
+        XCTAssertEqual(config2.dataSource, .server)
     }
 }

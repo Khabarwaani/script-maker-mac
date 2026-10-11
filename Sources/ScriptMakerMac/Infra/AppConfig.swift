@@ -65,7 +65,10 @@ final class AppConfig {
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
     var dataSource: DataSource {
-        didSet { UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey) }
+        didSet {
+            UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey)
+            UserDefaults.standard.removeObject(forKey: "useSampleData")
+        }
     }
 
     init() {
@@ -75,12 +78,15 @@ final class AppConfig {
         self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
-        // Migrate the old boolean key: true -> offline, false -> server.
         if let raw = UserDefaults.standard.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {
             self.dataSource = ds
+            UserDefaults.standard.removeObject(forKey: "useSampleData")
         } else if let old = UserDefaults.standard.object(forKey: "useSampleData") as? Bool {
-            self.dataSource = old ? .offline : .server
+            let migrated: DataSource = old ? .offline : .server
+            self.dataSource = migrated
+            UserDefaults.standard.set(migrated.rawValue, forKey: Self.dataSourceKey)
+            UserDefaults.standard.removeObject(forKey: "useSampleData")
         } else {
             self.dataSource = .offline
         }
