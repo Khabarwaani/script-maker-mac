@@ -31,6 +31,7 @@ struct ConfigSidebarView: View {
             StudioRow("Source", inset: 0) {
                 HStack(spacing: 8) {
                     StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                        .disabled(viewModel.isRefreshingCategories)
                         .onChange(of: viewModel.selectedStorySource) { _, _ in
                             Task { await viewModel.onStorySourceChanged() }
                         }
@@ -60,6 +61,7 @@ struct ConfigSidebarView: View {
                             Spacer()
                         } else {
                             StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
+                                .disabled(viewModel.isRefreshingHeadlines)
                                 .onChange(of: viewModel.selectedHeadline) { _, new in
                                     viewModel.selectedHeadline = new
                                     viewModel.onHeadlineChanged(new)
@@ -243,26 +245,34 @@ struct StudioOptionPicker: View {
         .accessibilityLabel(title)
         .accessibilityValue(label(selection))
         .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
-            ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(options, id: \.self) { option in
-                        Button {
-                            selection = option
-                            showingOptions = false
-                        } label: {
-                            HStack {
-                                Text(label(option)).frame(maxWidth: .infinity, alignment: .leading)
-                                Image(systemName: "checkmark").opacity(selection == option ? 1 : 0)
-                            }
-                            .padding(10).contentShape(Rectangle())
-                            .background(selection == option ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(8)
+            if options.isEmpty {
+                Text("No data")
+                    .font(.callout)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                    .padding(20)
+                    .frame(width: 200)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(options, id: \.self) { option in
+                            Button {
+                                selection = option
+                                showingOptions = false
+                            } label: {
+                                HStack {
+                                    Text(label(option)).frame(maxWidth: .infinity, alignment: .leading)
+                                    Image(systemName: "checkmark").opacity(selection == option ? 1 : 0)
+                                }
+                                .padding(10).contentShape(Rectangle())
+                                .background(selection == option ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(8)
+                }
+                .frame(width: 340, height: min(CGFloat(options.count) * 42 + 16, 400))
+                .foregroundStyle(AppTheme.ink).background(AppTheme.card)
+                .scrollIndicators(.visible)
             }
-            .frame(width: 340, height: min(CGFloat(options.count) * 42 + 16, 400))
-            .foregroundStyle(AppTheme.ink).background(AppTheme.card)
-            .scrollIndicators(.visible)
         }
     }
 }
