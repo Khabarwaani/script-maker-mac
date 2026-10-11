@@ -57,8 +57,9 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
    defaults to `http://localhost:8000`. IPv6-aware normalization in `AppConfig`.
    Never hardcode another default.
 6. **UX:** same use cases as the classic app. Apple HIG throughout.
-7. **Testing:** CI-first (`xcodebuild` on macos). Unit tests target ViewModels
-   and Services, never Views.
+7. **Testing:** Remote CI-first (`xcodebuild` on GitHub Actions). Rely on CI
+   for test verification; run local tests only upon CI failure. Unit tests target
+   ViewModels and Services, never Views.
 8. **Guidelines:** `docs/guidelines/` — architecture, layer-dependencies,
    workflows (feature, bugfix, git, failure, release, testing).
 9. **Tokens:** fewest words in comments and terminal text.
