@@ -10,8 +10,6 @@ struct ConfigSidebarView: View {
         Form {
             Section("Story & Topic") {
                 HStack {
-                    Text("Story & Topic")
-                        .font(.headline)
                     Spacer()
                     Button {
                         Task { await viewModel.refreshHeadlines() }
@@ -38,7 +36,7 @@ struct ConfigSidebarView: View {
                     .textFieldStyle(.roundedBorder)
 
                 // Headline dropdown (from sample data) — not in Manual mode.
-                if viewModel.selectedStorySource != "Manual" && !viewModel.headlines.isEmpty {
+                if !viewModel.isManualSource && !viewModel.headlines.isEmpty {
                     Picker("Headline", selection: $viewModel.selectedHeadline) {
                         ForEach(viewModel.headlines, id: \.self) { headline in
                             Text(headline).tag(headline)
@@ -50,7 +48,7 @@ struct ConfigSidebarView: View {
                 }
 
                 // Manual topic entry — only in Manual source mode.
-                if viewModel.selectedStorySource == "Manual" {
+                if viewModel.isManualSource {
                     TextField("News topic", text: $viewModel.topic)
                         .textFieldStyle(.roundedBorder)
                 }
