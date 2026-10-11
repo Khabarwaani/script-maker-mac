@@ -40,7 +40,9 @@
 		F025 /* PipelineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R028 /* PipelineService.swift */; };
 		F026 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = R029 /* APIError.swift */; };
 		F027 /* SceneThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = R030 /* SceneThumbnail.swift */; };
-		F038 /* SplitWidths.swift in Sources */ = {isa = PBXBuildFile; fileRef = R042 /* SplitWidths.swift */; };
+		F039 /* ConfigSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R043 /* ConfigSidebarView.swift */; };
+		F040 /* StoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R044 /* StoryListView.swift */; };
+		F041 /* StoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R045 /* StoryDetailView.swift */; };
 		F028 /* StageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = R031 /* StageTracker.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
 		Bverify /* verify.json in Resources */ = {isa = PBXBuildFile; fileRef = Jverify /* verify.json */; };
@@ -83,7 +85,9 @@
 		R025 /* WebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebClient.swift; sourceTree = "<group>"; };
 		R026 /* NetworkWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWebClient.swift; sourceTree = "<group>"; };
 		R027 /* OfflineWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWebClient.swift; sourceTree = "<group>"; };
-		R042 /* SplitWidths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitWidths.swift; sourceTree = "<group>"; };
+		R043 /* ConfigSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigSidebarView.swift; sourceTree = "<group>"; };
+		R044 /* StoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryListView.swift; sourceTree = "<group>"; };
+		R045 /* StoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDetailView.swift; sourceTree = "<group>"; };
 		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
 		R032 /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
@@ -254,7 +258,9 @@
 			children = (
 				R008 /* ContentView.swift */,
 				R030 /* SceneThumbnail.swift */,
-				R042 /* SplitWidths.swift */,
+				R043 /* ConfigSidebarView.swift */,
+				R044 /* StoryListView.swift */,
+				R045 /* StoryDetailView.swift */,
 				R031 /* StageTracker.swift */,
 				R009 /* PreferencesView.swift */,
 				R010 /* GenerateView.swift */,
@@ -397,7 +403,9 @@
 				F025 /* PipelineService.swift in Sources */,
 				F026 /* APIError.swift in Sources */,
 				F027 /* SceneThumbnail.swift in Sources */,
-				F038 /* SplitWidths.swift in Sources */,
+				F039 /* ConfigSidebarView.swift in Sources */,
+				F040 /* StoryListView.swift in Sources */,
+				F041 /* StoryDetailView.swift in Sources */,
 				F028 /* StageTracker.swift in Sources */,
 				F005 /* ContentViewModel.swift in Sources */,
 				F006 /* PreferencesViewModel.swift in Sources */,

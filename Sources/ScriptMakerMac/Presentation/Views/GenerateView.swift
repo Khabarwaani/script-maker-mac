@@ -14,163 +14,37 @@ struct GenerateView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let widths = SplitWidths.sidebar(totalWidth: geo.size.width)
-            NavigationSplitView {
-                // Master: configuration sidebar (like Streamlit's sidebar).
-                configSidebar
-                    .navigationTitle("Configuration")
-                    .navigationSplitViewColumnWidth(min: widths.min, ideal: widths.ideal, max: widths.max)
-            } detail: {
-                // Detail: stage flow results (Preview column like Streamlit, 40%).
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Preview")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    if viewModel.sessionID == nil {
-                        emptyDetail
-                    } else {
-                        stageFlow
-                    }
+        NavigationSplitView {
+            // Master: configuration sidebar (like Streamlit's sidebar).
+            // Fixed column widths: widths must never change as a result of
+            // layout — GeometryReader-driven widths throw inside AppKit's
+            // constraint pass (+[NSApplication _crashOnException:]).
+            // Default window is 1280 wide → 768 ≈ 60%, detail ≈ 40%.
+            ConfigSidebarView(viewModel: viewModel)
+                .navigationTitle("Configuration")
+                .navigationSplitViewColumnWidth(min: 320, ideal: 768, max: 900)
+        } detail: {
+            // Detail: stage flow results (Preview column like Streamlit).
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Preview")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                if viewModel.sessionID == nil {
+                    emptyDetail
+                } else {
+                    stageFlow
                 }
-                .padding()
-                .navigationTitle("Studio")
             }
-            .alert("Something went wrong", isPresented: errorBinding) {
-                Button("Retry stage") { Task { await viewModel.retryStage() } }
-                Button("Retry fresh") { Task { await viewModel.retryFresh() } }
-                Button("Skip stage") { Task { await viewModel.skipStage() } }
-                Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
-            }
+            .padding()
+            .navigationTitle("Studio")
         }
-    }
-
-    // MARK: - Master (config sidebar)
-
-    private var configSidebar: some View {
-        Form {
-            Section("Story & Topic") {
-                HStack {
-                    Text("Story & Topic")
-                        .font(.headline)
-                    Spacer()
-                    Button {
-                        Task { await viewModel.refreshHeadlines() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help("Refresh headlines")
-                    .disabled(viewModel.isRefreshingHeadlines)
-                }
-
-                Picker("Source", selection: $viewModel.selectedStorySource) {
-                    ForEach(viewModel.storySources, id: \.self) { source in
-                        Text(source).tag(source)
-                    }
-                }
-
-                Picker("Trending Hashtag", selection: $viewModel.selectedHashtag) {
-                    Text("None").tag("")
-                    ForEach(viewModel.trendingHashtags, id: \.self) { tag in
-                        Text(tag).tag(tag)
-                    }
-                }
-                TextField("Custom hashtag (e.g. #MakeInIndia)", text: $viewModel.customHashtag)
-                    .textFieldStyle(.roundedBorder)
-
-                // Headline dropdown (from sample data) — not in Manual mode.
-                if viewModel.selectedStorySource != "Manual" && !viewModel.headlines.isEmpty {
-                    Picker("Headline", selection: $viewModel.selectedHeadline) {
-                        ForEach(viewModel.headlines, id: \.self) { headline in
-                            Text(headline).tag(headline)
-                        }
-                    }
-                    .onChange(of: viewModel.selectedHeadline) { _, new in
-                        viewModel.topic = new
-                    }
-                }
-
-                // Manual topic entry — only in Manual source mode.
-                if viewModel.selectedStorySource == "Manual" {
-                    TextField("News topic", text: $viewModel.topic)
-                        .textFieldStyle(.roundedBorder)
-                }
-                TextField("Sample story (optional)", text: $viewModel.sampleStory, axis: .vertical)
-                    .lineLimit(3...8)
-                Text("The sample's content and idea guide dialogue and scenes. Timing and config still apply.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Configuration") {
-                Picker("AI Source", selection: $viewModel.selectedAISource) {
-                    ForEach(viewModel.aiSources, id: \.self) { Text($0).tag($0) }
-                }
-                .onChange(of: viewModel.selectedAISource) { _, _ in viewModel.updateInstruction() }
-                Picker("AI Model", selection: $viewModel.selectedAIModel) {
-                    ForEach(viewModel.aiModels, id: \.self) { Text($0).tag($0) }
-                }
-                .onChange(of: viewModel.selectedAIModel) { _, _ in viewModel.updateInstruction() }
-                Picker("AI Power", selection: $viewModel.selectedAIPower) {
-                    ForEach(viewModel.aiPowers, id: \.self) { Text($0).tag($0) }
-                }
-                .onChange(of: viewModel.selectedAIPower) { _, _ in viewModel.updateInstruction() }
-                Stepper("Duration: \(viewModel.duration)s", value: $viewModel.duration, in: 5...60, step: 5)
-                    .onChange(of: viewModel.duration) { _, _ in viewModel.updateInstruction() }
-                Picker("Emotion", selection: $viewModel.selectedEmotion) {
-                    ForEach(viewModel.emotions, id: \.self) { Text($0).tag($0) }
-                }
-                .onChange(of: viewModel.selectedEmotion) { _, _ in viewModel.updateInstruction() }
-                Stepper("Scripts: \(viewModel.scriptCount)", value: $viewModel.scriptCount, in: 1...5)
-                Stepper("Retries: \(viewModel.maxRetries)", value: $viewModel.maxRetries, in: 0...10)
-                Stepper("Characters: \(viewModel.characterCount)", value: $viewModel.characterCount, in: 1...10)
-                    .onChange(of: viewModel.characterCount) { _, _ in viewModel.updateInstruction() }
-                Picker("Character Kind", selection: $viewModel.selectedCharacterKind) {
-                    ForEach(viewModel.characterKinds, id: \.self) { Text($0).tag($0) }
-                }
-                .onChange(of: viewModel.selectedCharacterKind) { _, _ in viewModel.updateInstruction() }
-                TextField("Kind Detail", text: $viewModel.characterKindDetail)
-                    .textFieldStyle(.roundedBorder)
-                Picker("Format", selection: $viewModel.selectedFormat) {
-                    ForEach(viewModel.formats, id: \.self) { Text($0).tag($0) }
-                }
-                .onChange(of: viewModel.selectedFormat) { _, _ in viewModel.updateInstruction() }
-            }
-
-            Section("Instruction") {
-                TextEditor(text: $viewModel.instructionText)
-                    .frame(minHeight: 100)
-                    .font(.callout)
-                Text("Master instruction combining emotion, format, character count, duration, and sample story directives.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Refresh instruction") {
-                    viewModel.updateInstruction()
-                }
-                .help("Regenerate instruction from current config")
-            }
-
-            Section("Generation Mode") {
-                Picker("Mode", selection: $viewModel.workflowMode) {
-                    ForEach(GenerateViewModel.WorkflowMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-                Text("Continuous: runs all stages automatically. Step-Wise: advance manually through each stage.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Button("Generate") {
-                    Task { await viewModel.start() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
-            }
+        .alert("Something went wrong", isPresented: errorBinding) {
+            Button("Retry stage") { Task { await viewModel.retryStage() } }
+            Button("Retry fresh") { Task { await viewModel.retryFresh() } }
+            Button("Skip stage") { Task { await viewModel.skipStage() } }
+            Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
         }
     }
 
