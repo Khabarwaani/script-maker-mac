@@ -1,16 +1,18 @@
 import Foundation
+import Observation
 
 /// Preferences screen logic: edit + validate the server URL, test connectivity.
 /// Changes are staged in the view model and only saved to config on Save().
+@Observable
 @MainActor
-final class PreferencesViewModel: ObservableObject {
+final class PreferencesViewModel {
     private let config: AppConfig
 
-    @Published var draftURL: String
-    @Published var dataSource: DataSource
-    @Published var errorMessage: String?
-    @Published var noticeMessage: String?
-    @Published var isTesting = false
+    var draftURL: String
+    var dataSource: DataSource
+    var errorMessage: String?
+    var noticeMessage: String?
+    var isTesting = false
 
     init(config: AppConfig) {
         self.config = config

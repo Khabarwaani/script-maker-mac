@@ -25,8 +25,36 @@ Presentation → Domain → Platform → Infra
 
 **1. Presentation** (`Views/`, `ViewModels/`)
 - SwiftUI views (dumb — no business logic, no service calls)
-- ViewModels (`@MainActor`, `ObservableObject`) — UI state, calls Domain services
+- ViewModels (`@Observable`, `@MainActor`) — UI state, calls Domain services
 - Depends on: Domain
+
+### Observation Framework
+
+ViewModels use the modern Observation framework (`@Observable`), not the legacy `ObservableObject`/`@Published`:
+
+```swift
+@Observable
+@MainActor
+final class LibraryViewModel {
+    var stories: [Story] = []   // plain var — no @Published needed
+    ...
+}
+```
+
+Views hold models with `@State` (owner) and `@Bindable` (needs `$` bindings):
+
+```swift
+struct ContentView: View {
+    @State private var libraryViewModel: LibraryViewModel  // created once, stays in memory
+    ...
+}
+struct StoryListView: View {
+    @Bindable var viewModel: LibraryViewModel  // $viewModel.selectedStoryID bindings
+    ...
+}
+```
+
+Rules: ViewModels are created once (in `ContentView`) and passed down — never recreated on tab switch. Each section is its own `View` struct for stable identity.
 
 **2. Domain** (`Services/`: PipelineService, StoryRepository protocol, Models)
 - Business logic, entities, repository interfaces

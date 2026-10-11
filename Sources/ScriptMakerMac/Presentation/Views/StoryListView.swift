@@ -5,7 +5,7 @@ import SwiftUI
 /// widths must never change as a result of layout (GeometryReader-driven
 /// widths throw inside AppKit's constraint pass).
 struct StoryListView: View {
-    @ObservedObject var viewModel: LibraryViewModel
+    @Bindable var viewModel: LibraryViewModel
 
     var body: some View {
         NavigationSplitView {

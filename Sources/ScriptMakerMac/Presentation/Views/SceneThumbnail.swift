@@ -5,12 +5,12 @@ import SwiftUI
 struct SceneThumbnail: View {
     let sceneID: String
     let imageURL: String?
-    @StateObject private var viewModel: ThumbnailViewModel
+    @State private var viewModel: ThumbnailViewModel
 
     init(sceneID: String, imageURL: String?, config: AppConfig) {
         self.sceneID = sceneID
         self.imageURL = imageURL
-        _viewModel = StateObject(wrappedValue: ThumbnailViewModel(config: config))
+        _viewModel = State(wrappedValue: ThumbnailViewModel(config: config))
     }
 
     var body: some View {

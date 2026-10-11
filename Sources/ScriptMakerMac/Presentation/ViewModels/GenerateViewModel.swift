@@ -1,11 +1,13 @@
 import Foundation
+import Observation
 
 /// The stepwise generation flow: topic in, stages in order, recovery on failure.
 ///
 /// Mirrors the classic app's use cases — every step goes through PipelineService.
 /// Long stages stream SubstepEvents; the view renders them and never blocks.
+@Observable
 @MainActor
-final class GenerateViewModel: ObservableObject {
+final class GenerateViewModel {
     private let config: AppConfig
     private let repository: any StoryRepository
     private var eventTask: Task<Void, Never>?
@@ -13,45 +15,45 @@ final class GenerateViewModel: ObservableObject {
     /// Config for child views that need it (e.g. thumbnails).
     var appConfig: AppConfig { config }
 
-    @Published var topic: String = ""
-    @Published var sampleStory: String = ""
-    @Published var sessionID: String?
-    @Published var currentStage: PipelineStage?
-    @Published var stagePayloads: [PipelineStage: [String: Any]] = [:]
-    @Published var events: [SubstepEvent] = []
-    @Published var isRunning = false
-    @Published var errorMessage: String?
-    @Published var jobProgress: Double?
+    var topic: String = ""
+    var sampleStory: String = ""
+    var sessionID: String?
+    var currentStage: PipelineStage?
+    var stagePayloads: [PipelineStage: [String: Any]] = [:]
+    var events: [SubstepEvent] = []
+    var isRunning = false
+    var errorMessage: String?
+    var jobProgress: Double?
 
     // Headlines from sample data (or server when live).
-    @Published var headlines: [String] = []
-    @Published var selectedHeadline: String = ""
+    var headlines: [String] = []
+    var selectedHeadline: String = ""
 
     // Story & Topic (mirrors Streamlit settings panel).
-    @Published var storySources: [String] = ["Manual", "India News", "Trending Hashtags"]
-    @Published var selectedStorySource: String = "India News"
-    @Published var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
-    @Published var selectedHashtag: String = ""
-    @Published var customHashtag: String = ""
+    var storySources: [String] = ["Manual", "India News", "Trending Hashtags"]
+    var selectedStorySource: String = "India News"
+    var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
+    var selectedHashtag: String = ""
+    var customHashtag: String = ""
 
     // Configuration (mirrors Streamlit config section).
-    @Published var aiSources: [String] = ["Antigravity", "Gemini", "Grok", "Muse"]
-    @Published var selectedAISource: String = "Antigravity"
-    @Published var aiModels: [String] = ["Default"]
-    @Published var selectedAIModel: String = "Default"
-    @Published var aiPowers: [String] = ["Low", "Medium", "High"]
-    @Published var selectedAIPower: String = "Medium"
-    @Published var duration: Int = 12
-    @Published var emotions: [String] = ["Neutral", "Happy", "Sad", "Angry", "Surprised", "Fearful"]
-    @Published var selectedEmotion: String = "Neutral"
-    @Published var scriptCount: Int = 1
-    @Published var maxRetries: Int = 3
-    @Published var characterCount: Int = 3
-    @Published var characterKinds: [String] = ["Human", "Non-living", "Mixed"]
-    @Published var selectedCharacterKind: String = "Human"
-    @Published var characterKindDetail: String = ""
-    @Published var formats: [String] = ["9:16 Vertical", "16:9 Horizontal", "1:1 Square"]
-    @Published var selectedFormat: String = "9:16 Vertical"
+    var aiSources: [String] = ["Antigravity", "Gemini", "Grok", "Muse"]
+    var selectedAISource: String = "Antigravity"
+    var aiModels: [String] = ["Default"]
+    var selectedAIModel: String = "Default"
+    var aiPowers: [String] = ["Low", "Medium", "High"]
+    var selectedAIPower: String = "Medium"
+    var duration: Int = 12
+    var emotions: [String] = ["Neutral", "Happy", "Sad", "Angry", "Surprised", "Fearful"]
+    var selectedEmotion: String = "Neutral"
+    var scriptCount: Int = 1
+    var maxRetries: Int = 3
+    var characterCount: Int = 3
+    var characterKinds: [String] = ["Human", "Non-living", "Mixed"]
+    var selectedCharacterKind: String = "Human"
+    var characterKindDetail: String = ""
+    var formats: [String] = ["9:16 Vertical", "16:9 Horizontal", "1:1 Square"]
+    var selectedFormat: String = "9:16 Vertical"
 
     // Generation mode: Continuous (run all stages) or Step-Wise (manual advance).
     enum WorkflowMode: String, CaseIterable, Identifiable {
@@ -59,11 +61,11 @@ final class GenerateViewModel: ObservableObject {
         case stepwise = "Step-Wise"
         var id: String { rawValue }
     }
-    @Published var workflowMode: WorkflowMode = .continuous
+    var workflowMode: WorkflowMode = .continuous
 
     // Instruction: master instruction combining emotion, format, character directives.
-    @Published var instructionText: String = ""
-    @Published var isRefreshingHeadlines = false
+    var instructionText: String = ""
+    var isRefreshingHeadlines = false
 
     init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
         self.config = config
@@ -186,8 +188,8 @@ final class GenerateViewModel: ObservableObject {
     }
 
     /// Long render job with progress.
-    @Published var renderJobID: String?
-    @Published var renderCompleted = false
+    var renderJobID: String?
+    var renderCompleted = false
 
     func startRender(inputs: [String: Any] = [:]) async {
         await renderVideo(inputs: inputs)

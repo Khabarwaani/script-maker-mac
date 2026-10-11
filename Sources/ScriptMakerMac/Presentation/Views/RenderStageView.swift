@@ -4,7 +4,7 @@ import SwiftUI
 /// Shows validation results and the render job status.
 struct RenderStageView: View {
     let payload: [String: Any]
-    @ObservedObject var viewModel: GenerateViewModel
+    @Bindable var viewModel: GenerateViewModel
 
     private var validation: [String: Any] {
         payload["validation"] as? [String: Any] ?? [:]

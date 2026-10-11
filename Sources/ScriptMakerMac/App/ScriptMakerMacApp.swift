@@ -6,11 +6,11 @@ import SwiftUI
 /// pipeline server configured in Preferences; nothing is computed locally.
 @main
 struct ScriptMakerMacApp: App {
-    @StateObject private var contentViewModel: ContentViewModel
+    @State private var contentViewModel: ContentViewModel
 
     init() {
         let config = AppConfig()
-        _contentViewModel = StateObject(wrappedValue: ContentViewModel(config: config))
+        _contentViewModel = State(wrappedValue: ContentViewModel(config: config))
     }
 
     var body: some Scene {

@@ -1,35 +1,20 @@
-import Combine
 import Foundation
+import Observation
 
 /// Data source status for the toolbar: shows current mode and server URL.
 /// Selection and URL editing happen in Preferences, not here.
+/// Reads AppConfig directly — the Observation framework tracks nested
+/// @Observable access, so no Combine mirroring is needed.
+@Observable
 @MainActor
-final class ServerAddressBarViewModel: ObservableObject {
-    private let config: AppConfig
-    private var cancellables = Set<AnyCancellable>()
+final class ServerAddressBarViewModel {
+    let config: AppConfig
 
-    @Published var isConnected = false
-    @Published var isChecking = false
-    @Published var dataSource: DataSource
-    @Published var serverURL: String
+    var isConnected = false
+    var isChecking = false
 
     init(config: AppConfig) {
         self.config = config
-        self.dataSource = config.dataSource
-        self.serverURL = config.serverURL
-        // Stay in sync when Preferences changes the config.
-        config.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                if self.dataSource != self.config.dataSource {
-                    self.dataSource = self.config.dataSource
-                }
-                if self.serverURL != self.config.serverURL {
-                    self.serverURL = self.config.serverURL
-                }
-            }
-            .store(in: &cancellables)
     }
 
     func refreshStatus() async {

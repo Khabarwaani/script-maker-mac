@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Where the app gets its data — either a live pipeline server
 /// or the bundled offline sample JSON. Exactly one is active.
@@ -20,20 +21,21 @@ enum DataSource: String, Codable, CaseIterable, Identifiable {
 ///
 /// The pipeline server URL is the single connection point for every use case.
 /// Defaults to localhost; IPv6 hosts are accepted and bracketed automatically.
-final class AppConfig: ObservableObject {
+@Observable
+final class AppConfig {
     /// The default endpoint is named "localserver".
     static let localserverName = "localserver"
     static let defaultServerURL = "http://localhost:8501"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
 
-    @Published var serverURL: String {
+    var serverURL: String {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
     }
 
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
-    @Published var dataSource: DataSource {
+    var dataSource: DataSource {
         didSet { UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey) }
     }
 

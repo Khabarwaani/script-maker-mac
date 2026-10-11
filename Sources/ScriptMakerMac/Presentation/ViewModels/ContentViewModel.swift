@@ -1,8 +1,10 @@
 import Foundation
+import Observation
 
 /// Owns top-level navigation state and server connectivity.
+@Observable
 @MainActor
-final class ContentViewModel: ObservableObject {
+final class ContentViewModel {
     enum Tab: String, CaseIterable, Identifiable {
         case studio, library
         var id: String { rawValue }
@@ -16,7 +18,7 @@ final class ContentViewModel: ObservableObject {
 
     let config: AppConfig
 
-    @Published var selectedTab: Tab = .studio
+    var selectedTab: Tab = .studio
 
     init(config: AppConfig) {
         self.config = config

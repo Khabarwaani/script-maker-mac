@@ -3,7 +3,7 @@ import SwiftUI
 /// App-level Preferences (Cmd+,). Pipeline settings live on the server —
 /// this page is only about the app itself.
 struct PreferencesView: View {
-    @ObservedObject var viewModel: PreferencesViewModel
+    @Bindable var viewModel: PreferencesViewModel
 
     var body: some View {
         Form {

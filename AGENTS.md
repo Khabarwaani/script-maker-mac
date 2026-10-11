@@ -27,26 +27,21 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
 
 - `Sources/ScriptMakerMac/App/` — `@main` entry + `CompositionRoot.swift` (the ONLY
   place that creates concrete types; everything else depends on protocols).
-- `Sources/ScriptMakerMac/Models/` — Domain entities (`Story`, `PipelineModels`).
-  Codable types, enums. No logic.
+- `Sources/ScriptMakerMac/Domain/` — `Entities/` (`Story`, `PipelineModels`),
+  `Services/` (business logic + protocols: `PipelineService`, `ImageService`,
+  `StoryRepository`, `WebClient`). Never touches URLSession/UserDefaults directly.
 - `Sources/ScriptMakerMac/Core/` — dependency-free shared utilities
   (`DateFormatting`, `StringFormatting`, `AppLog`). Foundation only.
-- `Sources/ScriptMakerMac/Services/` — Domain + Platform + Infra (see below).
-- `Sources/ScriptMakerMac/ViewModels/` — `@MainActor final class : ObservableObject`.
-  Owns state, calls services via protocols, exposes `@Published`. No layout code.
-- `Sources/ScriptMakerMac/Views/` — dumb SwiftUI. No business logic, no direct
-  service calls — everything through the view model.
-
-Layer map inside `Services/`:
-
-- **Domain:** `PipelineService`, `ImageService`, `StoryRepository` (protocol),
-  `APIError`. Business logic. Never touches URLSession/UserDefaults directly.
-- **Platform (stateful):** `LocalStoryRepository` (in-memory cache),
-  `StoryDataSourceProtocol`, `UserDefaultsStoryDataSource`,
-  `WebClient` (protocol), `NetworkWebClient`, `OfflineWebClient`,
-  `StoryMapper`. May cache, hold session state.
-- **Infra (stateless):** `InfraStore.swift` — `HTTPClient`, `KeyValueStore`,
-  `FileStore`. Pure execution primitives. No app types, no state.
+- `Sources/ScriptMakerMac/Platform/` — `Repositories/`, `DataSources/`, `WebClients/`,
+  `Mappers/`. Stateful implementations (caching, sessions).
+- `Sources/ScriptMakerMac/Infra/` — `InfraStore.swift` (`HTTPClient`, `KeyValueStore`,
+  `FileStore`), `AppConfig`. Stateless execution primitives.
+- `Sources/ScriptMakerMac/Presentation/ViewModels/` — `@Observable @MainActor final class`.
+  Owns state, calls services via protocols. Plain `var` (no `@Published`).
+  Created once in `ContentView` (`@State`), passed down as `@Bindable`.
+  Never recreated. No layout code.
+- `Sources/ScriptMakerMac/Presentation/Views/` — dumb SwiftUI. No business logic, no direct
+  service calls — everything through the view model. Each section its own struct.
 
 ## Rules
 
