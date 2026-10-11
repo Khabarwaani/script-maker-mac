@@ -1,32 +1,70 @@
 # AGENTS.md — script-maker-mac
 
-Agent rules for this repo. Mirrors `ai-script-maker` conventions.
+Agent rules for this repo. Written for this repo — not copied.
+
+## Dispatch
+
+Re-read the matching guideline each task:
+
+| Task | File |
+| :--- | :--- |
+| Feature | `docs/guidelines/workflows/feature.md` |
+| Bug fix | `docs/guidelines/workflows/bugfix.md` |
+| Git / PR | `docs/guidelines/workflows/git.md` |
+| Test or CI failure | `docs/guidelines/workflows/failure.md` |
+| Unit tests | `docs/guidelines/testing.md` |
+| Release | `docs/guidelines/workflows/release.md` |
 
 ## What this repo is
 
-Thin-client Mac UI for Script Maker. Streamlit frontend, talks HTTP to the
-pipeline server. Same UX as the classic app — only the data layer changed.
+Native SwiftUI thin client for Script Maker. **No Python.** MVVM, async/await,
+best practices throughout.
+
+## Architecture (4 layers)
+
+`Presentation → Domain → Platform → Infra` — dependencies point inward only.
+Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/layer-dependencies.md`.
+
+- `Sources/ScriptMakerMac/App/` — `@main` entry + `CompositionRoot.swift` (the ONLY
+  place that creates concrete types; everything else depends on protocols).
+- `Sources/ScriptMakerMac/Domain/` — `Entities/` (`Story`, `PipelineModels`),
+  `Services/` (business logic + protocols: `PipelineService`, `ImageService`,
+  `StoryRepository`, `WebClient`). Never touches URLSession/UserDefaults directly.
+- `Sources/ScriptMakerMac/Core/` — dependency-free shared utilities
+  (`DateFormatting`, `StringFormatting`, `AppLog`). Foundation only.
+- `Sources/ScriptMakerMac/Platform/` — `Repositories/`, `DataSources/`, `WebClients/`,
+  `Mappers/`. Stateful implementations (caching, sessions).
+- `Sources/ScriptMakerMac/Infra/` — `InfraStore.swift` (`HTTPClient`, `KeyValueStore`,
+  `FileStore`), `AppConfig`. Stateless execution primitives.
+- `Sources/ScriptMakerMac/Presentation/ViewModels/` — `@Observable @MainActor final class`.
+  Owns state, calls services via protocols. Plain `var` (no `@Published`).
+  Created once in `ContentView` (`@State`), passed down as `@Bindable`.
+  Never recreated. No layout code.
+- `Sources/ScriptMakerMac/Presentation/Views/` — dumb SwiftUI. No business logic, no direct
+  service calls — everything through the view model. Each section its own struct.
 
 ## Rules
 
 1. **Branches & PR flow:** `main` and `develop`. Feature branches off `develop`,
    PRs target `develop`. Never push direct to `main`/`develop`.
-2. **Thin client:** the UI never imports the pipeline. All generation goes
-   through `app/api_client.py`. No `agents.*` imports anywhere in this repo.
-3. **Fail-loud:** no silent fallbacks. `ServerUnreachable` / `ServerError`
-   surface to the user; the UI stays usable offline.
-4. **UX:** same components, theming and Apple HIG compliance as the classic
-   app. Reusable views live in `app/views/`.
-5. **Server URL:** top-level setting, defaults to `http://localhost:8000`
-   (`app/config.py`). Never hardcode another default.
-6. **Testing:** CI-first on the server. `python -m pytest tests/ -q`.
-7. **Guidelines:** `docs/guidelines/workflows/` — feature, bugfix, git,
-   failure, release, testing. Same meanings as ai-script-maker.
-8. **Tokens:** fewest words in comments and terminal text.
-
-## Layout
-
-- `app/` — Streamlit thin client (`main.py`, `api_client.py`, `config.py`)
-- `assets/` — app icon (AppIcon.iconset, also wired into Xcode)
-- `packaging/mac/` — Xcode project + DMG build script (run on a Mac)
-- `tests/` — unit tests
+2. **Thin client:** the UI never computes pipeline work. All generation goes
+   through `PipelineAPI`. No local AI/ML imports.
+3. **Fail-loud:** typed errors (`APIError`, `ConfigError`) with `LocalizedError`.
+   Surfaces to the user; the UI stays usable offline.
+4. **Concurrency:** async/await only — no completion handlers, no Combine for
+   networking. `PipelineAPI` is an actor. ViewModels are `@MainActor`.
+5. **Server URL:** top-level setting in Preferences (Cmd+, via Settings scene),
+   defaults to `http://localhost:8000`. IPv6-aware normalization in `AppConfig`.
+   Never hardcode another default.
+6. **UX:** same use cases as the classic app. Apple HIG throughout.
+7. **Testing:** CI-first (`xcodebuild` on macos). Unit tests target ViewModels
+   and Services, never Views.
+8. **Guidelines:** `docs/guidelines/` — architecture, layer-dependencies,
+   workflows (feature, bugfix, git, failure, release, testing).
+9. **Tokens:** fewest words in comments and terminal text.
+10. **New code placement:** identify the layer first (Presentation/Domain/
+    Platform/Infra/Core). If it touches a framework (URLSession, UserDefaults),
+    it belongs in Infra. If it manages state/cache, Platform. Business logic,
+    Domain. UI state, ViewModel. Shared helper, Core.
+11. **Inject, don't create:** ViewModels/Services take `any Protocol` in
+    `init`, never `ConcreteType()`. The Composition Root wires concretes.

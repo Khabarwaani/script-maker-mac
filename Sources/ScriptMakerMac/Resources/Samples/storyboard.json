@@ -1,0 +1,21 @@
+{
+  "storyboards": [
+    {
+      "scenes": [
+        {
+          "audio_sfx": "Traffic horns, distant siren",
+          "character": "Kallu",
+          "on_screen_text": "ODD-EVEN IS BACK",
+          "scene_location": "ITO crossing, morning smog",
+          "scene_number": 1,
+          "video_prompt": {
+            "verification_status": "verified",
+            "visual_prompt_ai": "Cinematic close-up of a frustrated Indian taxi driver in a yellow-black taxi at a smoggy Delhi intersection, morning light, 9:16 vertical"
+          },
+          "visual_b_roll": "Kallu pleads with the constable, gesturing at his even number plate."
+        }
+      ],
+      "title": "The Odd Day — Storyboard"
+    }
+  ]
+}

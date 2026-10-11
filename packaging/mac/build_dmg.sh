@@ -1,36 +1,36 @@
 #!/bin/bash
 # Build the Script Maker Mac .app and DMG. RUN ON A MAC.
 #
-# 1. Builds the Xcode target (Swift launcher).
-# 2. Bundles the Streamlit payload into Resources/streamlit-payload.
-# 3. Stamps the AppIcon and produces ScriptMakerMac.dmg.
+# Usage: build_dmg.sh [VERSION]
+#   VERSION defaults to the CFBundleShortVersionString in Info.plist.
 set -euo pipefail
 
 cd "$(dirname "$0")"
-VERSION="${1:-1.0}"
 APP="ScriptMakerMac.app"
+
+if [ $# -ge 1 ]; then
+    VERSION="$1"
+else
+    VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' \
+        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null || echo 1.0)"
+fi
 DMG="ScriptMakerMac-${VERSION}.dmg"
 
-echo "==> Building Xcode target..."
-xcodebuild -project ScriptMakerMac.xcodeproj -scheme ScriptMakerMac \
-  -configuration Release -derivedDataPath build clean build
+echo "==> Building (Release)..."
+xcodebuild -project ../../ScriptMakerMac.xcodeproj \
+  -scheme ScriptMakerMac \
+  -configuration Release \
+  -derivedDataPath build \
+  clean build
 
 BUILT_APP="$(find build -name "$APP" -maxdepth 4 | head -1)"
-echo "==> Assembling payload..."
-PAYLOAD="$BUILT_APP/Contents/Resources/streamlit-payload"
-mkdir -p "$PAYLOAD"
-cp -r ../../../app "$PAYLOAD/"
-cp ../../../requirements.txt "$PAYLOAD/"
-cat > "$PAYLOAD/launch.sh" <<'EOF'
-#!/bin/bash
-# Launched by the Swift AppDelegate. Starts the Streamlit thin client.
-PORT="${1:-8502}"
-cd "$(dirname "$0")"
-exec python3 -m streamlit run app/main.py --server.port "$PORT" --server.headless true
-EOF
-chmod +x "$PAYLOAD/launch.sh"
+if [ -z "$BUILT_APP" ]; then
+    echo "ERROR: $APP not found under build/ after xcodebuild." >&2
+    exit 1
+fi
+echo "==> Built: $BUILT_APP"
 
 echo "==> Creating DMG..."
 rm -f "$DMG"
 hdiutil create -volname "Script Maker" -srcfolder "$BUILT_APP" -ov -format UDZO "$DMG"
-echo "Done: $DMG"
+echo "Done: $(pwd)/$DMG"

@@ -1,0 +1,47 @@
+{
+  "confidence_score": 92,
+  "core_conflict_or_irony": "Drivers support clean air but resent the inconvenience of leaving cars at home.",
+  "flagged_claims": [
+
+  ],
+  "headline": "Delhi announces odd-even vehicle restrictions to combat air pollution",
+  "is_verified": true,
+  "key_figures": [
+    "Delhi Environment Minister",
+    "Delhi Traffic Police Commissioner"
+  ],
+  "key_locations": [
+    "New Delhi",
+    "Connaught Place",
+    "ITO crossing"
+  ],
+  "physical_props": [
+    "Traffic barricades",
+    "Pollution masks",
+    "Number plate"
+  ],
+  "sources": [
+    {
+      "source": "PTI",
+      "title": "Delhi to reintroduce odd-even scheme",
+      "url": "https://example.com/pti-1"
+    },
+    {
+      "source": "ANI",
+      "title": "Odd-even: Delhi govt issues notification",
+      "url": "https://example.com/ani-1"
+    }
+  ],
+  "tangible_actions": [
+    "Traffic police checking number plates at intersections",
+    "Commuters switching to metro and carpools"
+  ],
+  "verification_status": "verified",
+  "verification_summary": "Multiple wire sources confirm the Delhi government will reintroduce the odd-even vehicle rationing scheme for two weeks starting Monday.",
+  "verified_facts": [
+    "Delhi government announced odd-even scheme starting Monday",
+    "Scheme applies to private four-wheelers between 8 AM and 8 PM",
+    "Two-wheelers and electric vehicles are exempt",
+    "First introduced in January 2016"
+  ]
+}

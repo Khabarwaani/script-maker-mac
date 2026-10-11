@@ -1,40 +1,116 @@
 # Script Maker for Mac
 
-Thin-client UI for Script Maker. Same UX as always — only the data layer changed:
-instead of importing the pipeline directly, every task goes over HTTP to the
-pipeline server.
+Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
+MVVM, async/await throughout.
 
-- **Works offline**: server defaults to `http://localhost:8000` — no internet needed.
-- **Server URL** is a top-level setting — point it at a remote server anytime.
-- **UX**: identical components, theming and Apple HIG compliance as the classic app.
+Same use cases as the classic app. Every task goes over HTTP to the pipeline
+server configured in Preferences (Cmd+,); nothing is computed locally.
+
+- **Works offline**: server defaults to `http://localhost:8501` — no internet needed.
+- **Server URL** is a top-level setting (IPv6-aware) — point it at a remote server anytime.
+- **Long generations** stream progress via Server-Sent Events; the UI never blocks.
+- **Failures** offer the same four options as the classic app: retry stage, retry fresh, skip, dismiss.
+
+---
 
 ## Architecture
 
+Clean 4-layer architecture (inspired by `abhi266raj/Camera`):
+
 ```
-script-maker-mac (this repo, public)     ai-script-maker (private)
-┌─────────────────────────────┐         ┌──────────────────────────┐
-│ Streamlit UI (thin client)  │  HTTP   │ Pipeline server (API)    │
-│ app/main.py                 │ ◄─────► │ sessions / stages / jobs │
-│ app/api_client.py           │   SSE   │ SSE progress stream      │
-└─────────────────────────────┘         └──────────────────────────┘
+Presentation → Domain → Platform → Infra
 ```
 
-## Run
+### Layer Descriptions
+
+**1. Presentation** (`Views/`, `ViewModels/`)
+- SwiftUI views (dumb — no business logic, no service calls)
+- ViewModels (`@Observable`, `@MainActor`) — UI state, calls Domain services
+- Depends on: Domain
+
+### Observation Framework
+
+ViewModels use the modern Observation framework (`@Observable`), not the legacy `ObservableObject`/`@Published`:
+
+```swift
+@Observable
+@MainActor
+final class LibraryViewModel {
+    var stories: [Story] = []   // plain var — no @Published needed
+    ...
+}
+```
+
+Views hold models with `@State` (owner) and `@Bindable` (needs `$` bindings):
+
+```swift
+struct ContentView: View {
+    @State private var libraryViewModel: LibraryViewModel  // created once, stays in memory
+    ...
+}
+struct StoryListView: View {
+    @Bindable var viewModel: LibraryViewModel  // $viewModel.selectedStoryID bindings
+    ...
+}
+```
+
+Rules: ViewModels are created once (in `ContentView`) and passed down — never recreated on tab switch. Each section is its own `View` struct for stable identity.
+
+**2. Domain** (`Services/`: PipelineService, StoryRepository protocol, Models)
+- Business logic, entities, repository interfaces
+- `PipelineService`: orchestrates pipeline via WebClient
+- `StoryRepository` protocol: defines persistence contract
+- Depends on: Platform (via protocols only)
+
+**3. Platform** (`Services/`: LocalStoryRepository, StoryDataSourceProtocol, WebClients)
+- Repository implementations, DataSource protocols, DTOs, mappers
+- `LocalStoryRepository`: implements Domain's protocol using DataSources
+- `NetworkWebClient` / `OfflineWebClient`: implement `WebClient` protocol
+- Depends on: Infra (via protocols/wrappers)
+
+**4. Infra** (`Services/`: InfraStore.swift)
+- Dumb framework wrappers — no business logic, no app types
+- `HTTPClient`: URLSession wrapper
+- `KeyValueStore`: UserDefaults wrapper
+- `FileStore`: FileManager wrapper
+- Depends on: nothing (dependency-free)
+
+### Layered Interaction Model
+
+- **View** displays ViewModel state and forwards user actions
+- **ViewModel** prepares data for UI and delegates to Domain services
+- **Domain** performs business logic using Platform abstractions
+- **Platform** implements persistence/network using Infra wrappers
+- **Infra** provides raw framework access with no app knowledge
+
+### Responsibility Matrix
+
+| Layer        | Responsibilities                              | Depends On     |
+|--------------|-----------------------------------------------|----------------|
+| Presentation | UI rendering, state management                | Domain         |
+| Domain       | Business logic, entities, repository contracts| Platform       |
+| Platform     | Repo impls, DataSources, WebClients, DTOs      | Infra          |
+| Infra        | URLSession, UserDefaults, FileManager wrappers| None           |
+
+### Rules
+
+1. **Dependencies point inward**: Infra knows nothing about Platform; Platform knows nothing about Domain.
+2. **Protocols at boundaries**: Domain defines `StoryRepository`; Platform defines `StoryDataSourceProtocol`; Infra provides concrete wrappers.
+3. **No framework in Domain**: Domain never imports SwiftUI or touches UserDefaults/URLSession directly.
+4. **Testable**: Every layer can be mocked via protocols.
+
+---
+
+## Open in Xcode
+
+Open `ScriptMakerMac.xcworkspace` (or `ScriptMakerMac.xcodeproj`) at the repo root.
+
+## Build the DMG (on a Mac)
 
 ```bash
-pip install -r requirements.txt
-streamlit run app/main.py
+packaging/mac/build_dmg.sh 1.0
 ```
-
-The app starts even with no server — it shows connection status and keeps the
-UX usable offline. Start the pipeline server (default `http://localhost:8000`)
-to generate.
-
-## Packaging (Mac)
-
-`packaging/mac/` holds the `.app` bundle scaffolding (`Info.plist`, icon) and
-`build_dmg.sh` — run on a Mac to produce the DMG.
 
 ## CI
 
-`.github/workflows/ci.yml` — import check + unit tests on every push/PR.
+`.github/workflows/ci.yml` — `xcodebuild` Debug build on every push/PR (public repo: free).

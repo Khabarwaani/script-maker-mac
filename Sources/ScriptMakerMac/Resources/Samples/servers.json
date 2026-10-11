@@ -1,0 +1,8 @@
+{
+  "servers": [
+    {
+      "name": "localserver",
+      "url": "http://localhost:8501"
+    }
+  ]
+}

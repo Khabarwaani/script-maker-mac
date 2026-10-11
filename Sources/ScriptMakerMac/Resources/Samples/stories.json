@@ -1,0 +1,20 @@
+{
+  "stories": [
+    {
+      "created_at": "2026-10-10",
+      "headline": "Delhi brings back odd-even traffic restrictions",
+      "id": "sample-1",
+      "status": "completed",
+      "summary": "Kallu's taxi is stopped at ITO crossing on an odd day.",
+      "title": "The Odd Day"
+    },
+    {
+      "created_at": "2026-10-09",
+      "headline": "Havaldar Sharma directs traffic at Connaught Place",
+      "id": "sample-2",
+      "status": "completed",
+      "summary": "Havaldar Sharma manages the chaos with his signature whistle.",
+      "title": "The Whistle Blower"
+    }
+  ]
+}
