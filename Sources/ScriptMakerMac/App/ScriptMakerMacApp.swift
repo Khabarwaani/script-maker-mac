@@ -17,6 +17,8 @@ struct ScriptMakerMacApp: App {
         WindowGroup {
             ContentView(viewModel: contentViewModel)
         }
+        // Default 1280 wide → Studio sidebar ideal 768 ≈ 60%, Preview ≈ 40%.
+        .defaultSize(width: 1280, height: 800)
         Settings {
             PreferencesView(
                 viewModel: PreferencesViewModel(config: contentViewModel.config)

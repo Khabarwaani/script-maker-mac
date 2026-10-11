@@ -4,10 +4,12 @@ import SwiftUI
 /// - Top tabs: Studio | Library. Each tab owns exactly ONE NavigationSplitView;
 ///   nesting split views throws inside AppKit layout (+[NSApplication _crashOnException:]).
 /// - Toolbar: connection status, Preferences.
-/// - Master-detail per tab defaults to 60/40 (Streamlit's settings/output [6,4]).
+/// - Every section is its own View struct; ViewModels are created once here
+///   and stay in memory (never recreated on tab switch).
 struct ContentView: View {
     @ObservedObject var viewModel: ContentViewModel
     @StateObject private var generateViewModel: GenerateViewModel
+    @StateObject private var libraryViewModel: LibraryViewModel
     @StateObject private var addressBarViewModel: ServerAddressBarViewModel
     @StateObject private var preferencesViewModel: PreferencesViewModel
 
@@ -17,6 +19,9 @@ struct ContentView: View {
         self.viewModel = viewModel
         _generateViewModel = StateObject(
             wrappedValue: GenerateViewModel(config: viewModel.config)
+        )
+        _libraryViewModel = StateObject(
+            wrappedValue: LibraryViewModel(config: viewModel.config)
         )
         _addressBarViewModel = StateObject(
             wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
@@ -34,7 +39,7 @@ struct ContentView: View {
                 }
                 .tag(ContentViewModel.Tab.studio)
 
-            LibraryView(config: viewModel.config)
+            LibraryView(viewModel: libraryViewModel)
                 .tabItem {
                     Label("Library", systemImage: "books.vertical")
                 }
@@ -60,15 +65,10 @@ struct ContentView: View {
     }
 }
 
-/// Library: saved stories. Mirrors the old app — story list (newest first),
-/// detail view, empty state. Explicit not-implemented notice until the
-/// server provides the stories endpoint.
+/// Library: saved stories. Thin section container — the ViewModel is created
+/// once in ContentView and stays in memory; StoryListView owns the split view.
 struct LibraryView: View {
-    @StateObject private var viewModel: LibraryViewModel
-
-    init(config: AppConfig) {
-        _viewModel = StateObject(wrappedValue: LibraryViewModel(config: config))
-    }
+    @ObservedObject var viewModel: LibraryViewModel
 
     var body: some View {
         Group {
@@ -77,7 +77,7 @@ struct LibraryView: View {
             } else if viewModel.stories.isEmpty && !viewModel.isLoading {
                 emptyView
             } else {
-                storyList
+                StoryListView(viewModel: viewModel)
             }
         }
         .navigationTitle("Library")
@@ -113,131 +113,5 @@ struct LibraryView: View {
                 .multilineTextAlignment(.center)
         }
         .padding()
-    }
-
-    private var storyList: some View {
-        GeometryReader { geo in
-            let widths = SplitWidths.sidebar(totalWidth: geo.size.width, min: 220)
-            NavigationSplitView {
-                List(selection: $viewModel.selectedStoryID) {
-                    ForEach(viewModel.stories) { story in
-                        storyRow(story)
-                            .tag(story.id)
-                    }
-                    .onDelete { offsets in
-                        for idx in offsets {
-                            let id = viewModel.stories[idx].id
-                            Task { await viewModel.deleteStory(id: id) }
-                        }
-                    }
-                }
-                .listStyle(.sidebar)
-                .navigationTitle("Stories · \(viewModel.stories.count)")
-                .navigationSplitViewColumnWidth(min: widths.min, ideal: widths.ideal, max: widths.max)
-                .toolbar {
-                    ToolbarItem {
-                        Button {
-                            Task { await viewModel.refresh() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .help("Refresh")
-                    }
-                }
-            } detail: {
-                if let story = viewModel.selectedStory {
-                    storyDetail(story)
-                } else {
-                    Text("Select a story")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private func storyRow(_ story: Story) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(story.title)
-                .font(.headline)
-                .lineLimit(1)
-            if !story.createdAt.isEmpty {
-                Text(story.createdAt)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-        .tag(story.id)
-    }
-
-    private func storyDetail(_ story: Story) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(story.title)
-                    .font(.largeTitle)
-                if !story.createdAt.isEmpty {
-                    Text(story.createdAt)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if !story.summary.isEmpty {
-                    Text(story.summary)
-                        .font(.callout)
-                }
-
-                // Metadata
-                if !story.headline.isEmpty {
-                    detailField("Headline", value: story.headline)
-                }
-                if !story.emotion.isEmpty {
-                    detailField("Emotion", value: story.emotion)
-                }
-                if !story.format.isEmpty {
-                    detailField("Format", value: story.format)
-                }
-                detailField("Status", value: story.status)
-
-                // Video section
-                Section("Video") {
-                    if let videoURL = story.videoURL, !videoURL.isEmpty {
-                        Text("Video attached")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("No video attached")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Button("Upload video…") {
-                        // TODO: file picker for video upload
-                    }
-                    .help("Attach a video file to this story")
-                }
-
-                // Merge section
-                Section("Merge clip at end") {
-                    Text("Append the configured closing clip to the story video.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Merge closing clip") {
-                        Task { await viewModel.mergeClip(storyID: story.id) }
-                    }
-                    .disabled(story.videoURL?.isEmpty ?? true)
-                    .help("Merge the default ending clip at the video's end")
-                }
-            }
-            .padding()
-        }
-    }
-
-    private func detailField(_ label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.headline)
-            Text(value)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.top, 8)
     }
 }
