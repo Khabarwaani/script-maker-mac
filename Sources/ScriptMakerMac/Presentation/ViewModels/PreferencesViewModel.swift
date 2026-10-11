@@ -55,9 +55,9 @@ final class PreferencesViewModel {
             let reachable = await connectionChecker.isReachable(at: url)
             config.serverURL = normalized
             draftURL = normalized
-            dataSource = reachable ? .server : .offline
-            config.dataSource = dataSource
-            noticeMessage = reachable ? "Using server." : "Server unavailable. Using Local JSON so you can continue."
+            config.dataSource = .server
+            dataSource = .server
+            noticeMessage = reachable ? "Using server." : "Saved server configuration. Warning: server is currently unreachable at this URL."
         } catch {
             errorMessage = error.localizedDescription
         }
