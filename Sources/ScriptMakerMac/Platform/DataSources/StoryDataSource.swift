@@ -26,6 +26,17 @@ struct UserDefaultsStoryDataSource: StoryDataSourceProtocol {
     }
 
     func load() -> [Story] {
+        let existing = loadSaved()
+        guard store.data(forKey: "sampleLibrarySeeded") == nil else { return existing }
+        let samples = (SampleData.json(for: "stories")?["stories"] as? [[String: Any]] ?? []).map(StoryMapper.from)
+        let ids = Set(existing.map(\.id))
+        let seeded = existing + samples.filter { !ids.contains($0.id) }
+        save(seeded)
+        store.set(Data([1]), forKey: "sampleLibrarySeeded")
+        return seeded
+    }
+
+    private func loadSaved() -> [Story] {
         guard let data = store.data(forKey: key) else { return [] }
         // Preferred: typed JSON.
         if let stories = try? JSONDecoder().decode([Story].self, from: data) {

@@ -18,7 +18,7 @@ DMG="ScriptMakerMac-${VERSION}.dmg"
 
 echo "==> Building (Release)..."
 xcodebuild -project ../../ScriptMakerMac.xcodeproj \
-  -target ScriptMakerMac \
+  -scheme ScriptMakerMac \
   -configuration Release \
   -derivedDataPath build \
   clean build

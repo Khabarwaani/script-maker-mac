@@ -1,11 +1,6 @@
 import SwiftUI
 
-/// Native macOS layout:
-/// - Top tabs: Studio | Library. Each tab owns exactly ONE NavigationSplitView;
-///   nesting split views throws inside AppKit layout (+[NSApplication _crashOnException:]).
-/// - Toolbar: connection status, Preferences.
-/// - Every section is its own View struct; ViewModels are created once here
-///   and stay in memory (never recreated on tab switch).
+/// Shared header and stable workspace view models.
 struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
@@ -18,69 +13,95 @@ struct ContentView: View {
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
         _generateViewModel = State(
-            wrappedValue: GenerateViewModel(config: viewModel.config)
+            wrappedValue: viewModel.generateViewModel
         )
         _libraryViewModel = State(
-            wrappedValue: LibraryViewModel(config: viewModel.config)
+            wrappedValue: viewModel.libraryViewModel
         )
         _addressBarViewModel = State(
             wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
         )
         _preferencesViewModel = State(
-            wrappedValue: PreferencesViewModel(config: viewModel.config)
+            wrappedValue: viewModel.preferencesViewModel
         )
     }
 
     var body: some View {
-        TabView(selection: $viewModel.selectedTab) {
-            GenerateView(viewModel: generateViewModel)
-                .tabItem {
-                    Label("Studio", systemImage: "wand.and.stars")
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                HStack(spacing: 4) {
+                    ForEach(ContentViewModel.Tab.allCases) { tab in
+                        Button { viewModel.selectedTab = tab } label: {
+                            Text(tab.title).font(.body.weight(.medium))
+                                .frame(width: 100).padding(.vertical, 9)
+                                .background(viewModel.selectedTab == tab ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityValue(viewModel.selectedTab == tab ? "Selected" : "")
+                    }
                 }
-                .tag(ContentViewModel.Tab.studio)
-
-            LibraryView(viewModel: libraryViewModel)
-                .tabItem {
-                    Label("Library", systemImage: "books.vertical")
+                .padding(4)
+                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.line, lineWidth: 1))
+                HStack {
+                    Spacer(minLength: 0)
+                    if viewModel.config.dataSource == .server {
+                        ServerAddressBar(viewModel: addressBarViewModel)
+                    }
+                    Button { showingPreferences = true } label: { Image(systemName: "gearshape") }
+                        .controlSize(.large)
+                        .help("Settings… (⌘,)")
+                        .accessibilityLabel("Settings")
                 }
-                .tag(ContentViewModel.Tab.library)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                ServerAddressBar(viewModel: addressBarViewModel)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingPreferences = true
-                } label: {
-                    Image(systemName: "gearshape")
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            Divider().overlay(AppTheme.line)
+            Group {
+                switch viewModel.selectedTab {
+                case .studio: GenerateView(viewModel: generateViewModel)
+                case .library: LibraryView(viewModel: libraryViewModel)
                 }
-                .help("Preferences… (⌘,)")
-                .accessibilityLabel("Preferences")
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationTitle(viewModel.config.buildTitle)
+        .font(.system(size: 14))
+        .foregroundStyle(AppTheme.ink)
+        .background(AppTheme.paper)
+        .tint(AppTheme.accent)
+        .accentColor(AppTheme.accent)
+        .buttonStyle(StudioButtonStyle())
+        .background(ScrollBarConfiguration())
+        .preferredColorScheme(viewModel.config.appearance.colorScheme)
+        .frame(minWidth: 1000, minHeight: 650)
         .sheet(isPresented: $showingPreferences) {
             PreferencesView(viewModel: preferencesViewModel)
         }
     }
 }
 
-/// Library: saved stories. Thin section container — the ViewModel is created
-/// once in ContentView and stays in memory; StoryListView owns the split view.
+/// Saved stories share the Studio repository.
 struct LibraryView: View {
     @Bindable var viewModel: LibraryViewModel
 
     var body: some View {
         Group {
-            if let notice = viewModel.notice {
+            if let notice = viewModel.notice, viewModel.stories.isEmpty {
                 notImplementedView(notice)
             } else if viewModel.stories.isEmpty && !viewModel.isLoading {
                 emptyView
             } else {
-                StoryListView(viewModel: viewModel)
+                VStack(spacing: 0) {
+                    if let notice = viewModel.notice {
+                        Text(notice).font(.callout).foregroundStyle(AppTheme.warning).padding(12)
+                    }
+                    StoryListView(viewModel: viewModel)
+                }
             }
         }
-        .navigationTitle("Library")
         .task { await viewModel.refresh() }
     }
 
@@ -89,12 +110,12 @@ struct LibraryView: View {
         VStack(spacing: 12) {
             Image(systemName: "books.vertical")
                 .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text("Not implemented")
+                .foregroundStyle(AppTheme.secondaryInk)
+            Text("Library unavailable")
                 .font(.headline)
             Text(notice)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryInk)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -104,12 +125,12 @@ struct LibraryView: View {
         VStack(spacing: 12) {
             Image(systemName: "books.vertical")
                 .font(.largeTitle)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryInk)
             Text("No saved stories yet.")
                 .font(.headline)
             Text("Generate a reel in the Studio tab — it auto-saves here on completion.")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryInk)
                 .multilineTextAlignment(.center)
         }
         .padding()

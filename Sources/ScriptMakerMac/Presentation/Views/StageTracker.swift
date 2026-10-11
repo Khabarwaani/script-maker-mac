@@ -21,18 +21,18 @@ struct StageTracker: View {
                 if isRunning {
                     Text("— Running")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.secondaryInk)
                     ProgressView()
                         .scaleEffect(0.7)
                 } else {
                     Text("— Complete")
                         .font(.subheadline)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppTheme.success)
                 }
             }
 
             // Substep status lines
-            ForEach(events.suffix(5)) { event in
+            ForEach(events.filter { $0.stage == stage.rawValue }.suffix(5)) { event in
                 HStack(spacing: 6) {
                     Image(systemName: iconFor(status: event.status))
                         .foregroundStyle(colorFor(status: event.status))
@@ -42,12 +42,12 @@ struct StageTracker: View {
                     Spacer()
                     Text(event.status)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.secondaryInk)
                 }
             }
         }
         .padding(8)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppTheme.sunken)
         .cornerRadius(8)
     }
 
@@ -63,11 +63,11 @@ struct StageTracker: View {
 
     private func colorFor(status: String) -> Color {
         switch status.lowercased() {
-        case "done", "complete", "passed": return .green
-        case "running": return .blue
-        case "failed", "error": return .red
-        case "waiting": return .secondary
-        default: return .secondary
+        case "done", "complete", "passed": return AppTheme.success
+        case "running": return .accentColor
+        case "failed", "error": return AppTheme.danger
+        case "waiting": return AppTheme.secondaryInk
+        default: return AppTheme.secondaryInk
         }
     }
 }
@@ -95,10 +95,10 @@ struct OutputCard<Content: View>: View {
         } label: {
             Label("Stage \(stageNumber): \(stage.title)", systemImage: "checkmark.circle.fill")
                 .font(.headline)
-                .foregroundStyle(.green)
+                .foregroundStyle(AppTheme.success)
         }
         .padding(8)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(AppTheme.card)
         .cornerRadius(8)
     }
 }

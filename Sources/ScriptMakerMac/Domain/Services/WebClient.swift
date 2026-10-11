@@ -11,7 +11,7 @@ protocol WebClient: Sendable {
     func runStage(sessionID: String, stage: PipelineStage, inputs: [String: Any]) async throws -> [String: Any]
     func select(sessionID: String, selection: [String: Any]) async throws -> [String: Any]
     func listStories() async throws -> [[String: Any]]
-    func startJob(sessionID: String, stage: PipelineStage, inputs: [String: Any]) async throws -> String
+    func startJob(sessionID: String, stage: PipelineJob, inputs: [String: Any]) async throws -> String
     func jobStatus(jobID: String) async throws -> JobStatus
     func pollJob(jobID: String, interval: TimeInterval) -> AsyncThrowingStream<JobStatus, Error>
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error>

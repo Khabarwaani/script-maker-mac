@@ -8,16 +8,23 @@ import Foundation
 enum StoryMapper {
     /// Dictionary → Story (tolerant: missing keys get defaults).
     static func from(_ dict: [String: Any]) -> Story {
-        Story(
-            id: dict["id"] as? String ?? UUID().uuidString,
-            title: dict["title"] as? String ?? "Untitled",
+        let metadata = dict["meta"] as? [String: Any] ?? dict
+        return Story(
+            id: metadata["id"] as? String ?? UUID().uuidString,
+            title: metadata["title"] as? String ?? "Untitled",
             summary: dict["summary"] as? String ?? "",
-            headline: dict["headline"] as? String ?? "",
-            createdAt: dict["created_at"] as? String ?? DateFormatting.iso8601Now(),
+            headline: metadata["headline"] as? String ?? metadata["source_headline"] as? String ?? "",
+            createdAt: metadata["created_at"] as? String ?? DateFormatting.iso8601Now(),
             status: dict["status"] as? String ?? "completed",
-            emotion: dict["emotion"] as? String ?? "",
+            emotion: metadata["emotion"] as? String ?? metadata["tone"] as? String ?? "",
             format: dict["format"] as? String ?? "",
-            videoURL: dict["video_url"] as? String
+            videoURL: dict["video_url"] as? String,
+            hashtags: metadata["hashtags"] as? [String],
+            sourceLinks: (metadata["news_links"] as? [[String: Any]])?.map { link in
+                StorySourceLink(title: link["title"] as? String ?? "Source", url: link["url"] as? String ?? link["link"] as? String ?? "", source: link["source"] as? String ?? "")
+            },
+            scriptText: dict["script_md"] as? String ?? dict["script"] as? String,
+            generationNumber: metadata["generation_number"] as? Int
         )
     }
 
@@ -33,6 +40,12 @@ enum StoryMapper {
             "emotion": story.emotion,
             "format": story.format,
         ]
+        if let hashtags = story.hashtags { dict["hashtags"] = hashtags }
+        if let links = story.sourceLinks {
+            dict["news_links"] = links.map { ["title": $0.title, "url": $0.url, "source": $0.source] }
+        }
+        if let script = story.scriptText { dict["script_md"] = script }
+        if let number = story.generationNumber { dict["generation_number"] = number }
         if let videoURL = story.videoURL {
             dict["video_url"] = videoURL
         }

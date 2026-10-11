@@ -11,9 +11,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build (Debug)
+      - name: Build and test (Debug)
         run: |
           xcodebuild -project ScriptMakerMac.xcodeproj \
-            -target ScriptMakerMac \
+            -scheme ScriptMakerMac \
             -configuration Debug \
-            build
+            -destination 'platform=macOS' \
+            -parallel-testing-enabled NO \
+            test

@@ -14,6 +14,13 @@ enum DateFormatting {
         return f
     }()
 
+    static func generationTime(_ value: String) -> String {
+        guard let date = iso.date(from: value) else { return value }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy · HH:mm:ss z"
+        return formatter.string(from: date)
+    }
+
     static func iso8601Now() -> String {
         iso.string(from: Date())
     }

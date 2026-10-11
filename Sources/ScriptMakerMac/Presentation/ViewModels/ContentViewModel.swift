@@ -17,10 +17,16 @@ final class ContentViewModel {
     }
 
     let config: AppConfig
+    let preferencesViewModel: PreferencesViewModel
+    let generateViewModel: GenerateViewModel
+    let libraryViewModel: LibraryViewModel
 
     var selectedTab: Tab = .studio
 
-    init(config: AppConfig) {
+    init(config: AppConfig, preferencesViewModel: PreferencesViewModel, generateViewModel: GenerateViewModel, libraryViewModel: LibraryViewModel) {
         self.config = config
+        self.preferencesViewModel = preferencesViewModel
+        self.generateViewModel = generateViewModel
+        self.libraryViewModel = libraryViewModel
     }
 }

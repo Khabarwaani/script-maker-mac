@@ -1,5 +1,9 @@
 import Foundation
 
+protocol ServerConnectionChecking: Sendable {
+    func isReachable(at url: URL) async -> Bool
+}
+
 /// Service layer: ViewModels call this, never the WebClient directly.
 ///
 /// The WebClient is chosen from config — NetworkWebClient for a live server,
@@ -10,10 +14,15 @@ struct PipelineService: Sendable {
 
     /// Choose the WebClient from config.
     init(config: AppConfig) throws {
-        self.baseURL = try config.baseURL()
+        if config.dataSource == .server {
+            self.baseURL = try config.baseURL()
+        } else {
+            guard let url = URL(string: AppConfig.defaultServerURL) else { throw ConfigError.invalidURL(AppConfig.defaultServerURL) }
+            self.baseURL = url
+        }
         switch config.dataSource {
         case .offline:
-            self.client = OfflineWebClient()
+            self.client = OfflineWebClient(delay: config.localJSONDelay)
         case .server:
             self.client = NetworkWebClient(baseURL: baseURL)
         }
@@ -45,7 +54,7 @@ struct PipelineService: Sendable {
         try await client.listStories()
     }
 
-    func startJob(sessionID: String, stage: PipelineStage, inputs: [String: Any] = [:]) async throws -> String {
+    func startJob(sessionID: String, stage: PipelineJob, inputs: [String: Any] = [:]) async throws -> String {
         try await client.startJob(sessionID: sessionID, stage: stage, inputs: inputs)
     }
 

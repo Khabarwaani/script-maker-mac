@@ -30,8 +30,8 @@ final class AppConfigTests: XCTestCase {
         XCTAssertThrowsError(try AppConfig.normalize(raw: "http://localhost:99999"))
     }
 
-    func testDefaultIsLocalhost8501() {
-        XCTAssertEqual(AppConfig.defaultServerURL, "http://localhost:8501")
+    func testDefaultIsLocalhost8000() {
+        XCTAssertEqual(AppConfig.defaultServerURL, "http://localhost:8000")
     }
 
     func testLocalserverName() {

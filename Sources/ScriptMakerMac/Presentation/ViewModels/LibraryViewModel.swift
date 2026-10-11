@@ -7,6 +7,7 @@ import Observation
 @MainActor
 final class LibraryViewModel {
     private let config: AppConfig
+    private let clipboard: (any ClipboardWriting)?
     private let repository: any StoryRepository
 
     var stories: [Story] = []
@@ -14,21 +15,44 @@ final class LibraryViewModel {
     var isLoading = false
     var notice: String?
 
-    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil) {
         self.config = config
         self.repository = repository
+        self.clipboard = clipboard
     }
 
     var selectedStory: Story? {
         stories.first { $0.id == selectedStoryID }
     }
 
+    var copyFeedback: String?
+
+    func copy(_ text: String, label: String) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            copyFeedback = "No \(label.lowercased()) to copy."
+            return
+        }
+        copyFeedback = clipboard?.write(text) == true ? "\(label) copied" : "Could not copy \(label.lowercased())."
+    }
+
     func refresh() async {
         // Prevent redundant refreshes (view .task can fire multiple times).
         guard !isLoading else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            if !stories.contains(where: { $0.id == selectedStoryID }) {
+                selectedStoryID = stories.first?.id
+            }
+        }
         notice = nil
+        if config.dataSource != .server {
+            stories = await repository.all()
+            if !stories.contains(where: { $0.id == selectedStoryID }) { selectedStoryID = stories.first?.id }
+            do { _ = try await PipelineService(config: config).listStories() }
+            catch { notice = error.localizedDescription }
+            return
+        }
         do {
             let api = try PipelineService(config: config)
             let serverDicts = try await api.listStories()
@@ -38,9 +62,6 @@ final class LibraryViewModel {
             // Deduplicate: local wins on id conflict.
             let localIDs = Set(local.map(\.id))
             stories = local + serverStories.filter { !localIDs.contains($0.id) }
-            if selectedStoryID == nil {
-                selectedStoryID = stories.first?.id
-            }
         } catch let e as APIError {
             switch e {
             case .notImplemented(let what):
@@ -57,12 +78,30 @@ final class LibraryViewModel {
 
     /// Delete a story (from local store; server deletion when API supports it).
     func deleteStory(id: String) async {
+        let local = await repository.all()
+        guard local.contains(where: { $0.id == id }) else {
+            notice = "This story is on the server. Server deletion is not available yet."
+            return
+        }
         await repository.remove(id: id)
         stories.removeAll { $0.id == id }
         if selectedStoryID == id {
             selectedStoryID = stories.first?.id
         }
         // TODO: server-side delete when the API provides it.
+    }
+
+    func deleteAllStories() async {
+        let local = await repository.all()
+        let localIDs = Set(local.map(\.id))
+        guard stories.allSatisfy({ localIDs.contains($0.id) }) else {
+            notice = "Server deletion is not available yet. No stories were deleted."
+            return
+        }
+        for story in local { await repository.remove(id: story.id) }
+        stories = []
+        selectedStoryID = nil
+        notice = nil
     }
 
     /// Merge the default closing clip at the end of the story's video.

@@ -4,7 +4,7 @@ import Foundation
 
 /// A pipeline stage in the stepwise flow.
 enum PipelineStage: String, CaseIterable, Identifiable {
-    case verify, characters, dialogue, scenes, storyboard, render
+    case verify, characters, dialogue, scenes, storyboard, validation
 
     var id: String { rawValue }
 
@@ -15,9 +15,13 @@ enum PipelineStage: String, CaseIterable, Identifiable {
         case .dialogue: return "Dialogue"
         case .scenes: return "Scenes"
         case .storyboard: return "Storyboard"
-        case .render: return "Render video"
+        case .validation: return "Integration & Final Validation"
         }
     }
+}
+
+enum PipelineJob: String {
+    case render
 }
 
 /// Server connection state for UI indicators.

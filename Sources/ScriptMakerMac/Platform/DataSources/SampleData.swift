@@ -1,5 +1,18 @@
 import Foundation
 
+struct BundledStudioCatalog: StudioCatalogProviding {
+    func load() throws -> StudioCatalog {
+        guard let data = SampleData.data(for: "studio_catalog") else {
+            throw APIError.malformed("Missing Studio option catalog")
+        }
+        do {
+            return try JSONDecoder().decode(StudioCatalog.self, from: data)
+        } catch {
+            throw APIError.malformed("Studio option catalog: \(error.localizedDescription)")
+        }
+    }
+}
+
 /// Bundled sample JSON for UX development and tests.
 /// When enabled (the default), the app runs fully offline against these
 /// fixtures instead of a live server.
