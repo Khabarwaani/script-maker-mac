@@ -15,9 +15,6 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("SOURCE").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
                 StudioChoiceGroup(title: "Source", selection: $viewModel.dataSource, options: [.offline, .server], label: { $0.label })
-                    .onChange(of: viewModel.dataSource) { _, source in
-                        if source != .server { Task { await viewModel.save() } }
-                    }
                 if viewModel.dataSource == .offline {
                     HStack {
                         Text("Network delay (s)")
@@ -32,11 +29,13 @@ struct PreferencesView: View {
                     .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 if viewModel.dataSource == .server {
                     TextField("Server URL", text: $viewModel.draftURL).textFieldStyle(.roundedBorder)
-                    HStack {
-                        Button("Test connection") { Task { await viewModel.testConnection() } }
-                        Button("Apply") { Task { await viewModel.save() } }
-                    }.disabled(viewModel.isTesting)
                 }
+                HStack {
+                    if viewModel.dataSource == .server {
+                        Button("Test connection") { Task { await viewModel.testConnection() } }
+                    }
+                    Button("Apply") { Task { await viewModel.save() } }
+                }.disabled(viewModel.isTesting)
             }
             .padding(18).frame(maxWidth: .infinity, alignment: .leading)
             .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
