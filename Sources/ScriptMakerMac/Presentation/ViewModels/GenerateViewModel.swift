@@ -980,6 +980,10 @@ final class GenerateViewModel {
             let title = script["title"] as? String ?? topic
             let boards = stagePayloads[.storyboard]?["storyboards"] as? [[String: Any]] ?? []
             let board = boards.indices.contains(index) ? boards[index] : [:]
+            let scriptContent = script["script_md"] as? String ?? script["script"] as? String ?? board["script_md"] as? String
+            let initialVersions: [StoryScriptVersion]? = scriptContent.map {
+                [StoryScriptVersion(number: 1, text: $0, createdAt: generationCreatedAt, instruction: instructionText.isEmpty ? nil : instructionText)]
+            }
             let story = Story(
                 id: id,
                 title: StringFormatting.isBlank(title) ? "Untitled story \(index + 1)" : title,
@@ -989,7 +993,9 @@ final class GenerateViewModel {
                 status: "completed",
                 emotion: selectedEmotion,
                 format: selectedFormat,
-                scriptText: script["script_md"] as? String ?? script["script"] as? String ?? board["script_md"] as? String,
+                scriptText: scriptContent,
+                instruction: instructionText.isEmpty ? nil : instructionText,
+                scriptVersions: initialVersions,
                 generationNumber: index + 1,
                 stageOutputs: outputs
             )

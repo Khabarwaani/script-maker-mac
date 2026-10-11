@@ -13,6 +13,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var format: String
     var videoURL: String?
     var scriptText: String?
+    var instruction: String?
+    var scriptVersions: [StoryScriptVersion]?
     var generationNumber: Int?
     var stageOutputs: [String: String]?
 
@@ -27,6 +29,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         format: String = "",
         videoURL: String? = nil,
         scriptText: String? = nil,
+        instruction: String? = nil,
+        scriptVersions: [StoryScriptVersion]? = nil,
         generationNumber: Int? = nil,
         stageOutputs: [String: String]? = nil
     ) {
@@ -40,7 +44,17 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.format = format
         self.videoURL = videoURL
         self.scriptText = scriptText
+        self.instruction = instruction
+        self.scriptVersions = scriptVersions
         self.generationNumber = generationNumber
         self.stageOutputs = stageOutputs
     }
+}
+
+struct StoryScriptVersion: Codable, Sendable, Hashable, Identifiable {
+    var id: String = UUID().uuidString
+    let number: Int
+    let text: String
+    let createdAt: String
+    let instruction: String?
 }

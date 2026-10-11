@@ -8,6 +8,7 @@ struct StoryListView: View {
 
     @State private var showingAddStorySheet = false
     @State private var newStoryTitle = ""
+    @State private var newStoryInstruction = ""
     @State private var newStorySummary = ""
     @State private var newStoryScreenplay = ""
     @State private var newStoryEmotion = ""
@@ -81,6 +82,10 @@ struct StoryListView: View {
                         TextField("Emotion (e.g. Curiosity)", text: $newStoryEmotion)
                         TextField("Format (e.g. Normal Talk)", text: $newStoryFormat)
                     }
+                    Section("Instruction") {
+                        TextField("Instruction…", text: $newStoryInstruction, axis: .vertical)
+                            .lineLimit(2...4)
+                    }
                     Section("Summary") {
                         TextField("Summary", text: $newStorySummary, axis: .vertical)
                             .lineLimit(3...6)
@@ -104,6 +109,7 @@ struct StoryListView: View {
                             let title = newStoryTitle
                             let summary = newStorySummary
                             let screenplay = newStoryScreenplay
+                            let instruction = newStoryInstruction
                             let emotion = newStoryEmotion
                             let format = newStoryFormat
                             Task {
@@ -111,6 +117,7 @@ struct StoryListView: View {
                                     title: title,
                                     summary: summary,
                                     screenplay: screenplay,
+                                    instruction: instruction,
                                     emotion: emotion,
                                     format: format
                                 )
@@ -128,6 +135,7 @@ struct StoryListView: View {
 
     private func resetNewStoryForm() {
         newStoryTitle = ""
+        newStoryInstruction = ""
         newStorySummary = ""
         newStoryScreenplay = ""
         newStoryEmotion = ""
@@ -161,7 +169,7 @@ struct StoryListView: View {
     @ViewBuilder
     private var detail: some View {
         if let story = viewModel.selectedStory {
-            StoryDetailView(story: story, onDelete: { storyToDelete = story }) { storyID in
+            StoryDetailView(story: story, viewModel: viewModel, onDelete: { storyToDelete = story }) { storyID in
                 Task { await viewModel.mergeClip(storyID: storyID) }
             }
             .id(story.id).frame(maxWidth: .infinity, maxHeight: .infinity)

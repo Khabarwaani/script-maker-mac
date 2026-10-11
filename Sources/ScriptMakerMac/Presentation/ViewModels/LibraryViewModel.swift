@@ -64,7 +64,10 @@ final class LibraryViewModel {
     }
 
     /// Add a new story manually to the library.
-    func addStory(title: String, summary: String = "", screenplay: String = "", emotion: String = "", format: String = "", videoURL: String? = nil) async {
+    func addStory(title: String, summary: String = "", screenplay: String = "", instruction: String = "", emotion: String = "", format: String = "", videoURL: String? = nil) async {
+        let initialVersions: [StoryScriptVersion]? = screenplay.isEmpty ? nil : [
+            StoryScriptVersion(number: 1, text: screenplay, createdAt: DateFormatting.iso8601Now(), instruction: instruction.isEmpty ? nil : instruction)
+        ]
         let newStory = Story(
             id: UUID().uuidString,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Story" : title,
@@ -76,12 +79,69 @@ final class LibraryViewModel {
             format: format,
             videoURL: videoURL,
             scriptText: screenplay.isEmpty ? nil : screenplay,
+            instruction: instruction.isEmpty ? nil : instruction,
+            scriptVersions: initialVersions,
             generationNumber: nil,
             stageOutputs: nil
         )
         await repository.save(newStory)
         stories.insert(newStory, at: 0)
         selectedStoryID = newStory.id
+    }
+
+    /// Update title, instruction, summary, and screenplay of an existing story.
+    func updateStory(id: String, title: String, instruction: String? = nil, summary: String? = nil, screenplay: String? = nil) async {
+        guard let idx = stories.firstIndex(where: { $0.id == id }) else { return }
+        var story = stories[idx]
+        if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            story.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let instruction {
+            story.instruction = instruction
+        }
+        if let summary {
+            story.summary = summary
+        }
+        if let screenplay {
+            let trimmed = screenplay.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != (story.scriptText ?? "") {
+                var versions = story.scriptVersions ?? []
+                let nextNum = (versions.map(\.number).max() ?? 0) + 1
+                versions.append(StoryScriptVersion(
+                    number: nextNum,
+                    text: trimmed,
+                    createdAt: DateFormatting.iso8601Now(),
+                    instruction: instruction
+                ))
+                story.scriptVersions = versions
+                story.scriptText = trimmed
+            }
+        }
+        stories[idx] = story
+        await repository.save(story)
+    }
+
+    /// Revert/select a specific script version.
+    func selectScriptVersion(_ version: StoryScriptVersion, for storyID: String) async {
+        guard let idx = stories.firstIndex(where: { $0.id == storyID }) else { return }
+        var story = stories[idx]
+        story.scriptText = version.text
+        if let inst = version.instruction {
+            story.instruction = inst
+        }
+        stories[idx] = story
+        await repository.save(story)
+    }
+
+    /// Share story via Telegram Web/App URI.
+    func shareToTelegram(story: Story) {
+        let script = story.scriptText ?? ""
+        let textToShare = "\(story.title)\n\n\(script)"
+        guard let encoded = textToShare.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://t.me/share/url?url=&text=\(encoded)") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     /// Delete a story (from local store; server deletion when API supports it).
