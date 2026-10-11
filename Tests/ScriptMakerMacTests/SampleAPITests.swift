@@ -71,7 +71,131 @@ final class SampleAPITests: XCTestCase {
         let stories = try await service().listStories()
         XCTAssertTrue(stories.isEmpty, "Offline Library reads the local repository")
     }
+
+    func testFetchNewsCategoriesOffline() async throws {
+        let response = try await service().fetchNewsCategories()
+        XCTAssertFalse(response.categories.isEmpty)
+        XCTAssertEqual(response.defaultCategory, "trending")
+        XCTAssertTrue(response.categories.contains { $0.id == "india" })
+    }
+
+    func testFetchTopTitlesOffline() async throws {
+        let response = try await service().fetchTopTitles(category: "india", n: 3, mode: "sample")
+        XCTAssertEqual(response.category, "india")
+        XCTAssertEqual(response.mode, "sample")
+        XCTAssertFalse(response.titles.isEmpty)
+        XCTAssertEqual(response.titles.count, 3)
+    }
+
+    func testVerifyNewsEndpointsOffline() async throws {
+        let verified = try await service().verifyNewsEndpoints()
+        XCTAssertTrue(verified)
+    }
+
+    func testNetworkWebClientNewsCategories() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockNewsURLProtocol.self]
+        let session = URLSession(configuration: config)
+        let httpClient = HTTPClient(session: session)
+        let client = NetworkWebClient(baseURL: URL(string: "http://localhost:8000")!, httpClient: httpClient)
+
+        MockNewsURLProtocol.requestHandler = { req in
+            XCTAssertEqual(req.url?.path, "/api/v1/news/category")
+            XCTAssertEqual(req.httpMethod, "GET")
+            let json = """
+            {
+              "categories": [
+                {"id": "trending", "label": "🔥 India Trending & Viral"},
+                {"id": "tech", "label": "💻 Technology & AI"}
+              ],
+              "default_category": "trending"
+            }
+            """
+            let resp = HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (resp, json.data(using: .utf8)!)
+        }
+
+        let result = try await client.fetchNewsCategories()
+        XCTAssertEqual(result.defaultCategory, "trending")
+        XCTAssertEqual(result.categories.count, 2)
+        XCTAssertEqual(result.categories.first?.id, "trending")
+    }
+
+    func testNetworkWebClientTopTitles() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockNewsURLProtocol.self]
+        let session = URLSession(configuration: config)
+        let httpClient = HTTPClient(session: session)
+        let client = NetworkWebClient(baseURL: URL(string: "http://localhost:8000")!, httpClient: httpClient)
+
+        MockNewsURLProtocol.requestHandler = { req in
+            XCTAssertEqual(req.url?.path, "/api/v1/news/title")
+            XCTAssertEqual(req.httpMethod, "GET")
+            let query = req.url?.query ?? ""
+            XCTAssertTrue(query.contains("category=tech"))
+            XCTAssertTrue(query.contains("n=2"))
+            XCTAssertTrue(query.contains("mode=sample"))
+            let json = """
+            {
+              "category": "tech",
+              "label": "💻 Technology & AI",
+              "n": 2,
+              "mode": "sample",
+              "cached": false,
+              "titles": [
+                {"title": "AI Model Released", "link": "https://example.com/ai"},
+                {"title": "Tech Breakthrough", "link": "https://example.com/tech"}
+              ]
+            }
+            """
+            let resp = HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (resp, json.data(using: .utf8)!)
+        }
+
+        let result = try await client.fetchTopTitles(category: "tech", n: 2, mode: "sample")
+        XCTAssertEqual(result.category, "tech")
+        XCTAssertEqual(result.label, "💻 Technology & AI")
+        XCTAssertEqual(result.titles.count, 2)
+        XCTAssertEqual(result.titles.first?.title, "AI Model Released")
+    }
+
+    @MainActor
+    func testGenerateViewModelRefreshHeadlines() async throws {
+        let appConfig = AppConfig()
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        viewModel.selectedStorySource = "🇮🇳 India Top Stories & Breaking"
+        viewModel.topic = ""
+        await viewModel.refreshHeadlines()
+        XCTAssertFalse(viewModel.headlines.isEmpty)
+        XCTAssertEqual(viewModel.selectedHeadline, "Delhi announces odd-even vehicle restrictions to combat air pollution")
+        XCTAssertEqual(viewModel.topic, viewModel.selectedHeadline)
+    }
 }
+
+final class MockNewsURLProtocol: URLProtocol {
+    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: NSError(domain: "MockNewsURLProtocol", code: -1))
+            return
+        }
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
 
 private actor WorkflowStoryRepository: StoryRepository {
     private var stories: [Story] = []

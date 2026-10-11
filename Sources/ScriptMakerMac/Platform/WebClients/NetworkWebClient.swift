@@ -4,6 +4,16 @@ struct ServerConnectionChecker: ServerConnectionChecking {
     let httpClient: HTTPClient
 
     func isReachable(at url: URL) async -> Bool {
+        var v1Req = URLRequest(url: url.appendingPathComponent("api/v1/health"))
+        v1Req.timeoutInterval = 3
+        v1Req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let (v1Data, v1Resp) = try? await httpClient.data(for: v1Req),
+           let http = v1Resp as? HTTPURLResponse, 200..<300 ~= http.statusCode,
+           let health = try? JSONSerialization.jsonObject(with: v1Data) as? [String: Any],
+           !health.isEmpty {
+            return true
+        }
+
         var request = URLRequest(url: url.appendingPathComponent("health"))
         request.timeoutInterval = 3
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -32,6 +42,10 @@ struct NetworkWebClient: WebClient {
 
     func ping() async -> Bool {
         do {
+            if let (_, response) = try? await httpClient.data(for: request(path: "api/v1/health", method: "GET")),
+               let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode {
+                return true
+            }
             let (_, response) = try await httpClient.data(for: request(path: "health", method: "GET"))
             return (response as? HTTPURLResponse).map { 200..<300 ~= $0.statusCode } ?? false
         } catch {
@@ -133,6 +147,67 @@ struct NetworkWebClient: WebClient {
                 }
             }
         }
+    }
+
+    func fetchNewsCategories() async throws -> NewsCategoriesResponse {
+        let data = try await perform(path: "api/v1/news/category", method: "GET")
+        do {
+            return try JSONDecoder().decode(NewsCategoriesResponse.self, from: data)
+        } catch {
+            throw APIError.malformed("News categories response")
+        }
+    }
+
+    func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse {
+        let url = baseURL.appendingPathComponent("api/v1/news/title")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        var queryItems: [URLQueryItem] = []
+        if let category, !category.isEmpty {
+            queryItems.append(URLQueryItem(name: "category", value: category))
+        }
+        if let n {
+            queryItems.append(URLQueryItem(name: "n", value: String(n)))
+        }
+        if let mode, !mode.isEmpty {
+            queryItems.append(URLQueryItem(name: "mode", value: mode))
+        }
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        guard let finalURL = components?.url else {
+            throw APIError.malformed("Invalid news title URL")
+        }
+        var req = URLRequest(url: finalURL)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await httpClient.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.transport("No HTTP response")
+            }
+            guard 200..<300 ~= http.statusCode else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                if http.statusCode == 404 || http.statusCode == 501 {
+                    throw APIError.notImplemented("GET api/v1/news/title — the server does not implement this endpoint")
+                }
+                throw APIError.server(http.statusCode, String(body.prefix(500)))
+            }
+            do {
+                return try JSONDecoder().decode(TopTitlesResponse.self, from: data)
+            } catch {
+                throw APIError.malformed("Top titles response")
+            }
+        } catch let e as APIError {
+            throw e
+        } catch {
+            throw APIError.unreachable(baseURL.absoluteString)
+        }
+    }
+
+    func verifyNewsEndpoints() async throws -> Bool {
+        _ = try await fetchNewsCategories()
+        _ = try await fetchTopTitles(category: nil, n: 1, mode: "sample")
+        return true
     }
 
     // MARK: - Private

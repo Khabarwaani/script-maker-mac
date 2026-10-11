@@ -16,4 +16,8 @@ protocol WebClient: Sendable {
     func pollJob(jobID: String, interval: TimeInterval) -> AsyncThrowingStream<JobStatus, Error>
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error>
     func fetchData(from url: URL) async throws -> Data
+    func fetchNewsCategories() async throws -> NewsCategoriesResponse
+    func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse
+    func verifyNewsEndpoints() async throws -> Bool
 }
+

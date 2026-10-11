@@ -230,9 +230,65 @@ final class GenerateViewModel {
     func refreshHeadlines() async {
         isRefreshingHeadlines = true
         defer { isRefreshingHeadlines = false }
-        // Simulate refresh delay; in server mode this would fetch fresh headlines.
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        loadSampleLists()
+        do {
+            let service = try api()
+            let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
+            let response = try await service.fetchTopTitles(category: categoryParam, n: 16, mode: nil)
+            let loadedHeadlines = response.titles.map(\.title)
+            if !loadedHeadlines.isEmpty {
+                headlines = loadedHeadlines
+                if selectedHeadline.isEmpty || !headlines.contains(selectedHeadline) {
+                    selectedHeadline = headlines.first ?? ""
+                }
+                if StringFormatting.isBlank(topic) || headlines.contains(topic) {
+                    topic = selectedHeadline
+                }
+            }
+        } catch {
+            if isLocalJSON {
+                loadSampleLists()
+            } else {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Handles story source selection change to load headlines for the selected news category.
+    func onStorySourceChanged() async {
+        guard !isManualSource && !isHashtagSource else { return }
+        await refreshHeadlines()
+    }
+
+    /// Fetch news categories from server when available.
+    func loadNewsCategories() async {
+        guard !isLocalJSON else { return }
+        do {
+            let service = try api()
+            let response = try await service.fetchNewsCategories()
+            let serverLabels = response.categories.map(\.label)
+            if !serverLabels.isEmpty {
+                var combined = [Self.manualSourceLabel]
+                for label in serverLabels where !combined.contains(label) {
+                    combined.append(label)
+                }
+                if !combined.contains("#️⃣ Trending Hashtags (Google)") {
+                    combined.insert("#️⃣ Trending Hashtags (Google)", at: min(3, combined.count))
+                }
+                storySources = combined
+            }
+        } catch {
+            // Keep catalog story sources
+        }
+    }
+
+    /// Verify news endpoints are available.
+    func verifyNewsEndpoints() async -> Bool {
+        do {
+            let service = try api()
+            return try await service.verifyNewsEndpoints()
+        } catch {
+            return false
+        }
     }
 
     /// Update the master instruction from current config.

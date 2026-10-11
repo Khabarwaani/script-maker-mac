@@ -84,4 +84,68 @@ struct OfflineWebClient: WebClient {
             continuation.finish()
         }
     }
+
+    func fetchNewsCategories() async throws -> NewsCategoriesResponse {
+        try await pause()
+        if let data = SampleData.data(for: "news_categories"),
+           let response = try? JSONDecoder().decode(NewsCategoriesResponse.self, from: data) {
+            return response
+        }
+        return NewsCategoriesResponse(
+            categories: [
+                NewsCategory(id: "trending", label: "🔥 India Trending & Viral"),
+                NewsCategory(id: "india", label: "🇮🇳 India Top Stories & Breaking"),
+                NewsCategory(id: "funny_india", label: "😂 Desi Quirky, Jugaad & Funny India"),
+                NewsCategory(id: "proud_india", label: "🏆 Proud India"),
+                NewsCategory(id: "emotional", label: "❤️ Emotional India"),
+                NewsCategory(id: "politics", label: "🏛️ Indian Politics, Elections & Governance"),
+                NewsCategory(id: "culture", label: "🪔 Indian Culture, Heritage & Festivals"),
+                NewsCategory(id: "india_tech", label: "🚀 India Tech, Space (ISRO) & Startups"),
+                NewsCategory(id: "tech", label: "💻 Technology & AI"),
+                NewsCategory(id: "world", label: "🌍 World News"),
+                NewsCategory(id: "business", label: "📈 Business & Economy")
+            ],
+            defaultCategory: "trending"
+        )
+    }
+
+    func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse {
+        try await pause()
+        if let data = SampleData.data(for: "headlines"),
+           let decoded = try? JSONDecoder().decode(TopTitlesResponse.self, from: data) {
+            let requestedCount = n ?? decoded.titles.count
+            let titles = Array(decoded.titles.prefix(max(1, requestedCount)))
+            return TopTitlesResponse(
+                category: category ?? decoded.category,
+                label: decoded.label,
+                n: titles.count,
+                mode: mode ?? decoded.mode,
+                cached: decoded.cached,
+                titles: titles
+            )
+        }
+        let sampleList = (SampleData.json(for: "headlines")?["headlines"] as? [String]) ?? [
+            "Delhi announces odd-even vehicle restrictions to combat air pollution",
+            "Mumbai local trains get 12 new air-conditioned rakes",
+            "ISRO successfully launches communication satellite GSAT-24"
+        ]
+        let requestedCount = n ?? sampleList.count
+        let titles = sampleList.prefix(max(1, requestedCount)).enumerated().map { index, title in
+            NewsTitle(title: title, link: "https://sample.example/articles/\(index + 1)")
+        }
+        return TopTitlesResponse(
+            category: category ?? "india",
+            label: "🇮🇳 India Top Stories & Breaking",
+            n: titles.count,
+            mode: mode ?? "sample",
+            cached: false,
+            titles: titles
+        )
+    }
+
+    func verifyNewsEndpoints() async throws -> Bool {
+        try await pause()
+        return true
+    }
 }
+

@@ -60,3 +60,60 @@ struct SubstepEvent: Identifiable {
     let status: String
     let detail: String
 }
+
+// MARK: - News Models (GET /api/v1/news/category, GET /api/v1/news/title)
+
+public struct NewsCategory: Codable, Identifiable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
+    }
+}
+
+public struct NewsCategoriesResponse: Codable, Equatable, Sendable {
+    public let categories: [NewsCategory]
+    public let defaultCategory: String
+
+    public init(categories: [NewsCategory], defaultCategory: String) {
+        self.categories = categories
+        self.defaultCategory = defaultCategory
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case categories
+        case defaultCategory = "default_category"
+    }
+}
+
+public struct NewsTitle: Codable, Identifiable, Equatable, Hashable, Sendable {
+    public var id: String { link.isEmpty ? title : link }
+    public let title: String
+    public let link: String
+
+    public init(title: String, link: String) {
+        self.title = title
+        self.link = link
+    }
+}
+
+public struct TopTitlesResponse: Codable, Equatable, Sendable {
+    public let category: String
+    public let label: String
+    public let n: Int
+    public let mode: String
+    public let cached: Bool
+    public let titles: [NewsTitle]
+
+    public init(category: String, label: String, n: Int, mode: String, cached: Bool = false, titles: [NewsTitle]) {
+        self.category = category
+        self.label = label
+        self.n = n
+        self.mode = mode
+        self.cached = cached
+        self.titles = titles
+    }
+}
+

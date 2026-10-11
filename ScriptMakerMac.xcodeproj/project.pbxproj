@@ -61,6 +61,7 @@
 		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
 		Brender /* validation.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* validation.json */; };
 		Bheadlines /* headlines.json in Resources */ = {isa = PBXBuildFile; fileRef = Jheadlines /* headlines.json */; };
+		Bcategories /* news_categories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcategories /* news_categories.json */; };
 		Bservers /* servers.json in Resources */ = {isa = PBXBuildFile; fileRef = Jservers /* servers.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
@@ -126,6 +127,7 @@
 		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
 		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
 		Jheadlines /* headlines.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = headlines.json; sourceTree = "<group>"; };
+		Jcategories /* news_categories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = news_categories.json; sourceTree = "<group>"; };
 		Jservers /* servers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = servers.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
@@ -334,6 +336,7 @@
 				Jstories /* stories.json */,
 				Jservers /* servers.json */,
 				Jheadlines /* headlines.json */,
+				Jcategories /* news_categories.json */,
 			);
 			path = Samples;
 			sourceTree = "<group>";
@@ -499,7 +502,7 @@ P006 /* Build revision */ = {
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, Bcategories /* news_categories.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {

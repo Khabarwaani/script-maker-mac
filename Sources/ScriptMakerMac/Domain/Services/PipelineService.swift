@@ -69,4 +69,17 @@ struct PipelineService: Sendable {
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error> {
         client.eventStream(sessionID: sessionID)
     }
+
+    func fetchNewsCategories() async throws -> NewsCategoriesResponse {
+        try await client.fetchNewsCategories()
+    }
+
+    func fetchTopTitles(category: String? = nil, n: Int? = nil, mode: String? = nil) async throws -> TopTitlesResponse {
+        try await client.fetchTopTitles(category: category, n: n, mode: mode)
+    }
+
+    func verifyNewsEndpoints() async throws -> Bool {
+        try await client.verifyNewsEndpoints()
+    }
 }
+

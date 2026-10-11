@@ -3,7 +3,7 @@ import XCTest
 
 final class AppConfigTests: XCTestCase {
     func testNormalizeBareHostAssumesHTTP() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "localhost:8501"), "http://localhost:8501")
+        XCTAssertEqual(try AppConfig.normalize(raw: "localhost:8000"), "http://localhost:8000")
     }
 
     func testNormalizeKeepsScheme() throws {
@@ -11,15 +11,15 @@ final class AppConfigTests: XCTestCase {
     }
 
     func testNormalizeBracketsBareIPv6() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "http://::1:8501"), "http://[::1]:8501")
+        XCTAssertEqual(try AppConfig.normalize(raw: "http://::1:8000"), "http://[::1]:8000")
     }
 
     func testNormalizeKeepsBracketedIPv6() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "http://[::1]:8501"), "http://[::1]:8501")
+        XCTAssertEqual(try AppConfig.normalize(raw: "http://[::1]:8000"), "http://[::1]:8000")
     }
 
     func testNormalizeStripsTrailingSlash() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "http://localhost:8501/"), "http://localhost:8501")
+        XCTAssertEqual(try AppConfig.normalize(raw: "http://localhost:8000/"), "http://localhost:8000")
     }
 
     func testNormalizeRejectsEmpty() {

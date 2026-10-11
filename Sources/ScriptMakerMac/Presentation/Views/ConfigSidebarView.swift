@@ -25,6 +25,9 @@ struct ConfigSidebarView: View {
         } content: {
             StudioRow("Source", inset: 0) {
                 StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                    .onChange(of: viewModel.selectedStorySource) { _, _ in
+                        Task { await viewModel.onStorySourceChanged() }
+                    }
             }
             if viewModel.isHashtagSource {
                 StudioRow("Trending hashtag", inset: 0) {

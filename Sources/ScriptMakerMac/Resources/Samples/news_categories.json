@@ -1,0 +1,49 @@
+{
+  "categories": [
+    {
+      "id": "trending",
+      "label": "🔥 India Trending & Viral"
+    },
+    {
+      "id": "india",
+      "label": "🇮🇳 India Top Stories & Breaking"
+    },
+    {
+      "id": "funny_india",
+      "label": "😂 Desi Quirky, Jugaad & Funny India"
+    },
+    {
+      "id": "proud_india",
+      "label": "🏆 Proud India"
+    },
+    {
+      "id": "emotional",
+      "label": "❤️ Emotional India"
+    },
+    {
+      "id": "politics",
+      "label": "🏛️ Indian Politics, Elections & Governance"
+    },
+    {
+      "id": "culture",
+      "label": "🪔 Indian Culture, Heritage & Festivals"
+    },
+    {
+      "id": "india_tech",
+      "label": "🚀 India Tech, Space (ISRO) & Startups"
+    },
+    {
+      "id": "tech",
+      "label": "💻 Technology & AI"
+    },
+    {
+      "id": "world",
+      "label": "🌍 World News"
+    },
+    {
+      "id": "business",
+      "label": "📈 Business & Economy"
+    }
+  ],
+  "default_category": "trending"
+}
