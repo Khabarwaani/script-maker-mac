@@ -18,6 +18,7 @@ protocol WebClient: Sendable {
     func fetchData(from url: URL) async throws -> Data
     func fetchNewsCategories() async throws -> NewsCategoriesResponse
     func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse
+    func fetchTrendingHashtags(n: Int?) async throws -> NewsHashtagsResponse
     func verifyNewsEndpoints() async throws -> Bool
 }
 

@@ -205,6 +205,43 @@ struct NetworkWebClient: WebClient {
         }
     }
 
+    func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
+        let url = baseURL.appendingPathComponent("api/v1/news/hashtags")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        if let n {
+            components?.queryItems = [URLQueryItem(name: "n", value: String(n))]
+        }
+        guard let finalURL = components?.url else {
+            throw APIError.malformed("Invalid hashtags URL")
+        }
+        var req = URLRequest(url: finalURL)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 15
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await httpClient.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.transport("No HTTP response")
+            }
+            guard 200..<300 ~= http.statusCode else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                if http.statusCode == 404 || http.statusCode == 501 {
+                    throw APIError.notImplemented("GET api/v1/news/hashtags — the server does not implement this endpoint")
+                }
+                throw APIError.server(http.statusCode, String(body.prefix(500)))
+            }
+            do {
+                return try JSONDecoder().decode(NewsHashtagsResponse.self, from: data)
+            } catch {
+                throw APIError.malformed("Hashtags response")
+            }
+        } catch let e as APIError {
+            throw e
+        } catch {
+            throw APIError.unreachable(url: baseURL.absoluteString, detail: error.localizedDescription)
+        }
+    }
+
     func verifyNewsEndpoints() async throws -> Bool {
         _ = try await fetchNewsCategories()
         _ = try await fetchTopTitles(category: nil, n: 1, mode: "sample")

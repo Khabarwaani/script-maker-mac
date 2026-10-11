@@ -78,6 +78,10 @@ struct PipelineService: Sendable {
         try await client.fetchTopTitles(category: category, n: n, mode: mode)
     }
 
+    func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
+        try await client.fetchTrendingHashtags(n: n)
+    }
+
     func verifyNewsEndpoints() async throws -> Bool {
         try await client.verifyNewsEndpoints()
     }

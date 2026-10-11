@@ -117,3 +117,40 @@ public struct TopTitlesResponse: Codable, Equatable, Sendable {
     }
 }
 
+public struct NewsHashtag: Codable, Identifiable, Equatable, Hashable, Sendable {
+    public var id: String { tag }
+    public let tag: String
+    public let headline: String?
+    public let link: String?
+    public let source: String?
+
+    public init(tag: String, headline: String? = nil, link: String? = nil, source: String? = nil) {
+        self.tag = tag
+        self.headline = headline
+        self.link = link
+        self.source = source
+    }
+}
+
+public struct NewsHashtagsResponse: Codable, Equatable, Sendable {
+    public let n: Int
+    public let mode: String
+    public let cached: Bool
+    public let refreshedAt: Double?
+    public let hashtags: [NewsHashtag]
+
+    public init(n: Int, mode: String, cached: Bool = false, refreshedAt: Double? = nil, hashtags: [NewsHashtag]) {
+        self.n = n
+        self.mode = mode
+        self.cached = cached
+        self.refreshedAt = refreshedAt
+        self.hashtags = hashtags
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case n, mode, cached
+        case refreshedAt = "refreshed_at"
+        case hashtags
+    }
+}
+
