@@ -11,6 +11,24 @@ final class LibraryViewModel {
     private let repository: any StoryRepository
     private let updater: (any LibraryUpdating)?
     private let mediaImporter: (any LibraryMediaImporting)?
+    private let sharing: (any StorySharing)?
+    var isSharing = false
+
+    func share(_ story: Story, to destination: StoryShareDestination) async {
+        guard !isSharing else { return }
+        isSharing = true
+        defer { isSharing = false }
+        do {
+            guard let sharing else { throw APIError.notImplemented("Sharing is unavailable.") }
+            let text = story.title + "\n\n" + copyText(for: story, format: .all)
+            let outcome = try await sharing.share(to: destination, title: story.title, text: text, sourceURL: story.sourceLinks?.compactMap(\.webURL).first)
+            switch outcome {
+            case .cancelled: break
+            case .composerOpened: actionNotice = "Telegram opened. Choose a conversation to share this story."
+            case .exported(let url): actionNotice = "Story exported to \(url.lastPathComponent). Google Drive syncs files saved in its folder."
+            }
+        } catch { actionNotice = error.localizedDescription }
+    }
 
     var stories: [Story] = []
     var selectedStoryID: String? {
@@ -55,12 +73,13 @@ final class LibraryViewModel {
     var isLoading = false
     var notice: String?
 
-    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil) {
         self.config = config
         self.repository = repository
         self.clipboard = clipboard
         self.updater = updater
         self.mediaImporter = mediaImporter
+        self.sharing = sharing
     }
 
     let aiEngines = ["None", "Local First Then Antigravity", "Antigravity", "Codex", "Grok Low", "Grok Medium", "Grok High", "On-device"]

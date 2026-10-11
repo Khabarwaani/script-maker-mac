@@ -100,6 +100,9 @@ private struct StoryDetailToolbar: View {
                 .disabled(viewModel.busyUpdates.contains(.images))
             Divider().frame(height: 24)
             Menu {
+                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Google Drive…", systemImage: "externaldrive") }
+                Button { Task { await viewModel.share(story, to: .telegram) } } label: { Label("Telegram…", systemImage: "paperplane") }
+                Divider()
                 Button("Copy News Links + Hashtags") { viewModel.copy(viewModel.shareText(for: story), label: "News links and hashtags") }
                 Divider()
                 ShareLink(item: viewModel.shareText(for: story)) { Label("News Links + Hashtags", systemImage: "square.and.arrow.up") }
@@ -108,6 +111,7 @@ private struct StoryDetailToolbar: View {
             } label: { LibraryActionLabel(icon: "square.and.arrow.up") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Share story").accessibilityLabel("Share story")
+                .disabled(viewModel.isSharing)
             Menu {
                 ForEach(StoryCopyFormat.allCases) { format in
                     if format == .all { Divider() }
@@ -128,8 +132,6 @@ private struct StoryDetailToolbar: View {
             } label: { LibraryActionLabel(icon: "square.and.arrow.down") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
-            SettingsLink { Text(viewModel.selectedAIEngine).lineLimit(1).truncationMode(.middle) }.buttonStyle(StudioButtonStyle())
-                .frame(width: 190, height: 44).help("Shared AI model · edit in Settings")
             Divider().frame(height: 24)
             Spacer(minLength: 0)
             Button { showingReset = true } label: { LibraryActionLabel(icon: "arrow.counterclockwise") }
@@ -199,8 +201,12 @@ private struct StorySourcesSection: View {
     @Bindable var viewModel: LibraryViewModel
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            StoryDetailSection("Hashtags") {
-                LibraryUpdateButton(kind: .hashtags, viewModel: viewModel)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Hashtags").font(.headline)
+                    Spacer()
+                    LibraryUpdateButton(kind: .hashtags, viewModel: viewModel)
+                }
                 if let tags = story.hashtags, !tags.isEmpty {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), alignment: .leading)], alignment: .leading, spacing: 8) {
                         ForEach(tags, id: \.self) { tag in
@@ -217,9 +223,13 @@ private struct StorySourcesSection: View {
                 } else {
                     Text("No hashtags provided").font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 }
-            }
-            StoryDetailSection("News sources") {
-                LibraryUpdateButton(kind: .news, viewModel: viewModel)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("News sources").font(.headline)
+                    Spacer()
+                    LibraryUpdateButton(kind: .news, viewModel: viewModel)
+                }
                 if let links = story.sourceLinks, !links.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(links, id: \.self) { link in
@@ -245,7 +255,7 @@ private struct StorySourcesSection: View {
                 } else {
                     Text("No source links provided").font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 }
-            }
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(16).background(AppTheme.sunken.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.line, lineWidth: 1))
@@ -257,14 +267,9 @@ private struct LibraryUpdateButton: View {
     @Bindable var viewModel: LibraryViewModel
     var body: some View {
         Button { Task { await viewModel.update(kind) } } label: {
-            HStack(spacing: 8) {
-                Group {
-                    if viewModel.busyUpdates.contains(kind) { StudioActivityIndicator() }
-                    else { Image(systemName: "arrow.clockwise") }
-                }.frame(width: 16, height: 16)
-                Text("Update \(kind.rawValue)")
-            }
-        }.buttonStyle(StudioButtonStyle()).disabled(viewModel.busyUpdates.contains(kind))
+            LibraryActionLabel(icon: "arrow.clockwise", isLoading: viewModel.busyUpdates.contains(kind))
+        }.buttonStyle(.plain).disabled(viewModel.busyUpdates.contains(kind))
+            .help("Update \(kind.rawValue)").accessibilityLabel("Update \(kind.rawValue)")
     }
 }
 

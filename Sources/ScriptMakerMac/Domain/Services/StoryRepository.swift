@@ -22,6 +22,14 @@ protocol ClipboardWriting {
     func write(_ text: String) -> Bool
 }
 
+enum StoryShareDestination { case googleDrive, telegram }
+enum StoryShareOutcome { case exported(URL), composerOpened, cancelled }
+
+@MainActor
+protocol StorySharing {
+    func share(to destination: StoryShareDestination, title: String, text: String, sourceURL: URL?) async throws -> StoryShareOutcome
+}
+
 protocol LibraryUpdating: Sendable {
     func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
                 localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult
