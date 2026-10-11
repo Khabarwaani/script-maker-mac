@@ -42,6 +42,28 @@ final class StoryRepositoryTests: XCTestCase {
         await repo.remove(id: "ut-old")
         await repo.remove(id: "ut-new")
     }
+
+    func testCacheInvalidation() async {
+        // Platform is stateful: cache must reflect mutations.
+        let repo = LocalStoryRepository()
+        await repo.save(Story(id: "cache-1", title: "Cached"))
+        var stories = await repo.all()
+        XCTAssertTrue(stories.contains { $0.id == "cache-1" })
+        await repo.remove(id: "cache-1")
+        stories = await repo.all()
+        XCTAssertFalse(stories.contains { $0.id == "cache-1" },
+                       "Cache must be invalidated on remove")
+    }
+
+    func testInvalidateCacheReloadsFromDataSource() async {
+        let repo = LocalStoryRepository()
+        await repo.save(Story(id: "inv-1", title: "Before"))
+        _ = await repo.all() // populate cache
+        await repo.invalidateCache()
+        let stories = await repo.all() // reloads from data source
+        XCTAssertTrue(stories.contains { $0.id == "inv-1" })
+        await repo.remove(id: "inv-1")
+    }
 }
 
 /// Unit tests for UserDefaultsStoryDataSource (infra layer).
