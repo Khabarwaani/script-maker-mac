@@ -39,8 +39,8 @@ struct StoryListView: View {
                         selectedDeletion = viewModel.selectedStoryIDs
                     }.disabled(viewModel.selectedStoryIDs.isEmpty)
                     Button("Delete all stories…", role: .destructive) { deletingAll = true }
-                } label: { Image(systemName: "trash") }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).modifier(LibraryActionFrame())
+                } label: { LibraryActionLabel(icon: "trash") }
+                    .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                     .help("Select or delete stories").accessibilityLabel("Story selection and deletion")
                     .disabled(viewModel.stories.isEmpty || viewModel.isLoading || viewModel.isDeletingStories)
             }

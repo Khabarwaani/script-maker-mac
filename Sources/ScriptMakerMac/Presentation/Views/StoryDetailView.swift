@@ -105,9 +105,8 @@ private struct StoryDetailToolbar: View {
                 ShareLink(item: viewModel.shareText(for: story)) { Label("News Links + Hashtags", systemImage: "square.and.arrow.up") }
                 ShareLink(item: story.scriptText ?? "") { Label("Script", systemImage: "doc.text") }
                     .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
-            } label: { Image(systemName: "square.and.arrow.up") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                .modifier(LibraryActionFrame())
+            } label: { LibraryActionLabel(icon: "square.and.arrow.up") }
+                .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Share story").accessibilityLabel("Share story")
             Menu {
                 ForEach(StoryCopyFormat.allCases) { format in
@@ -119,16 +118,15 @@ private struct StoryDetailToolbar: View {
                 Divider()
                 Button("Story UUID") { viewModel.copy(story.id, label: "Story UUID") }
             } label: {
-                Image(systemName: "doc.on.doc")
+                LibraryActionLabel(icon: "doc.on.doc")
             }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden)
-            .modifier(LibraryActionFrame())
+            .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
             .help("Copy story content").accessibilityLabel("Copy story content")
             Menu {
                 Button("Add image…") { importKind = .image; showingImport = true }
                 Button("Add video…") { importKind = .video; showingImport = true }
-            } label: { Image(systemName: "square.and.arrow.down") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).modifier(LibraryActionFrame())
+            } label: { LibraryActionLabel(icon: "square.and.arrow.down") }
+                .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
             SettingsLink { Text(viewModel.selectedAIEngine).lineLimit(1).truncationMode(.middle) }.buttonStyle(StudioButtonStyle())
                 .frame(width: 190, height: 44).help("Shared AI model · edit in Settings")
