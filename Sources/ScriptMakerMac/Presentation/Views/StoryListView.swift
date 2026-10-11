@@ -5,6 +5,7 @@ struct StoryListView: View {
     @State private var storyToDelete: Story?
     @State private var deletingAll = false
     @State private var isCollapsed = false
+    @State private var showingAddStory = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -14,6 +15,11 @@ struct StoryListView: View {
                         .font(.headline)
                 }.buttonStyle(.plain).help(isCollapsed ? "Expand stories" : "Collapse stories")
                 Spacer()
+                Button {
+                    viewModel.prepareNewStory()
+                    showingAddStory = true
+                } label: { Image(systemName: "plus") }
+                .help("Add story from a script").accessibilityLabel("Add story")
                 Button { Task { await viewModel.refresh() } } label: {
                     Image(systemName: "arrow.clockwise")
                 }.help("Refresh library").disabled(viewModel.isLoading)
@@ -39,6 +45,7 @@ struct StoryListView: View {
                 viewModel.selectedStoryID = viewModel.stories.first?.id
             }
         }
+        .sheet(isPresented: $showingAddStory) { AddLibraryStoryView(viewModel: viewModel) }
         .alert("Delete story?", isPresented: Binding(get: { storyToDelete != nil }, set: { if !$0 { storyToDelete = nil } })) {
             Button("Cancel", role: .cancel) { storyToDelete = nil }
             Button("Delete story", role: .destructive) {
@@ -90,8 +97,57 @@ struct StoryListView: View {
             }
             .id(story.id).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            Text("Select a story").foregroundStyle(AppTheme.secondaryInk)
+            VStack(spacing: 12) {
+                Image(systemName: "doc.text").font(.largeTitle)
+                Text(viewModel.stories.isEmpty ? "No saved stories" : "Select a story").font(.headline)
+                if viewModel.stories.isEmpty {
+                    Text("Use the plus button to add a script, or generate a story in Studio.")
+                        .font(.callout).multilineTextAlignment(.center)
+                }
+            }.foregroundStyle(AppTheme.secondaryInk)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+private struct AddLibraryStoryView: View {
+    @Bindable var viewModel: LibraryViewModel
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var titleFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Add story").font(.title2.weight(.semibold))
+            Text("Paste your script to save it in Library.")
+                .font(.callout).foregroundStyle(AppTheme.secondaryInk)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Title").font(.headline)
+                TextField("Story title", text: $viewModel.newStoryTitle)
+                    .textFieldStyle(.roundedBorder).focused($titleFocused)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Script").font(.headline)
+                TextEditor(text: $viewModel.newStoryScript)
+                    .font(.body).scrollContentBackground(.hidden).padding(8)
+                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+                    .accessibilityLabel("Story script")
+                    .frame(minHeight: 240)
+                    .background(ScrollBarConfiguration())
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                    .disabled(viewModel.isAddingStory)
+                Button("Add story") {
+                    Task { if await viewModel.addStory() { dismiss() } }
+                }
+                .buttonStyle(StudioPrimaryButtonStyle()).keyboardShortcut(.defaultAction)
+                .disabled(!viewModel.canAddStory)
+            }
+        }
+        .padding(24).frame(width: 560, height: 560)
+        .foregroundStyle(AppTheme.ink).background(AppTheme.card)
+        .onAppear { titleFocused = true }
     }
 }

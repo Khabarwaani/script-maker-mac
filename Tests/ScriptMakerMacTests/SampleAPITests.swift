@@ -101,6 +101,33 @@ private actor WorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class LocalWorkflowTests: XCTestCase {
+    func testAddStoryRequiresScriptAndSelectsSavedUUID() async throws {
+        let repository = WorkflowStoryRepository()
+        let library = LibraryViewModel(config: AppConfig(), repository: repository)
+        library.prepareNewStory()
+        XCTAssertFalse(library.canAddStory)
+        library.newStoryTitle = "Manual story"
+        XCTAssertFalse(library.canAddStory)
+        let rejected = await library.addStory()
+        XCTAssertFalse(rejected)
+        library.newStoryScript = "  Full pasted screenplay\nSpoken dialogue  "
+        XCTAssertTrue(library.canAddStory)
+        let saved = await library.addStory()
+        XCTAssertTrue(saved)
+        let story = try XCTUnwrap(library.selectedStory)
+        XCTAssertNotNil(UUID(uuidString: story.id))
+        XCTAssertNotNil(ISO8601DateFormatter().date(from: story.createdAt))
+        XCTAssertEqual(story.title, "Manual story")
+        XCTAssertEqual(story.scriptText, "Full pasted screenplay\nSpoken dialogue")
+        XCTAssertEqual(story.status, "saved")
+        let persisted = await repository.all()
+        XCTAssertEqual(persisted.count, 1)
+        XCTAssertEqual(persisted.first?.id, story.id)
+        library.prepareNewStory()
+        XCTAssertTrue(library.newStoryTitle.isEmpty)
+        XCTAssertTrue(library.newStoryScript.isEmpty)
+    }
+
     func testCopyUsesSelectedContentAndReportsFailures() {
         let clipboard = TestClipboard()
         let library = LibraryViewModel(config: AppConfig(), repository: WorkflowStoryRepository(), clipboard: clipboard)

@@ -88,51 +88,13 @@ struct LibraryView: View {
     @Bindable var viewModel: LibraryViewModel
 
     var body: some View {
-        Group {
-            if let notice = viewModel.notice, viewModel.stories.isEmpty {
-                notImplementedView(notice)
-            } else if viewModel.stories.isEmpty && !viewModel.isLoading {
-                emptyView
-            } else {
-                VStack(spacing: 0) {
-                    if let notice = viewModel.notice {
-                        Text(notice).font(.callout).foregroundStyle(AppTheme.warning).padding(12)
-                    }
-                    StoryListView(viewModel: viewModel)
-                }
+        VStack(spacing: 0) {
+            if let notice = viewModel.notice {
+                Text(notice).font(.callout).foregroundStyle(AppTheme.warning).padding(12)
             }
+            StoryListView(viewModel: viewModel)
         }
         .task { await viewModel.refresh() }
     }
-
-    @ViewBuilder
-    private func notImplementedView(_ notice: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "books.vertical")
-                .font(.largeTitle)
-                .foregroundStyle(AppTheme.secondaryInk)
-            Text("Library unavailable")
-                .font(.headline)
-            Text(notice)
-                .font(.callout)
-                .foregroundStyle(AppTheme.secondaryInk)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-    }
-
-    private var emptyView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "books.vertical")
-                .font(.largeTitle)
-                .foregroundStyle(AppTheme.secondaryInk)
-            Text("No saved stories yet.")
-                .font(.headline)
-            Text("Generate a reel in the Studio tab — it auto-saves here on completion.")
-                .font(.callout)
-                .foregroundStyle(AppTheme.secondaryInk)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-    }
 }
+
