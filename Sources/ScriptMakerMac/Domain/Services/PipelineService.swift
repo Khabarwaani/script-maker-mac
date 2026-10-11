@@ -71,23 +71,77 @@ struct PipelineService: Sendable {
     }
 
     func fetchNewsCategories() async throws -> NewsCategoriesResponse {
-        try await client.fetchNewsCategories()
+        try await client.get(path: "api/v1/news/category", queryItems: nil)
     }
 
     func fetchTopTitles(category: String? = nil, n: Int? = nil, mode: String? = nil) async throws -> TopTitlesResponse {
-        try await client.fetchTopTitles(category: category, n: n, mode: mode)
+        var queryItems: [URLQueryItem] = []
+        if let category, !category.isEmpty {
+            queryItems.append(URLQueryItem(name: "category", value: category))
+        }
+        if let n {
+            queryItems.append(URLQueryItem(name: "n", value: String(n)))
+        }
+        if let mode, !mode.isEmpty {
+            queryItems.append(URLQueryItem(name: "mode", value: mode))
+        }
+        return try await client.get(path: "api/v1/news/title", queryItems: queryItems.isEmpty ? nil : queryItems)
     }
 
     func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
-        try await client.fetchTrendingHashtags(n: n)
+        var queryItems: [URLQueryItem]? = nil
+        if let n {
+            queryItems = [URLQueryItem(name: "n", value: String(n))]
+        }
+        return try await client.get(path: "api/v1/news/hashtags", queryItems: queryItems)
     }
 
     func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
-        client.createAndStreamStory(params: params)
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await sse in client.streamSSE(path: "api/v1/stories/stream", json: params) {
+                        if let event = Self.parseCreatorEvent(name: sse.event, json: sse.data) {
+                            continuation.yield(event)
+                            if case .end = event {
+                                continuation.finish()
+                                return
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    private static func parseCreatorEvent(name: String, json: String) -> CreatorStreamEvent? {
+        if name == "end" { return .end }
+        guard let data = json.data(using: .utf8) else { return nil }
+
+        // Use typed JSONDecoder for Stream API Contract v1
+        if let decoded = try? JSONDecoder().decode(CreatorStreamEvent.self, from: data) {
+            // Extract raw dictionaries for stage/substep output payloads
+            if case .outputStage(let step, let status, let outputType, _, let llmCalls) = decoded,
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let output = dict["output"] as? [String: Any] {
+                return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
+            } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, _) = decoded,
+                      let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let output = dict["output"] as? [String: Any] {
+                return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, output: output)
+            }
+            return decoded
+        }
+        return nil
     }
 
     func verifyNewsEndpoints() async throws -> Bool {
-        try await client.verifyNewsEndpoints()
+        _ = try await fetchNewsCategories()
+        _ = try await fetchTopTitles(category: nil, n: 1, mode: "sample")
+        return true
     }
 }
 

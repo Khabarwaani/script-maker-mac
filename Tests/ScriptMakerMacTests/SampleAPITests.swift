@@ -115,7 +115,7 @@ final class SampleAPITests: XCTestCase {
             return (resp, json.data(using: .utf8)!)
         }
 
-        let result = try await client.fetchNewsCategories()
+        let result: NewsCategoriesResponse = try await client.get(path: "api/v1/news/category", queryItems: nil)
         XCTAssertEqual(result.defaultCategory, "trending")
         XCTAssertEqual(result.categories.count, 2)
         XCTAssertEqual(result.categories.first?.id, "trending")
@@ -152,7 +152,12 @@ final class SampleAPITests: XCTestCase {
             return (resp, json.data(using: .utf8)!)
         }
 
-        let result = try await client.fetchTopTitles(category: "tech", n: 2, mode: "sample")
+        let queryItems = [
+            URLQueryItem(name: "category", value: "tech"),
+            URLQueryItem(name: "n", value: "2"),
+            URLQueryItem(name: "mode", value: "sample")
+        ]
+        let result: TopTitlesResponse = try await client.get(path: "api/v1/news/title", queryItems: queryItems)
         XCTAssertEqual(result.category, "tech")
         XCTAssertEqual(result.label, "💻 Technology & AI")
         XCTAssertEqual(result.titles.count, 2)

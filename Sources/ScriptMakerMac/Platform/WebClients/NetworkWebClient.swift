@@ -149,38 +149,22 @@ struct NetworkWebClient: WebClient {
         }
     }
 
-    func fetchNewsCategories() async throws -> NewsCategoriesResponse {
-        let data = try await perform(path: "api/v1/news/category", method: "GET")
-        do {
-            return try JSONDecoder().decode(NewsCategoriesResponse.self, from: data)
-        } catch {
-            throw APIError.malformed("News categories response")
-        }
-    }
-
-    func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse {
-        let url = baseURL.appendingPathComponent("api/v1/news/title")
+    // MARK: - Generic Transport
+    
+    func get<T: Decodable & Sendable>(path: String, queryItems: [URLQueryItem]? = nil) async throws -> T {
+        let url = baseURL.appendingPathComponent(path)
         var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-        var queryItems: [URLQueryItem] = []
-        if let category, !category.isEmpty {
-            queryItems.append(URLQueryItem(name: "category", value: category))
-        }
-        if let n {
-            queryItems.append(URLQueryItem(name: "n", value: String(n)))
-        }
-        if let mode, !mode.isEmpty {
-            queryItems.append(URLQueryItem(name: "mode", value: mode))
-        }
-        if !queryItems.isEmpty {
+        if let queryItems, !queryItems.isEmpty {
             components?.queryItems = queryItems
         }
         guard let finalURL = components?.url else {
-            throw APIError.malformed("Invalid news title URL")
+            throw APIError.malformed("Invalid URL for path: \(path)")
         }
         var req = URLRequest(url: finalURL)
         req.httpMethod = "GET"
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+
         do {
             let (data, response) = try await httpClient.data(for: req)
             guard let http = response as? HTTPURLResponse else {
@@ -189,14 +173,14 @@ struct NetworkWebClient: WebClient {
             guard 200..<300 ~= http.statusCode else {
                 let body = String(data: data, encoding: .utf8) ?? ""
                 if http.statusCode == 404 || http.statusCode == 501 {
-                    throw APIError.notImplemented("GET api/v1/news/title — the server does not implement this endpoint")
+                    throw APIError.notImplemented("GET \(path) — the server does not implement this endpoint")
                 }
                 throw APIError.server(http.statusCode, String(body.prefix(500)))
             }
             do {
-                return try JSONDecoder().decode(TopTitlesResponse.self, from: data)
+                return try JSONDecoder().decode(T.self, from: data)
             } catch {
-                throw APIError.malformed("Top titles response")
+                throw APIError.malformed("Failed to decode response for \(path): \(error.localizedDescription)")
             }
         } catch let e as APIError {
             throw e
@@ -205,53 +189,27 @@ struct NetworkWebClient: WebClient {
         }
     }
 
-    func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
-        let url = baseURL.appendingPathComponent("api/v1/news/hashtags")
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-        if let n {
-            components?.queryItems = [URLQueryItem(name: "n", value: String(n))]
-        }
-        guard let finalURL = components?.url else {
-            throw APIError.malformed("Invalid hashtags URL")
-        }
-        var req = URLRequest(url: finalURL)
-        req.httpMethod = "GET"
-        req.timeoutInterval = 15
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
+    func post<T: Decodable & Sendable>(path: String, json: [String: Any]? = nil) async throws -> T {
+        let data = try await perform(path: path, method: "POST", json: json)
         do {
-            let (data, response) = try await httpClient.data(for: req)
-            guard let http = response as? HTTPURLResponse else {
-                throw APIError.transport("No HTTP response")
-            }
-            guard 200..<300 ~= http.statusCode else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                if http.statusCode == 404 || http.statusCode == 501 {
-                    throw APIError.notImplemented("GET api/v1/news/hashtags — the server does not implement this endpoint")
-                }
-                throw APIError.server(http.statusCode, String(body.prefix(500)))
-            }
-            do {
-                return try JSONDecoder().decode(NewsHashtagsResponse.self, from: data)
-            } catch {
-                throw APIError.malformed("Hashtags response")
-            }
-        } catch let e as APIError {
-            throw e
+            return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            throw APIError.unreachable(url: baseURL.absoluteString, detail: error.localizedDescription)
+            throw APIError.malformed("Failed to decode response for \(path): \(error.localizedDescription)")
         }
     }
 
-    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
+    func streamSSE(path: String, json: [String: Any]? = nil) -> AsyncThrowingStream<ServerSSEEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let url = baseURL.appendingPathComponent("api/v1/stories/stream")
+                    let url = baseURL.appendingPathComponent(path)
                     var req = URLRequest(url: url)
                     req.httpMethod = "POST"
                     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    req.httpBody = try JSONSerialization.data(withJSONObject: params)
+                    if let json {
+                        req.httpBody = try JSONSerialization.data(withJSONObject: json)
+                    }
 
                     let (bytes, response) = try await httpClient.bytes(for: req)
                     guard let http = response as? HTTPURLResponse else {
@@ -267,12 +225,11 @@ struct NetworkWebClient: WebClient {
                             eventName = line.dropFirst(6).trimmingCharacters(in: .whitespaces)
                         } else if line.hasPrefix("data:") {
                             let payloadStr = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
-                            if let event = Self.parseCreatorEvent(name: eventName, json: payloadStr) {
-                                continuation.yield(event)
-                                if case .end = event {
-                                    continuation.finish()
-                                    return
-                                }
+                            let sseEvent = ServerSSEEvent(event: eventName, data: payloadStr)
+                            continuation.yield(sseEvent)
+                            if eventName == "end" {
+                                continuation.finish()
+                                return
                             }
                         }
                     }
@@ -284,32 +241,6 @@ struct NetworkWebClient: WebClient {
         }
     }
 
-    private static func parseCreatorEvent(name: String, json: String) -> CreatorStreamEvent? {
-        if name == "end" { return .end }
-        guard let data = json.data(using: .utf8) else { return nil }
-
-        // Use typed JSONDecoder for Stream API Contract v1
-        if let decoded = try? JSONDecoder().decode(CreatorStreamEvent.self, from: data) {
-            // If output payload dictionary is needed for output_stage / output_substep, extract the raw sub-object
-            if case .outputStage(let step, let status, let outputType, _, let llmCalls) = decoded,
-               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let output = dict["output"] as? [String: Any] {
-                return .outputStage(step: step, status: status, outputType: outputType, output: output, llmCalls: llmCalls)
-            } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, _) = decoded,
-                      let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let output = dict["output"] as? [String: Any] {
-                return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, output: output)
-            }
-            return decoded
-        }
-        return nil
-    }
-
-    func verifyNewsEndpoints() async throws -> Bool {
-        _ = try await fetchNewsCategories()
-        _ = try await fetchTopTitles(category: nil, n: 1, mode: "sample")
-        return true
-    }
 
     // MARK: - Private
 

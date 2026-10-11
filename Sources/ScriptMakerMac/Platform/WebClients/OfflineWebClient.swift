@@ -85,89 +85,113 @@ struct OfflineWebClient: WebClient {
         }
     }
 
-    func fetchNewsCategories() async throws -> NewsCategoriesResponse {
-        try await pause()
-        if let data = SampleData.data(for: "news_categories"),
-           let response = try? JSONDecoder().decode(NewsCategoriesResponse.self, from: data) {
-            return response
-        }
-        return NewsCategoriesResponse(
-            categories: [
-                NewsCategory(id: "trending", label: "🔥 India Trending & Viral"),
-                NewsCategory(id: "india", label: "🇮🇳 India Top Stories & Breaking"),
-                NewsCategory(id: "funny_india", label: "😂 Desi Quirky, Jugaad & Funny India"),
-                NewsCategory(id: "proud_india", label: "🏆 Proud India"),
-                NewsCategory(id: "emotional", label: "❤️ Emotional India"),
-                NewsCategory(id: "politics", label: "🏛️ Indian Politics, Elections & Governance"),
-                NewsCategory(id: "culture", label: "🪔 Indian Culture, Heritage & Festivals"),
-                NewsCategory(id: "india_tech", label: "🚀 India Tech, Space (ISRO) & Startups"),
-                NewsCategory(id: "tech", label: "💻 Technology & AI"),
-                NewsCategory(id: "world", label: "🌍 World News"),
-                NewsCategory(id: "business", label: "📈 Business & Economy")
-            ],
-            defaultCategory: "trending"
-        )
-    }
+    // MARK: - Generic Transport
 
-    func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse {
+    func get<T: Decodable & Sendable>(path: String, queryItems: [URLQueryItem]? = nil) async throws -> T {
         try await pause()
-        if let data = SampleData.data(for: "headlines"),
-           let decoded = try? JSONDecoder().decode(TopTitlesResponse.self, from: data) {
-            let requestedCount = n ?? decoded.titles.count
-            let titles = Array(decoded.titles.prefix(max(1, requestedCount)))
-            return TopTitlesResponse(
-                category: category ?? decoded.category,
-                label: decoded.label,
+        let cleanPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        if cleanPath == "api/v1/news/category" {
+            if let data = SampleData.data(for: "news_categories"),
+               let decoded = try? JSONDecoder().decode(T.self, from: data) {
+                return decoded
+            }
+            let fallback = NewsCategoriesResponse(
+                categories: [
+                    NewsCategory(id: "trending", label: "🔥 India Trending & Viral"),
+                    NewsCategory(id: "india", label: "🇮🇳 India Top Stories & Breaking"),
+                    NewsCategory(id: "funny_india", label: "😂 Desi Quirky, Jugaad & Funny India"),
+                    NewsCategory(id: "proud_india", label: "🏆 Proud India"),
+                    NewsCategory(id: "emotional", label: "❤️ Emotional India"),
+                    NewsCategory(id: "politics", label: "🏛️ Indian Politics, Elections & Governance"),
+                    NewsCategory(id: "culture", label: "🪔 Indian Culture, Heritage & Festivals"),
+                    NewsCategory(id: "india_tech", label: "🚀 India Tech, Space (ISRO) & Startups"),
+                    NewsCategory(id: "tech", label: "💻 Technology & AI"),
+                    NewsCategory(id: "world", label: "🌍 World News"),
+                    NewsCategory(id: "business", label: "📈 Business & Economy")
+                ],
+                defaultCategory: "trending"
+            )
+            let encoded = try JSONEncoder().encode(fallback)
+            return try JSONDecoder().decode(T.self, from: encoded)
+        }
+
+        if cleanPath == "api/v1/news/title" {
+            let category = queryItems?.first(where: { $0.name == "category" })?.value
+            let mode = queryItems?.first(where: { $0.name == "mode" })?.value
+            let nCount = queryItems?.first(where: { $0.name == "n" })?.value.flatMap(Int.init)
+
+            if let data = SampleData.data(for: "headlines"),
+               let decoded = try? JSONDecoder().decode(TopTitlesResponse.self, from: data) {
+                let requestedCount = nCount ?? decoded.titles.count
+                let titles = Array(decoded.titles.prefix(max(1, requestedCount)))
+                let response = TopTitlesResponse(
+                    category: category ?? decoded.category,
+                    label: decoded.label,
+                    n: titles.count,
+                    mode: mode ?? decoded.mode,
+                    cached: decoded.cached,
+                    titles: titles
+                )
+                let encoded = try JSONEncoder().encode(response)
+                return try JSONDecoder().decode(T.self, from: encoded)
+            }
+            let sampleList = (SampleData.json(for: "headlines")?["headlines"] as? [String]) ?? [
+                "Delhi announces odd-even vehicle restrictions to combat air pollution",
+                "Mumbai local trains get 12 new air-conditioned rakes",
+                "ISRO successfully launches communication satellite GSAT-24"
+            ]
+            let requestedCount = nCount ?? sampleList.count
+            let titles = sampleList.prefix(max(1, requestedCount)).enumerated().map { index, title in
+                NewsTitle(title: title, link: "https://sample.example/articles/\(index + 1)")
+            }
+            let response = TopTitlesResponse(
+                category: category ?? "india",
+                label: "🇮🇳 India Top Stories & Breaking",
                 n: titles.count,
-                mode: mode ?? decoded.mode,
-                cached: decoded.cached,
+                mode: mode ?? "sample",
+                cached: false,
                 titles: titles
             )
+            let encoded = try JSONEncoder().encode(response)
+            return try JSONDecoder().decode(T.self, from: encoded)
         }
-        let sampleList = (SampleData.json(for: "headlines")?["headlines"] as? [String]) ?? [
-            "Delhi announces odd-even vehicle restrictions to combat air pollution",
-            "Mumbai local trains get 12 new air-conditioned rakes",
-            "ISRO successfully launches communication satellite GSAT-24"
-        ]
-        let requestedCount = n ?? sampleList.count
-        let titles = sampleList.prefix(max(1, requestedCount)).enumerated().map { index, title in
-            NewsTitle(title: title, link: "https://sample.example/articles/\(index + 1)")
+
+        if cleanPath == "api/v1/news/hashtags" {
+            let nCount = queryItems?.first(where: { $0.name == "n" })?.value.flatMap(Int.init)
+            let tags = [
+                "#AtmanirbharBharat",
+                "#TNWelcomesModi",
+                "#winOPPOF35",
+                "#OPPOF35Series",
+                "#HappyNavratri",
+                "#InternationalDayOfGirlChild",
+                "#JaiMataDi"
+            ]
+            let requestedCount = nCount ?? tags.count
+            let items = tags.prefix(max(1, requestedCount)).map {
+                NewsHashtag(tag: $0, headline: $0.replacingOccurrences(of: "#", with: ""), link: nil, source: "X")
+            }
+            let response = NewsHashtagsResponse(
+                n: items.count,
+                mode: "sample",
+                cached: false,
+                refreshedAt: Date().timeIntervalSince1970,
+                hashtags: items
+            )
+            let encoded = try JSONEncoder().encode(response)
+            return try JSONDecoder().decode(T.self, from: encoded)
         }
-        return TopTitlesResponse(
-            category: category ?? "india",
-            label: "🇮🇳 India Top Stories & Breaking",
-            n: titles.count,
-            mode: mode ?? "sample",
-            cached: false,
-            titles: titles
-        )
+
+        throw APIError.notImplemented("Offline sample for GET \(path)")
     }
 
-    func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
+    func post<T: Decodable & Sendable>(path: String, json: [String: Any]? = nil) async throws -> T {
         try await pause()
-        let tags = [
-            "#AtmanirbharBharat",
-            "#TNWelcomesModi",
-            "#winOPPOF35",
-            "#OPPOF35Series",
-            "#HappyNavratri",
-            "#InternationalDayOfGirlChild",
-            "#JaiMataDi"
-        ]
-        let requestedCount = n ?? tags.count
-        let items = tags.prefix(max(1, requestedCount)).map {
-            NewsHashtag(tag: $0, headline: $0.replacingOccurrences(of: "#", with: ""), link: nil, source: "X")
-        }
-        return NewsHashtagsResponse(
-            n: items.count,
-            mode: "sample",
-            cached: false,
-            refreshedAt: Date().timeIntervalSince1970,
-            hashtags: items
-        )
+        throw APIError.notImplemented("Offline sample for POST \(path)")
     }
 
-    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
+    func streamSSE(path: String, json: [String: Any]? = nil) -> AsyncThrowingStream<ServerSSEEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -180,7 +204,8 @@ struct OfflineWebClient: WebClient {
                         StreamStagePlan(id: 6, type: "script", label: "Integration & Final Validation")
                     ]
 
-                    continuation.yield(.planStream(StreamPlanStreamPayload(version: "5.1.2", stages: stagesPlan)))
+                    let planStreamData = try JSONEncoder().encode(StreamPlanStreamPayload(version: "5.1.2", stages: stagesPlan))
+                    continuation.yield(ServerSSEEvent(event: "plan_stream", data: String(data: planStreamData, encoding: .utf8) ?? "{}"))
                     try await pause()
 
                     for (idx, meta) in stagesPlan.enumerated() {
@@ -193,27 +218,35 @@ struct OfflineWebClient: WebClient {
                             StreamSubstepPlan(id: "\(position).2", substepType: stageType, name: "\(label) - Step 2")
                         ]
 
-                        continuation.yield(.planStage(StreamPlanStagePayload(position: position, stageType: stageType, substeps: substeps)))
-                        continuation.yield(.progressStage(StreamProgressStagePayload(position: position, stageType: stageType, status: "running")))
+                        let planStageData = try JSONEncoder().encode(StreamPlanStagePayload(position: position, stageType: stageType, substeps: substeps))
+                        continuation.yield(ServerSSEEvent(event: "plan_stage", data: String(data: planStageData, encoding: .utf8) ?? "{}"))
+
+                        let progressStageData = try JSONEncoder().encode(StreamProgressStagePayload(position: position, stageType: stageType, status: "running"))
+                        continuation.yield(ServerSSEEvent(event: "progress_stage", data: String(data: progressStageData, encoding: .utf8) ?? "{}"))
 
                         for sub in substeps {
-                            continuation.yield(.progressSubstep(StreamProgressSubstepPayload(position: position, substep: sub.id, substepType: stageType, status: "running")))
+                            let progSubData = try JSONEncoder().encode(StreamProgressSubstepPayload(position: position, substep: sub.id, substepType: stageType, status: "running"))
+                            continuation.yield(ServerSSEEvent(event: "progress_substep", data: String(data: progSubData, encoding: .utf8) ?? "{}"))
                             try await pause()
-                            continuation.yield(.outputSubstep(
-                                step: position,
-                                substep: sub.id,
-                                substepType: stageType,
-                                name: sub.name,
-                                status: "success",
-                                output: ["result": "OK"]
-                            ))
+
+                            let outSubDict: [String: Any] = [
+                                "type": "output_substep",
+                                "step": position,
+                                "substep": sub.id,
+                                "substep_type": stageType,
+                                "name": sub.name,
+                                "status": "success",
+                                "output": ["result": "OK"]
+                            ]
+                            let outSubData = try JSONSerialization.data(withJSONObject: outSubDict)
+                            continuation.yield(ServerSSEEvent(event: "output_substep", data: String(data: outSubData, encoding: .utf8) ?? "{}"))
                         }
 
                         // Load sample output for this stage
                         var stageSample = SampleData.json(for: stageType) ?? [:]
                         let key = stageType == "dialogue" ? "scripts" : stageType == "storyboard" ? "storyboards" : (stageType == "script" || stageType == "validation") ? "scripts" : nil
                         if let key, let templates = stageSample[key] as? [[String: Any]], !templates.isEmpty {
-                            let count = max(params["batch_size"] as? Int ?? templates.count, 1)
+                            let count = max(json?["batch_size"] as? Int ?? templates.count, 1)
                             stageSample[key] = (0..<count).map { index in
                                 var item = templates[index % templates.count]
                                 let title = item["title"] as? String ?? "Sample story"
@@ -222,16 +255,18 @@ struct OfflineWebClient: WebClient {
                             }
                         }
 
-                        continuation.yield(.outputStage(
-                            step: position,
-                            status: "success",
-                            outputType: stageType,
-                            output: stageSample,
-                            llmCalls: nil
-                        ))
+                        let outStageDict: [String: Any] = [
+                            "type": "output_stage",
+                            "step": position,
+                            "status": "success",
+                            "output_type": stageType,
+                            "output": stageSample
+                        ]
+                        let outStageData = try JSONSerialization.data(withJSONObject: outStageDict)
+                        continuation.yield(ServerSSEEvent(event: "output_stage", data: String(data: outStageData, encoding: .utf8) ?? "{}"))
                     }
 
-                    continuation.yield(.end)
+                    continuation.yield(ServerSSEEvent(event: "end", data: "{}"))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -239,10 +274,6 @@ struct OfflineWebClient: WebClient {
             }
         }
     }
-
-    func verifyNewsEndpoints() async throws -> Bool {
-        try await pause()
-        return true
-    }
 }
+
 

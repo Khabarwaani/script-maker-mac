@@ -1,12 +1,34 @@
 import Foundation
 
-/// WebClient protocol: request/response transport.
+/// Raw Server-Sent Event frame from stream transport.
+public struct ServerSSEEvent: Sendable, Equatable {
+    public let event: String
+    public let data: String
+
+    public init(event: String, data: String) {
+        self.event = event
+        self.data = data
+    }
+}
+
+/// WebClient protocol: generic request/response transport.
 ///
-/// Two implementations, chosen by config:
+/// Implementations handle networking/transport only.
+/// Callers specify target Decodable types or decode SSE payloads.
+///
+/// Two implementations:
 /// - NetworkWebClient: real HTTP via URLSession
 /// - OfflineWebClient: bundled sample JSON, no network
 protocol WebClient: Sendable {
     func ping() async -> Bool
+    func fetchData(from url: URL) async throws -> Data
+
+    // Generic HTTP transport
+    func get<T: Decodable & Sendable>(path: String, queryItems: [URLQueryItem]?) async throws -> T
+    func post<T: Decodable & Sendable>(path: String, json: [String: Any]?) async throws -> T
+    func streamSSE(path: String, json: [String: Any]?) -> AsyncThrowingStream<ServerSSEEvent, Error>
+
+    // Legacy stage and session support
     func createSession() async throws -> String
     func runStage(sessionID: String, stage: PipelineStage, inputs: [String: Any]) async throws -> [String: Any]
     func select(sessionID: String, selection: [String: Any]) async throws -> [String: Any]
@@ -15,11 +37,6 @@ protocol WebClient: Sendable {
     func jobStatus(jobID: String) async throws -> JobStatus
     func pollJob(jobID: String, interval: TimeInterval) -> AsyncThrowingStream<JobStatus, Error>
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error>
-    func fetchData(from url: URL) async throws -> Data
-    func fetchTrendingHashtags(n: Int?) async throws -> NewsHashtagsResponse
-    func fetchNewsCategories() async throws -> NewsCategoriesResponse
-    func fetchTopTitles(category: String?, n: Int?, mode: String?) async throws -> TopTitlesResponse
-    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error>
-    func verifyNewsEndpoints() async throws -> Bool
 }
+
 
