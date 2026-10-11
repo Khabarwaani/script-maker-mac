@@ -84,7 +84,9 @@ final class GenerateViewModel {
         self.catalogProvider = catalogProvider
         loadCatalog()
         resetConfiguration()
-        loadSampleLists()
+        if config.dataSource == .offline {
+            loadSampleLists()
+        }
         if let saved = config.loadStudioConfig() {
             applyStudioConfig(saved)
         }
@@ -333,10 +335,9 @@ final class GenerateViewModel {
     func initialLoad() async {
         if config.dataSource == .server {
             await loadNewsCategories()
-            if headlines.isEmpty {
-                await refreshHeadlines(forceFresh: false)
-            }
+            await refreshHeadlines(forceFresh: false)
         } else {
+            loadCatalog()
             loadSampleLists()
         }
     }

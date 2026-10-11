@@ -58,4 +58,20 @@ final class AppConfigTests: XCTestCase {
         config.saveLastSelectedHeadline("Important Breaking News", forSource: testSource)
         XCTAssertEqual(config.getLastSelectedHeadline(forSource: testSource), "Important Breaking News")
     }
+
+    @MainActor
+    func testPreferencesViewModelPreservesServerDataSourceOnApply() async {
+        struct MockChecker: ServerConnectionChecking {
+            let reachable: Bool
+            func isReachable(at url: URL) async -> Bool { reachable }
+        }
+        let config = AppConfig()
+        let vm = PreferencesViewModel(config: config, connectionChecker: MockChecker(reachable: false))
+        vm.dataSource = .server
+        vm.draftURL = "http://localhost:8000"
+        await vm.save()
+        XCTAssertEqual(config.dataSource, .server)
+        XCTAssertEqual(vm.dataSource, .server)
+        XCTAssertTrue(vm.noticeMessage?.contains("Warning: server is currently unreachable") == true)
+    }
 }

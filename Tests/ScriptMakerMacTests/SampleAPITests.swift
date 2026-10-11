@@ -164,8 +164,11 @@ final class SampleAPITests: XCTestCase {
         let appConfig = AppConfig()
         appConfig.dataSource = .offline
         appConfig.localJSONDelay = 0
+        let testSource = "🇮🇳 India Top Stories & Breaking"
+        UserDefaults.standard.removeObject(forKey: "headlinesCache_" + testSource)
+        UserDefaults.standard.removeObject(forKey: "selectedHeadline_" + testSource)
         let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
-        viewModel.selectedStorySource = "🇮🇳 India Top Stories & Breaking"
+        viewModel.selectedStorySource = testSource
         viewModel.topic = ""
         await viewModel.refreshHeadlines()
         XCTAssertFalse(viewModel.headlines.isEmpty)
