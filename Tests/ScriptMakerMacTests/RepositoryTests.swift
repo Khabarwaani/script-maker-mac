@@ -5,37 +5,37 @@ import XCTest
 final class StoryRepositoryTests: XCTestCase {
     func testSaveAndLoad() async {
         let repo = LocalStoryRepository()
-        await repo.save(["id": "ut-1", "title": "Unit Test"])
+        await repo.save(Story(id: "ut-1", title: "Unit Test"))
         let stories = await repo.all()
-        XCTAssertTrue(stories.contains { ($0["id"] as? String) == "ut-1" })
+        XCTAssertTrue(stories.contains { $0.id == "ut-1" })
         await repo.remove(id: "ut-1")
     }
 
     func testRemove() async {
         let repo = LocalStoryRepository()
-        await repo.save(["id": "ut-remove", "title": "Remove Me"])
+        await repo.save(Story(id: "ut-remove", title: "Remove Me"))
         await repo.remove(id: "ut-remove")
         let stories = await repo.all()
-        XCTAssertFalse(stories.contains { ($0["id"] as? String) == "ut-remove" })
+        XCTAssertFalse(stories.contains { $0.id == "ut-remove" })
     }
 
     func testSaveReplacesExisting() async {
         let repo = LocalStoryRepository()
-        await repo.save(["id": "ut-replace", "title": "Original"])
-        await repo.save(["id": "ut-replace", "title": "Updated"])
-        let matches = await repo.all().filter { ($0["id"] as? String) == "ut-replace" }
+        await repo.save(Story(id: "ut-replace", title: "Original"))
+        await repo.save(Story(id: "ut-replace", title: "Updated"))
+        let matches = await repo.all().filter { $0.id == "ut-replace" }
         XCTAssertEqual(matches.count, 1)
-        XCTAssertEqual(matches.first?["title"] as? String, "Updated")
+        XCTAssertEqual(matches.first?.title, "Updated")
         await repo.remove(id: "ut-replace")
     }
 
     func testNewestFirst() async {
         let repo = LocalStoryRepository()
-        await repo.save(["id": "ut-old", "title": "Old"])
-        await repo.save(["id": "ut-new", "title": "New"])
+        await repo.save(Story(id: "ut-old", title: "Old"))
+        await repo.save(Story(id: "ut-new", title: "New"))
         let stories = await repo.all()
-        let oldIdx = stories.firstIndex { ($0["id"] as? String) == "ut-old" }
-        let newIdx = stories.firstIndex { ($0["id"] as? String) == "ut-new" }
+        let oldIdx = stories.firstIndex { $0.id == "ut-old" }
+        let newIdx = stories.firstIndex { $0.id == "ut-new" }
         if let o = oldIdx, let n = newIdx {
             XCTAssertTrue(n < o, "Newer stories should appear first")
         }
@@ -49,15 +49,60 @@ final class StoryDataSourceTests: XCTestCase {
     func testSaveAndLoad() {
         let ds = UserDefaultsStoryDataSource()
         let original = ds.load()
-        ds.save([["id": "ds-ut", "title": "DS Test"]])
-        XCTAssertTrue(ds.load().contains { ($0["id"] as? String) == "ds-ut" })
+        ds.save([Story(id: "ds-ut", title: "DS Test")])
+        XCTAssertTrue(ds.load().contains { $0.id == "ds-ut" })
         ds.save(original) // restore
     }
 
     func testLoadReturnsArray() {
         let ds = UserDefaultsStoryDataSource()
         let result = ds.load()
-        XCTAssertTrue(result is [[String: Any]])
+        XCTAssertTrue(result is [Story])
+    }
+
+    func testLegacyDictionaryMigration() {
+        let ds = UserDefaultsStoryDataSource()
+        let original = ds.load()
+        // Simulate legacy storage: raw JSON dictionaries.
+        let legacy: [[String: Any]] = [
+            ["id": "legacy-1", "title": "Legacy Story", "created_at": "2026-01-01T00:00:00Z"]
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: legacy) {
+            KeyValueStore().set(data, forKey: "savedStories")
+        }
+        let loaded = ds.load()
+        XCTAssertTrue(loaded.contains { $0.id == "legacy-1" })
+        XCTAssertEqual(loaded.first { $0.id == "legacy-1" }?.title, "Legacy Story")
+        ds.save(original) // restore
+    }
+}
+
+/// Unit tests for StoryMapper (platform layer).
+final class StoryMapperTests: XCTestCase {
+    func testFromDictWithDefaults() {
+        let story = StoryMapper.from([:])
+        XCTAssertEqual(story.title, "Untitled")
+        XCTAssertFalse(story.id.isEmpty)
+    }
+
+    func testFromDictMapsAllFields() {
+        let dict: [String: Any] = [
+            "id": "m-1", "title": "T", "summary": "S", "headline": "H",
+            "created_at": "2026-01-01", "status": "done",
+            "emotion": "happy", "format": "9:16", "video_url": "http://x/y.mp4",
+        ]
+        let story = StoryMapper.from(dict)
+        XCTAssertEqual(story.id, "m-1")
+        XCTAssertEqual(story.title, "T")
+        XCTAssertEqual(story.videoURL, "http://x/y.mp4")
+    }
+
+    func testRoundTrip() {
+        let original = Story(id: "rt-1", title: "Round Trip", videoURL: "http://x/v.mp4")
+        let restored = StoryMapper.from(StoryMapper.toDict(original))
+        XCTAssertEqual(restored.id, original.id)
+        XCTAssertEqual(restored.title, original.title)
+        XCTAssertEqual(restored.videoURL, original.videoURL)
     }
 }
 

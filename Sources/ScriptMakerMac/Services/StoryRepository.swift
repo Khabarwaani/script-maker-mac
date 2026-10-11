@@ -8,11 +8,11 @@ import Foundation
 ///       ↓
 ///   Domain (Service + Repository protocol) ← YOU ARE HERE
 ///       ↓
-///   Data (Repository implementation)
+///   Platform (Repository implementation)
 ///       ↓
-///   Infra (DataSource: UserDefaults/files/network)
+///   Infra (KeyValueStore, HTTPClient, FileStore)
 protocol StoryRepository: Sendable {
-    func save(_ story: [String: Any]) async
-    func all() async -> [[String: Any]]
+    func save(_ story: Story) async
+    func all() async -> [Story]
     func remove(id: String) async
 }

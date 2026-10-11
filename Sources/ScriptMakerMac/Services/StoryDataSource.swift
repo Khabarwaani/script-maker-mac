@@ -9,13 +9,14 @@ import Foundation
 ///       ↓
 ///   Infra (KeyValueStore, HTTPClient, FileStore)
 
-/// Protocol for story persistence.
+/// Protocol for story persistence (typed).
 protocol StoryDataSourceProtocol: Sendable {
-    func load() -> [[String: Any]]
-    func save(_ stories: [[String: Any]])
+    func load() -> [Story]
+    func save(_ stories: [Story])
 }
 
 /// Platform implementation using Infra's KeyValueStore.
+/// Persists via JSON encoding of the typed Story array.
 struct UserDefaultsStoryDataSource: StoryDataSourceProtocol {
     private let store: KeyValueStore
     private let key = "savedStories"
@@ -24,16 +25,21 @@ struct UserDefaultsStoryDataSource: StoryDataSourceProtocol {
         self.store = store
     }
 
-    func load() -> [[String: Any]] {
-        guard let data = store.data(forKey: key),
-              let stories = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return []
+    func load() -> [Story] {
+        guard let data = store.data(forKey: key) else { return [] }
+        // Preferred: typed JSON.
+        if let stories = try? JSONDecoder().decode([Story].self, from: data) {
+            return stories
         }
-        return stories
+        // Legacy fallback: pre-DTO `[String: Any]` dictionaries.
+        if let dicts = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            return dicts.map(StoryMapper.from)
+        }
+        return []
     }
 
-    func save(_ stories: [[String: Any]]) {
-        if let data = try? JSONSerialization.data(withJSONObject: stories) {
+    func save(_ stories: [Story]) {
+        if let data = try? JSONEncoder().encode(stories) {
             store.set(data, forKey: key)
         }
     }

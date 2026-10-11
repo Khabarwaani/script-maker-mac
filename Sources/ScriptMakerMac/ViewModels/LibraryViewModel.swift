@@ -7,7 +7,7 @@ final class LibraryViewModel: ObservableObject {
     private let config: AppConfig
     private let repository: any StoryRepository
 
-    @Published var stories: [[String: Any]] = []
+    @Published var stories: [Story] = []
     @Published var selectedStoryID: String?
     @Published var isLoading = false
     @Published var notice: String?
@@ -17,8 +17,8 @@ final class LibraryViewModel: ObservableObject {
         self.repository = repository
     }
 
-    var selectedStory: [String: Any]? {
-        stories.first { ($0["id"] as? String) == selectedStoryID }
+    var selectedStory: Story? {
+        stories.first { $0.id == selectedStoryID }
     }
 
     func refresh() async {
@@ -29,11 +29,15 @@ final class LibraryViewModel: ObservableObject {
         notice = nil
         do {
             let api = try PipelineService(config: config)
-            stories = try await api.listStories()
+            let serverDicts = try await api.listStories()
+            let serverStories = serverDicts.map(StoryMapper.from)
             // Merge in locally saved stories (from completed generations).
-            stories = await repository.all() + stories
+            let local = await repository.all()
+            // Deduplicate: local wins on id conflict.
+            let localIDs = Set(local.map(\.id))
+            stories = local + serverStories.filter { !localIDs.contains($0.id) }
             if selectedStoryID == nil {
-                selectedStoryID = stories.first?["id"] as? String
+                selectedStoryID = stories.first?.id
             }
         } catch let e as APIError {
             switch e {
@@ -52,9 +56,9 @@ final class LibraryViewModel: ObservableObject {
     /// Delete a story (from local store; server deletion when API supports it).
     func deleteStory(id: String) async {
         await repository.remove(id: id)
-        stories.removeAll { ($0["id"] as? String) == id }
+        stories.removeAll { $0.id == id }
         if selectedStoryID == id {
-            selectedStoryID = stories.first?["id"] as? String
+            selectedStoryID = stories.first?.id
         }
         // TODO: server-side delete when the API provides it.
     }

@@ -255,16 +255,15 @@ final class GenerateViewModel: ObservableObject {
 
     /// Save the completed generation to the Library via the repository.
     private func saveToLibrary() {
-        let story: [String: Any] = [
-            "id": sessionID ?? UUID().uuidString,
-            "title": topic.isEmpty ? "Untitled" : topic,
-            "summary": sampleStory,
-            "headline": selectedHeadline,
-            "created_at": DateFormatting.iso8601Now(),
-            "status": "completed",
-            "emotion": selectedEmotion,
-            "format": selectedFormat,
-        ]
+        let story = Story(
+            id: sessionID ?? UUID().uuidString,
+            title: StringFormatting.isBlank(topic) ? "Untitled" : topic,
+            summary: sampleStory,
+            headline: selectedHeadline,
+            status: "completed",
+            emotion: selectedEmotion,
+            format: selectedFormat
+        )
         Task { await repository.save(story) }
     }
 
