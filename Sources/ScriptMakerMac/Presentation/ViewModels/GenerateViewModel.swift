@@ -24,8 +24,29 @@ final class GenerateViewModel {
     var stagePayloads: [PipelineStage: [String: Any]] = [:]
     var events: [SubstepEvent] = []
     var isRunning = false
-    var errorMessage: String?
+    var errorTitle: String?
+    var errorDetail: String?
+    var errorMessage: String? {
+        get { errorDetail ?? errorTitle }
+        set {
+            errorTitle = newValue != nil ? "Error" : nil
+            errorDetail = newValue
+        }
+    }
     var jobProgress: Double?
+
+    func setError(_ error: Error) {
+        if let apiError = error as? APIError {
+            errorTitle = apiError.errorDescription ?? "Error"
+            var parts: [String] = []
+            if let reason = apiError.failureReason { parts.append(reason) }
+            if let recovery = apiError.recoverySuggestion { parts.append(recovery) }
+            errorDetail = parts.isEmpty ? apiError.localizedDescription : parts.joined(separator: "\n\n")
+        } else {
+            errorTitle = "Error"
+            errorDetail = error.localizedDescription
+        }
+    }
 
     // Headlines from sample data (or server when live).
     var headlines: [String] = []
@@ -165,7 +186,7 @@ final class GenerateViewModel {
             formats = loaded.formats.map(\.name)
             updateAIOptions()
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -244,7 +265,8 @@ final class GenerateViewModel {
 
         do {
             let service = try api()
-            let response = try await service.fetchTopTitles(category: categoryParam, n: 16, mode: nil)
+            let pageSize = config.newsPageSize
+            let response = try await service.fetchTopTitles(category: categoryParam, n: pageSize, mode: nil)
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
                 config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
@@ -261,7 +283,7 @@ final class GenerateViewModel {
             } else {
                 headlines = []
                 selectedHeadline = ""
-                errorMessage = error.localizedDescription
+                setError(error)
             }
         }
     }
@@ -327,7 +349,7 @@ final class GenerateViewModel {
                 }
             }
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -383,7 +405,7 @@ final class GenerateViewModel {
             try await runStage(.verify, api: api, inputs: stageInputs())
             if workflowMode == .continuous { try await continueAutomatically(api: api) }
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -419,7 +441,7 @@ final class GenerateViewModel {
             let api = try api()
             try await runStage(stage, api: api, inputs: inputs.isEmpty ? stageInputs() : inputs)
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -458,7 +480,7 @@ final class GenerateViewModel {
                 try await runStage(next, api: api, inputs: stageInputs())
             }
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -496,7 +518,7 @@ final class GenerateViewModel {
         do {
             try await completeRender(api: api(), inputs: inputs.isEmpty ? stageInputs() : inputs)
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 

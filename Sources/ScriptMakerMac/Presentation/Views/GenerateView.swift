@@ -26,13 +26,13 @@ struct GenerateView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .alert("Something went wrong", isPresented: errorBinding) {
+        .alert(viewModel.errorTitle ?? "Error", isPresented: errorBinding) {
             Button("Retry stage") { Task { await viewModel.retryStage() } }
             Button("Retry fresh") { Task { await viewModel.retryFresh() } }
             Button("Skip stage") { Task { await viewModel.skipStage() } }
             Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
         } message: {
-            Text(viewModel.errorMessage ?? "")
+            Text(viewModel.errorDetail ?? "")
         }
     }
 }

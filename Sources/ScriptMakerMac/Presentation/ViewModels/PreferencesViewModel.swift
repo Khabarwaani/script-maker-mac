@@ -27,6 +27,11 @@ final class PreferencesViewModel {
         set { config.localJSONDelay = min(max(newValue, 0), 60) }
     }
 
+    var newsPageSize: Int {
+        get { config.newsPageSize }
+        set { config.newsPageSize = min(max(newValue, 1), 50) }
+    }
+
     var currentURL: String { config.serverURL }
     var appearance: AppAppearance {
         get { config.appearance }
