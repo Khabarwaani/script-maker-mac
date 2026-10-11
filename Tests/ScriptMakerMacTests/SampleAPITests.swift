@@ -288,6 +288,25 @@ final class LocalWorkflowTests: XCTestCase {
 }
 
 final class LocalSimulationTests: XCTestCase {
+    func testLibraryServerUpdateFailsWithoutSimulating() async {
+        do {
+            _ = try await LibraryUpdateClient().update(.hashtags, story: Story(), engine: "None", instruction: "", localJSON: false, delay: 60)
+            XCTFail("Server mode must not return fixtures")
+        } catch { XCTAssertTrue(error is ConfigError) }
+    }
+
+    func testLibraryUpdateCancellationAndDelay() async throws {
+        let client = LibraryUpdateClient()
+        let clock = ContinuousClock()
+        let start = clock.now
+        let result = try await client.update(.hashtags, story: Story(), engine: "None", instruction: "", localJSON: true, delay: 0.02)
+        XCTAssertGreaterThanOrEqual(start.duration(to: clock.now), .milliseconds(20))
+        XCTAssertFalse(result.hashtags?.isEmpty ?? true)
+        let task = Task { try await client.update(.news, story: Story(), engine: "None", instruction: "", localJSON: true, delay: 60) }
+        task.cancel()
+        do { _ = try await task.value; XCTFail("Cancelled update must fail") }
+        catch { XCTAssertTrue(error is CancellationError) }
+    }
     func testDelayedRequestCanBeCancelled() async {
         let client = OfflineWebClient(delay: 60)
         let request = Task { try await client.createSession() }
@@ -305,4 +324,170 @@ final class LocalSimulationTests: XCTestCase {
         _ = try await client.createSession()
         XCTAssertGreaterThanOrEqual(started.duration(to: clock.now), .milliseconds(20))
     }
+}
+
+@MainActor
+final class LibraryDetailTests: XCTestCase {
+    func testRefinementPreviewRequiresAcceptanceAndVersionsKeepIdentity() async throws {
+        let config = AppConfig()
+        let originalSource = config.dataSource, originalEngine = config.libraryAIEngine
+        let originalDelay = config.localJSONDelay
+        defer { config.dataSource = originalSource; config.libraryAIEngine = originalEngine; config.localJSONDelay = originalDelay }
+        config.dataSource = .offline; config.localJSONDelay = 0; config.libraryAIEngine = "Antigravity"
+        let original = Story(title: "Original title", scriptText: "Original script")
+        let other = Story(title: "Other story", scriptText: "Other script")
+        let repo = WorkflowStoryRepository()
+        await repo.save(original); await repo.save(other)
+        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
+        await vm.refresh(); vm.selectedStoryID = original.id
+        vm.refinementInstruction = "Tighten hook"
+        await vm.update(.refine)
+        XCTAssertNotNil(vm.refinement)
+        XCTAssertEqual(vm.selectedStory?.scriptText, "Original script")
+        vm.refinementInstruction = "A later draft instruction"
+        await vm.acceptRefinement()
+        let accepted = try XCTUnwrap(vm.selectedStory)
+        XCTAssertEqual(accepted.id, original.id)
+        XCTAssertEqual(accepted.createdAt, original.createdAt)
+        XCTAssertEqual(accepted.scriptVersions?.count, 2)
+        XCTAssertEqual(accepted.scriptVersions?.last?.instruction, "Tighten hook")
+        XCTAssertNotEqual(accepted.scriptText, original.scriptText)
+        let first = try XCTUnwrap(accepted.scriptVersions?.first)
+        await vm.useVersion(first, storyID: original.id)
+        XCTAssertEqual(vm.selectedStory?.scriptText, original.scriptText)
+        await vm.update(.refine)
+        vm.selectedStoryID = other.id
+        XCTAssertNil(vm.refinement)
+        await vm.acceptRefinement()
+        XCTAssertEqual(vm.selectedStory?.scriptText, other.scriptText)
+        let saved = await repo.all()
+        let persisted = try XCTUnwrap(saved.first { $0.id == original.id })
+        let encoded = try JSONEncoder().encode(persisted)
+        XCTAssertEqual(try JSONDecoder().decode(Story.self, from: encoded).scriptVersions?.count, 2)
+    }
+
+    func testEditingUpdatesSameStoryAndCopyFormatsUseCurrentContent() async throws {
+        let repo = WorkflowStoryRepository()
+        var story = Story(title: "Before", scriptText: "Old script")
+        story.hashtags = ["#News"]; story.imageURLs = ["https://example.com/image.jpg"]
+        story.sourceLinks = [StorySourceLink(title: "News", url: "https://example.com/news", source: "Wire")]
+        await repo.save(story)
+        let vm = LibraryViewModel(config: AppConfig(), repository: repo)
+        vm.stories = [story]; vm.selectedStoryID = story.id
+        vm.prepareEdits(story); vm.editedTitle = "After"; vm.editedScript = "Current script"
+        let saved = await vm.saveEdits(id: story.id)
+        XCTAssertTrue(saved)
+        let current = try XCTUnwrap(vm.selectedStory)
+        XCTAssertEqual(current.id, story.id)
+        XCTAssertEqual(current.createdAt, story.createdAt)
+        XCTAssertEqual(current.title, "After")
+        XCTAssertEqual(vm.copyText(for: current, format: .script), "Current script")
+        XCTAssertEqual(vm.copyText(for: current, format: .tags), "Current script\n\n#News")
+        XCTAssertTrue(vm.copyText(for: current, format: .media).contains("https://example.com/image.jpg"))
+        XCTAssertFalse(vm.copyText(for: current, format: .media).contains("#News"))
+        XCTAssertTrue(vm.copyText(for: current, format: .all).contains("#News"))
+        XCTAssertTrue(vm.shareText(for: current).contains("https://example.com/news"))
+        await vm.resetEnrichment(id: current.id)
+        XCTAssertNil(vm.selectedStory?.hashtags)
+        XCTAssertNil(vm.selectedStory?.imageURLs)
+        XCTAssertNil(vm.selectedStory?.sourceLinks)
+        XCTAssertEqual(vm.selectedStory?.scriptText, "Current script")
+        XCTAssertEqual(vm.selectedStory?.scriptVersions?.count, 2)
+    }
+
+    func testUpdatesPersistOnlyRequestedFields() async throws {
+        let config = AppConfig()
+        let originalSource = config.dataSource, originalDelay = config.localJSONDelay
+        defer { config.dataSource = originalSource; config.localJSONDelay = originalDelay }
+        config.dataSource = .offline; config.localJSONDelay = 0
+        let repo = WorkflowStoryRepository()
+        let story = Story(title: "Update target", scriptText: "Keep script")
+        await repo.save(story)
+        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
+        await vm.refresh()
+        await vm.update(.hashtags)
+        XCTAssertFalse(vm.selectedStory?.hashtags?.isEmpty ?? true)
+        XCTAssertNil(vm.selectedStory?.imageURLs)
+        await vm.update(.images); await vm.update(.news)
+        XCTAssertFalse(vm.selectedStory?.imageURLs?.isEmpty ?? true)
+        XCTAssertFalse(vm.selectedStory?.sourceLinks?.isEmpty ?? true)
+        XCTAssertEqual(vm.selectedStory?.scriptText, "Keep script")
+        XCTAssertEqual(vm.selectedStory?.id, story.id)
+        XCTAssertTrue(vm.busyUpdates.isEmpty)
+    }
+}
+
+final class LibraryNetworkContractTests: XCTestCase {
+    private func client(status: Int = 200, body: String) -> LibraryUpdateClient {
+        LibraryStubProtocol.status = status
+        LibraryStubProtocol.body = Data(body.utf8)
+        LibraryStubProtocol.captured = nil
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LibraryStubProtocol.self]
+        return LibraryUpdateClient(httpClient: HTTPClient(session: URLSession(configuration: configuration)))
+    }
+
+    func testUpdateUsesConfiguredURLAndContractBodyWithoutSimulationDelay() async throws {
+        let api = client(body: "{\"hashtags\":[\"#News\"]}")
+        let story = Story(title: "News", scriptText: "Current script")
+        let output = try await api.update(.hashtags, story: story, engine: "None", instruction: "", localJSON: false,
+                                          delay: 60, serverURL: URL(string: "http://library.test:8000/api"))
+        XCTAssertEqual(output.hashtags, ["#News"])
+        let request = try XCTUnwrap(LibraryStubProtocol.captured)
+        XCTAssertEqual(request.url?.absoluteString, "http://library.test:8000/api/stories/\(story.id)/updates/hashtags")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["engine"] as? String, "None")
+        XCTAssertEqual(json["instruction"] as? String, "")
+        XCTAssertEqual((json["story"] as? [String: Any])?["scriptText"] as? String, "Current script")
+    }
+
+    func testRefinementRouteAndUnavailableServerErrors() async throws {
+        let api = client(body: "{\"script\":\"Refined preview\"}")
+        let story = Story(scriptText: "Original script")
+        let output = try await api.update(.refine, story: story, engine: "Codex", instruction: "Tighten hook", localJSON: false,
+                                          delay: 60, serverURL: URL(string: "http://library.test"))
+        XCTAssertEqual(output.script, "Refined preview")
+        XCTAssertEqual(LibraryStubProtocol.captured?.url?.path, "/stories/\(story.id)/refinements")
+        let unavailable = client(status: 501, body: "{\"error\":{\"code\":\"not_implemented\",\"message\":\"Pending\"}}")
+        do {
+            _ = try await unavailable.update(.news, story: story, engine: "None", instruction: "", localJSON: false,
+                                             delay: 60, serverURL: URL(string: "http://library.test"))
+            XCTFail("Unavailable server must not return fixture data")
+        } catch {
+            XCTAssertTrue(error is APIError)
+            XCTAssertTrue(error.localizedDescription.contains("No changes were saved"))
+        }
+    }
+}
+
+private final class LibraryStubProtocol: URLProtocol {
+    static var status = 200
+    static var body = Data()
+    static var captured: URLRequest?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        var captured = request
+        if captured.httpBody == nil, let stream = captured.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var bytes = [UInt8](repeating: 0, count: 4096)
+            var data = Data()
+            while stream.hasBytesAvailable {
+                let count = stream.read(&bytes, maxLength: bytes.count)
+                if count <= 0 { break }
+                data.append(contentsOf: bytes.prefix(count))
+            }
+            captured.httpBody = data
+        }
+        Self.captured = captured
+        let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() { }
 }

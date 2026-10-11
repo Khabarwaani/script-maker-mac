@@ -8,6 +8,8 @@ import Foundation
 enum StoryMapper {
     /// Dictionary → Story (tolerant: missing keys get defaults).
     static func from(_ dict: [String: Any]) -> Story {
+        if let data = try? JSONSerialization.data(withJSONObject: dict),
+           let story = try? JSONDecoder().decode(Story.self, from: data) { return story }
         let metadata = dict["meta"] as? [String: Any] ?? dict
         return Story(
             id: metadata["id"] as? String ?? UUID().uuidString,
@@ -24,7 +26,8 @@ enum StoryMapper {
                 StorySourceLink(title: link["title"] as? String ?? "Source", url: link["url"] as? String ?? link["link"] as? String ?? "", source: link["source"] as? String ?? "")
             },
             scriptText: dict["script_md"] as? String ?? dict["script"] as? String,
-            generationNumber: metadata["generation_number"] as? Int
+            generationNumber: metadata["generation_number"] as? Int,
+            imageURLs: metadata["image_urls"] as? [String]
         )
     }
 
@@ -41,6 +44,7 @@ enum StoryMapper {
             "format": story.format,
         ]
         if let hashtags = story.hashtags { dict["hashtags"] = hashtags }
+        if let images = story.imageURLs { dict["image_urls"] = images }
         if let links = story.sourceLinks {
             dict["news_links"] = links.map { ["title": $0.title, "url": $0.url, "source": $0.source] }
         }

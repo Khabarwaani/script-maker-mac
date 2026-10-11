@@ -43,6 +43,10 @@ final class AppConfig {
         didSet { UserDefaults.standard.set(localJSONDelay, forKey: "localJSONDelay") }
     }
 
+    var libraryAIEngine: String {
+        didSet { UserDefaults.standard.set(libraryAIEngine, forKey: "libraryAIEngine") }
+    }
+
     var buildTitle: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
@@ -62,6 +66,7 @@ final class AppConfig {
     }
 
     init() {
+        self.libraryAIEngine = UserDefaults.standard.string(forKey: "libraryAIEngine") ?? "None"
         self.localJSONDelay = UserDefaults.standard.object(forKey: "localJSONDelay") as? Double ?? 1
         self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)

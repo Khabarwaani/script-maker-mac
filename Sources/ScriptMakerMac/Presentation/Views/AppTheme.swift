@@ -16,6 +16,23 @@ enum AppTheme {
     static let onAccent = Color("OnAccent")
 }
 
+struct LibraryActionLabel: View {
+    let icon: String
+    var body: some View {
+        Image(systemName: icon).font(.system(size: 15)).modifier(LibraryActionFrame())
+    }
+}
+
+struct LibraryActionFrame: ViewModifier {
+    func body(content: Content) -> some View {
+        content.foregroundStyle(AppTheme.ink).tint(AppTheme.ink)
+            .frame(width: 40, height: 36)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+            .contentShape(Rectangle())
+    }
+}
+
 struct StudioButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

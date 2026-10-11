@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Story",
+  "type": "object",
+  "required": ["id", "title", "summary", "headline", "createdAt", "status", "emotion", "format"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "description": "Immutable identity. New stories use UUIDs; legacy saved IDs are accepted." },
+    "title": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string" },
+    "headline": { "type": "string" },
+    "createdAt": { "type": "string", "format": "date-time", "description": "Immutable generation or manual creation timestamp." },
+    "status": { "type": "string" },
+    "emotion": { "type": "string" },
+    "format": { "type": "string" },
+    "videoURL": { "type": "string", "format": "uri" },
+    "hashtags": { "type": "array", "items": { "type": "string" } },
+    "sourceLinks": { "type": "array", "items": { "$ref": "library-result.schema.json#/properties/news/items" } },
+    "scriptText": { "type": "string", "description": "Current/default screenplay used by display, Copy and Share." },
+    "generationNumber": { "type": "integer", "minimum": 1 },
+    "stageOutputs": { "type": "object", "additionalProperties": { "type": "string", "description": "Formatted stage JSON" } },
+    "imageURLs": { "type": "array", "items": { "type": "string", "format": "uri" } },
+    "scriptVersions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "number", "text", "createdAt"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "number": { "type": "integer", "minimum": 1 },
+          "text": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "instruction": { "type": "string" }
+        }
+      }
+    }
+  }
+}

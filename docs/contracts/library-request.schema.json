@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LibraryRequest",
+  "type": "object",
+  "required": ["story", "engine", "instruction"],
+  "additionalProperties": false,
+  "properties": {
+    "story": { "$ref": "library-story.schema.json" },
+    "engine": {
+      "type": "string",
+      "description": "None disables AI. Fine tuning rejects None with HTTP 422.",
+      "enum": ["None", "Local First Then Antigravity", "Antigravity", "Codex", "Grok Low", "Grok Medium", "Grok High", "On-device"]
+    },
+    "instruction": {
+      "type": "string",
+      "description": "Required nonblank for refinements; empty string for enrichment updates."
+    }
+  },
+  "examples": [
+    {
+      "story": {
+        "id": "4c349aaa-2d1c-4be6-9ad8-9376d58a3c23",
+        "title": "The Odd Day",
+        "summary": "Delhi considers odd-even traffic restrictions.",
+        "headline": "Delhi announces odd-even restrictions",
+        "createdAt": "2026-10-11T03:00:00Z",
+        "status": "saved",
+        "emotion": "Curiosity",
+        "format": "Normal Talk",
+        "scriptText": "Narrator: Will odd-even restrictions help?"
+      },
+      "engine": "Antigravity",
+      "instruction": "Tighten the hook while preserving the facts."
+    }
+  ]
+}

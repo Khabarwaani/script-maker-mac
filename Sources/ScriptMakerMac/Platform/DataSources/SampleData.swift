@@ -1,5 +1,48 @@
 import Foundation
 
+struct LibraryUpdateClient: LibraryUpdating {
+    let httpClient: HTTPClient
+    init(httpClient: HTTPClient = HTTPClient()) { self.httpClient = httpClient }
+
+    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
+                localJSON: Bool, delay: TimeInterval, serverURL: URL? = nil) async throws -> LibraryUpdateResult {
+        if !localJSON {
+            guard let baseURL = serverURL else { throw ConfigError.invalidURL("Missing server URL") }
+            let path = kind == .refine ? "refinements" : "updates/\(kind.rawValue)"
+            var request = URLRequest(url: baseURL.appendingPathComponent("stories").appendingPathComponent(story.id).appendingPathComponent(path))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.httpBody = try JSONEncoder().encode(LibraryUpdateRequest(story: story, engine: engine, instruction: instruction))
+            let data: Data
+            let response: URLResponse
+            do { (data, response) = try await httpClient.data(for: request) }
+            catch is CancellationError { throw CancellationError() }
+            catch { throw APIError.unreachable(baseURL.absoluteString) }
+            guard let http = response as? HTTPURLResponse else { throw APIError.transport("No HTTP response") }
+            guard 200..<300 ~= http.statusCode else {
+                if http.statusCode == 404 || http.statusCode == 501 {
+                    throw APIError.notImplemented("Library \(kind.rawValue) endpoint is not available on this server. No changes were saved.")
+                }
+                throw APIError.server(http.statusCode, String(data: data, encoding: .utf8) ?? "Library update failed")
+            }
+            do { return try JSONDecoder().decode(LibraryUpdateResult.self, from: data) }
+            catch { throw APIError.malformed("Library \(kind.rawValue) response") }
+        }
+        if delay > 0 { try await Task.sleep(for: .seconds(min(delay, 60))) }
+        guard let data = SampleData.data(for: "library_updates") else {
+            throw APIError.malformed("Missing Library update samples")
+        }
+        return try JSONDecoder().decode(LibraryUpdateResult.self, from: data)
+    }
+}
+
+private struct LibraryUpdateRequest: Encodable {
+    let story: Story
+    let engine: String
+    let instruction: String
+}
+
 struct BundledStudioCatalog: StudioCatalogProviding {
     func load() throws -> StudioCatalog {
         guard let data = SampleData.data(for: "studio_catalog") else {

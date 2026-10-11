@@ -18,19 +18,19 @@ struct StoryListView: View {
                 Button {
                     viewModel.prepareNewStory()
                     showingAddStory = true
-                } label: { Image(systemName: "plus") }
+                } label: { LibraryActionLabel(icon: "plus") }
+                .buttonStyle(.plain)
                 .help("Add story from a script").accessibilityLabel("Add story")
                 Button { Task { await viewModel.refresh() } } label: {
-                    Image(systemName: "arrow.clockwise")
-                }.help("Refresh library").disabled(viewModel.isLoading)
+                    LibraryActionLabel(icon: "arrow.clockwise")
+                }.buttonStyle(.plain).help("Refresh library").disabled(viewModel.isLoading)
                 Button { deletingAll = true } label: {
-                    Image(systemName: "trash")
-                }.help("Delete all stories").accessibilityLabel("Delete all stories")
+                    LibraryActionLabel(icon: "trash")
+                }.buttonStyle(.plain).help("Delete all stories").accessibilityLabel("Delete all stories")
                     .disabled(viewModel.stories.isEmpty || viewModel.isLoading)
             }
             Divider().overlay(AppTheme.line)
             if isCollapsed {
-                storyList(limit: 2).frame(height: 116)
                 detail
             } else {
                 HStack(alignment: .top, spacing: 24) {
@@ -40,11 +40,6 @@ struct StoryListView: View {
             }
         }
         .padding(24).background(AppTheme.paper)
-        .onChange(of: isCollapsed) { _, collapsed in
-            if collapsed && !viewModel.stories.prefix(2).contains(where: { $0.id == viewModel.selectedStoryID }) {
-                viewModel.selectedStoryID = viewModel.stories.first?.id
-            }
-        }
         .sheet(isPresented: $showingAddStory) { AddLibraryStoryView(viewModel: viewModel) }
         .alert("Delete story?", isPresented: Binding(get: { storyToDelete != nil }, set: { if !$0 { storyToDelete = nil } })) {
             Button("Cancel", role: .cancel) { storyToDelete = nil }
@@ -65,10 +60,10 @@ struct StoryListView: View {
         }
     }
 
-    private func storyList(limit: Int? = nil) -> some View {
+    private func storyList() -> some View {
         ScrollView {
             LazyVStack(spacing: 4) {
-                ForEach(Array(viewModel.stories.prefix(limit ?? viewModel.stories.count))) { story in
+                ForEach(viewModel.stories) { story in
                     Button { viewModel.selectedStoryID = story.id } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(story.title).font(.body.weight(.medium)).lineLimit(2)
@@ -82,6 +77,9 @@ struct StoryListView: View {
                     .buttonStyle(.plain)
                     .accessibilityValue(viewModel.selectedStoryID == story.id ? "Selected" : "")
                     .contextMenu {
+                        Button("Copy script") { viewModel.copy(story.scriptText ?? "", label: "Script") }
+                            .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
+                        Divider()
                         Button("Delete story", role: .destructive) { storyToDelete = story }
                     }
                 }

@@ -65,3 +65,9 @@ struct MacClipboardWriter: ClipboardWriting {
     let store: PasteboardStore
     func write(_ text: String) -> Bool { store.write(text) }
 }
+
+struct LibraryMediaStore: LibraryMediaImporting {
+    let files: FileStore
+    func importFile(_ url: URL) async throws -> URL { try files.importMedia(url) }
+    func imageData(at url: URL) async throws -> Data { try files.contents(of: url) }
+}
