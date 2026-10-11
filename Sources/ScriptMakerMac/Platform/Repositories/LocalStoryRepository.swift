@@ -65,3 +65,47 @@ struct MacClipboardWriter: ClipboardWriting {
     let store: PasteboardStore
     func write(_ text: String) -> Bool { store.write(text) }
 }
+
+@MainActor
+struct MacStorySharing: StorySharing {
+    let store: SharingStore
+
+    static func telegramURL(text: String, sourceURL: URL?, native: Bool = false) throws -> URL {
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        guard let encodedText = text.addingPercentEncoding(withAllowedCharacters: allowed),
+              let encodedURL = (sourceURL?.absoluteString ?? "").addingPercentEncoding(withAllowedCharacters: allowed),
+              let url = URL(string: "\(native ? "tg://msg_url" : "https://t.me/share/url")?url=\(encodedURL)&text=\(encodedText)") else {
+            throw APIError.malformed("Telegram share content")
+        }
+        return url
+    }
+
+    func share(to destination: StoryShareDestination, title: String, text: String, sourceURL: URL?) async throws -> StoryShareOutcome {
+        switch destination {
+        case .telegram:
+            let url = try Self.telegramURL(text: text, sourceURL: sourceURL)
+            let native = try Self.telegramURL(text: text, sourceURL: sourceURL, native: true)
+            guard store.open(url, nativeURL: native) else { throw APIError.transport("Could not open Telegram sharing.") }
+            return .composerOpened
+        case .googleDrive:
+            let invalid = CharacterSet(charactersIn: "/\\:\n\r").union(.controlCharacters)
+            let filename = title.components(separatedBy: invalid).filter { !$0.isEmpty }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = try store.saveText(text, filename: "\(filename.isEmpty ? "Story" : filename).txt", title: "Export to Google Drive", message: "Choose a Google Drive folder to sync this story. Drive for desktop handles the upload. You can also save a file to upload manually.") else { return .cancelled }
+            return .exported(url)
+        }
+    }
+}
+
+struct LibraryMediaStore: LibraryMediaImporting {
+    let files: FileStore
+    let httpClient: HTTPClient
+    func importFile(_ url: URL) async throws -> URL { try files.importMedia(url) }
+    func imageData(at url: URL) async throws -> Data {
+        if url.isFileURL { return try files.contents(of: url) }
+        let (data, response) = try await httpClient.data(for: URLRequest(url: url))
+        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw APIError.transport("Image request failed")
+        }
+        return data
+    }
+}

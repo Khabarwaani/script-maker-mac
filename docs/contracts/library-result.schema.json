@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LibraryUpdateResult",
+  "type": "object",
+  "additionalProperties": false,
+  "oneOf": [
+    { "required": ["hashtags"] },
+    { "required": ["images"] },
+    { "required": ["news"] },
+    { "required": ["script"] }
+  ],
+  "properties": {
+    "hashtags": { "type": "array", "items": { "type": "string", "pattern": "^#\\S+$" }, "uniqueItems": true },
+    "images": { "type": "array", "items": { "type": "string", "format": "uri", "pattern": "^https?://" }, "uniqueItems": true },
+    "news": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "url", "source"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string" },
+          "url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "script": { "type": "string", "minLength": 1, "pattern": "\\S" }
+  },
+  "examples": [
+    { "hashtags": ["#Delhi", "#AirQuality"] },
+    { "images": ["https://example.com/story-image.jpg"] },
+    { "news": [{ "title": "Report", "url": "https://example.com/report", "source": "Publisher" }] },
+    { "script": "Narrator: Delhi is testing odd-even restrictions. Will the air-quality data show a change?" }
+  ]
+}
