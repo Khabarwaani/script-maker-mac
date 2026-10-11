@@ -21,7 +21,7 @@ struct VerifyStageView: View {
     }
 
     var body: some View {
-        ScrollView {
+        Group {
             VStack(alignment: .leading, spacing: 12) {
                 badgeRow
 
@@ -31,7 +31,7 @@ struct VerifyStageView: View {
                 if !str("verification_status").isEmpty {
                     Text("Status: \(str("verification_status"))")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.secondaryInk)
                 }
                 if !str("verification_summary").isEmpty || !str("summary").isEmpty {
                     section("Summary") {
@@ -54,12 +54,11 @@ struct VerifyStageView: View {
                 sourcesSection
 
                 Button("Continue to characters") { onContinue() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(StudioPrimaryButtonStyle())
                     .padding(.top, 8)
             }
             .padding()
         }
-        .navigationTitle("Verify facts")
     }
 
     private var badgeRow: some View {
@@ -74,7 +73,7 @@ struct VerifyStageView: View {
             systemImage: verified ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
         )
         .font(.headline)
-        .foregroundStyle(verified ? Color.green : Color.orange)
+        .foregroundStyle(verified ? AppTheme.success : AppTheme.warning)
         .help("Confidence \(confText)")
     }
 
@@ -107,7 +106,7 @@ struct VerifyStageView: View {
                 ForEach(flags, id: \.self) { flag in
                     Label(flag, systemImage: "flag")
                         .font(.callout)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppTheme.warning)
                 }
             }
         }

@@ -18,17 +18,13 @@ struct GenerateView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            // Master: configuration sidebar (like Streamlit's sidebar).
-            // Fixed column widths: widths must never change as a result of
-            // layout — GeometryReader-driven widths throw inside AppKit's
-            // constraint pass (+[NSApplication _crashOnException:]).
-            // Default window is 1280 wide → 768 ≈ 60%, detail ≈ 40%.
-            ConfigSidebarView(viewModel: viewModel)
-                .navigationTitle("Configuration")
-                .navigationSplitViewColumnWidth(min: 320, ideal: 768, max: 900)
-        } detail: {
-            StudioDetailView(viewModel: viewModel)
+        GeometryReader { geometry in
+            HStack(alignment: .top, spacing: 0) {
+                ConfigSidebarView(viewModel: viewModel)
+                    .frame(width: geometry.size.width * 0.6)
+                StudioDetailView(viewModel: viewModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("Retry stage") { Task { await viewModel.retryStage() } }

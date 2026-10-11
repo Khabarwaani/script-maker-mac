@@ -138,8 +138,10 @@ final class ImageServiceTests: XCTestCase {
 
     func testInvalidURLReturnsNil() async {
         let service = ImageService(webClient: OfflineWebClient())
-        XCTAssertNil(await service.fetchImage(from: ""))
-        XCTAssertNil(await service.fetchImage(from: "not a url"))
+        let empty = await service.fetchImage(from: "")
+        XCTAssertNil(empty)
+        let invalid = await service.fetchImage(from: "not a url")
+        XCTAssertNil(invalid)
     }
 }
 
@@ -147,7 +149,8 @@ final class ImageServiceTests: XCTestCase {
 final class WebClientSelectionTests: XCTestCase {
     func testOfflineClientPing() async {
         let client = OfflineWebClient()
-        XCTAssertTrue(await client.ping())
+        let reachable = await client.ping()
+        XCTAssertTrue(reachable)
     }
 
     func testOfflineFetchDataThrows() async {

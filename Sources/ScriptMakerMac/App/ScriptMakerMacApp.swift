@@ -9,8 +9,7 @@ struct ScriptMakerMacApp: App {
     @State private var contentViewModel: ContentViewModel
 
     init() {
-        let config = AppConfig()
-        _contentViewModel = State(wrappedValue: ContentViewModel(config: config))
+        _contentViewModel = State(wrappedValue: CompositionRoot.makeContentViewModel())
     }
 
     var body: some Scene {
@@ -21,8 +20,21 @@ struct ScriptMakerMacApp: App {
         .defaultSize(width: 1280, height: 800)
         Settings {
             PreferencesView(
-                viewModel: PreferencesViewModel(config: contentViewModel.config)
+                viewModel: contentViewModel.preferencesViewModel
             )
         }
+    }
+}
+
+@MainActor
+enum CompositionRoot {
+    static func makeContentViewModel() -> ContentViewModel {
+        let config = AppConfig()
+        let checker = ServerConnectionChecker(httpClient: HTTPClient())
+        let preferences = PreferencesViewModel(config: config, connectionChecker: checker)
+        let repository = LocalStoryRepository()
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let library = LibraryViewModel(config: config, repository: repository)
+        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library)
     }
 }

@@ -12,6 +12,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var emotion: String
     var format: String
     var videoURL: String?
+    var stageOutputs: [String: String]?
 
     init(
         id: String = UUID().uuidString,
@@ -22,7 +23,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         status: String = "completed",
         emotion: String = "",
         format: String = "",
-        videoURL: String? = nil
+        videoURL: String? = nil,
+        stageOutputs: [String: String]? = nil
     ) {
         self.id = id
         self.title = title
@@ -33,5 +35,6 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.emotion = emotion
         self.format = format
         self.videoURL = videoURL
+        self.stageOutputs = stageOutputs
     }
 }

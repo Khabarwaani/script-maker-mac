@@ -1,5 +1,25 @@
 import Foundation
 
+struct ServerConnectionChecker: ServerConnectionChecking {
+    let httpClient: HTTPClient
+
+    func isReachable(at url: URL) async -> Bool {
+        var request = URLRequest(url: url.appendingPathComponent("health"))
+        request.timeoutInterval = 3
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await httpClient.data(for: request)
+            guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode,
+                  let health = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return false
+            }
+            return !health.isEmpty
+        } catch {
+            return false
+        }
+    }
+}
+
 /// Real HTTP WebClient. Talks to the pipeline server via Infra's HTTPClient.
 struct NetworkWebClient: WebClient {
     let baseURL: URL
@@ -55,7 +75,7 @@ struct NetworkWebClient: WebClient {
         return stories
     }
 
-    func startJob(sessionID: String, stage: PipelineStage, inputs: [String: Any]) async throws -> String {
+    func startJob(sessionID: String, stage: PipelineJob, inputs: [String: Any]) async throws -> String {
         var payload = inputs
         payload["stage"] = stage.rawValue
         let data = try await perform(path: "sessions/\(sessionID)/jobs", method: "POST", json: payload)

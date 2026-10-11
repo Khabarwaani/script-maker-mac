@@ -1,78 +1,64 @@
 import SwiftUI
 
-/// Story detail pane. Dumb view: renders a Story, reports merge taps.
 struct StoryDetailView: View {
     let story: Story
+    let onDelete: () -> Void
     let onMerge: (String) -> Void
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(story.title)
-                    .font(.largeTitle)
-                if !story.createdAt.isEmpty {
-                    Text(story.createdAt)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(story.title).font(.title2.weight(.semibold))
+                        Text(story.createdAt).font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                    }
+                    Spacer()
+                    ShareLink(item: story.summary.isEmpty ? story.title : "\(story.title)\n\n\(story.summary)") {
+                        Image(systemName: "square.and.arrow.up")
+                    }.help("Share story")
+                    Button(action: onDelete) { Image(systemName: "trash") }
+                        .help("Delete this story").accessibilityLabel("Delete story")
                 }
+                HStack(spacing: 12) {
+                    Label(story.status.capitalized, systemImage: "checkmark.circle")
+                        .foregroundStyle(AppTheme.success)
+                    if !story.emotion.isEmpty { Text(story.emotion) }
+                    if !story.format.isEmpty { Text(story.format) }
+                }.font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                Divider().overlay(AppTheme.line)
                 if !story.summary.isEmpty {
-                    Text(story.summary)
-                        .font(.callout)
+                    Text("Summary").font(.headline)
+                    Text(story.summary).font(.body)
                 }
-
-                // Metadata
                 if !story.headline.isEmpty {
-                    detailField("Headline", value: story.headline)
+                    DisclosureGroup("Original headline") { Text(story.headline).padding(.top, 8) }
                 }
-                if !story.emotion.isEmpty {
-                    detailField("Emotion", value: story.emotion)
-                }
-                if !story.format.isEmpty {
-                    detailField("Format", value: story.format)
-                }
-                detailField("Status", value: story.status)
-
-                // Video section
-                Section("Video") {
-                    if let videoURL = story.videoURL, !videoURL.isEmpty {
-                        Text("Video attached")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("No video attached")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                if let outputs = story.stageOutputs, !outputs.isEmpty {
+                    Text("Generation outputs").font(.headline)
+                    ForEach(PipelineStage.allCases) { stage in
+                        if let json = outputs[stage.rawValue] {
+                            DisclosureGroup(stage.title) {
+                                Text(json).font(.system(.callout, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                                    .padding(.top, 8)
+                            }
+                        }
                     }
-                    Button("Upload video…") {
-                        // TODO: file picker for video upload
-                    }
-                    .help("Attach a video file to this story")
                 }
-
-                // Merge section
-                Section("Merge clip at end") {
-                    Text("Append the configured closing clip to the story video.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Merge closing clip") {
-                        onMerge(story.id)
-                    }
-                    .disabled(story.videoURL?.isEmpty ?? true)
-                    .help("Merge the default ending clip at the video's end")
+                if let videoURL = story.videoURL, !videoURL.isEmpty {
+                    Divider().overlay(AppTheme.line)
+                    Label("Video attached", systemImage: "film")
+                    Button("Merge closing clip") { onMerge(story.id) }
                 }
             }
-            .padding()
+            .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+            .padding(.trailing, 12)
+            .textSelection(.enabled)
         }
-    }
-
-    private func detailField(_ label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.headline)
-            Text(value)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.top, 8)
+        .scrollIndicators(.visible).background(ScrollBarConfiguration())
     }
 }

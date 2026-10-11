@@ -21,12 +21,19 @@ struct CharactersStageView: View {
 
             if options.isEmpty {
                 Text("No character options returned.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryInk)
             } else {
-                List(options.indices, id: \.self, selection: $selectedIndex) { idx in
-                    characterRow(options[idx], index: idx)
+                ForEach(options.indices, id: \.self) { idx in
+                    Button { selectedIndex = idx } label: {
+                        HStack(alignment: .top) {
+                            characterRow(options[idx], index: idx)
+                            Spacer()
+                            Image(systemName: selectedIndex == idx ? "checkmark.circle.fill" : "circle")
+                        }
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
+                    }.buttonStyle(.plain)
                 }
-                .frame(minHeight: 160)
             }
 
             Spacer()
@@ -38,11 +45,10 @@ struct CharactersStageView: View {
                     onSelect([:])
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(StudioPrimaryButtonStyle())
             .disabled(options.isEmpty)
         }
         .padding()
-        .navigationTitle("Characters")
     }
 
     private func characterRow(_ persona: [String: Any], index: Int) -> some View {
@@ -52,13 +58,12 @@ struct CharactersStageView: View {
             if let desc = persona["description"] as? String, !desc.isEmpty {
                 Text(desc)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
             if let kind = persona["kind"] as? String, !kind.isEmpty, kind != "Human" {
                 Text(kind)
                     .font(.caption)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(AppTheme.accent)
             }
         }
         .padding(.vertical, 4)

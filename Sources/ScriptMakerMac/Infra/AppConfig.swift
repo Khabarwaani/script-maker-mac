@@ -1,6 +1,13 @@
 import Foundation
 import Observation
 
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+    var id: String { rawValue }
+}
+
 /// Where the app gets its data — either a live pipeline server
 /// or the bundled offline sample JSON. Exactly one is active.
 enum DataSource: String, Codable, CaseIterable, Identifiable {
@@ -12,7 +19,7 @@ enum DataSource: String, Codable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .server: return "Server"
-        case .offline: return "Offline Data"
+        case .offline: return "Local JSON"
         }
     }
 }
@@ -25,9 +32,24 @@ enum DataSource: String, Codable, CaseIterable, Identifiable {
 final class AppConfig {
     /// The default endpoint is named "localserver".
     static let localserverName = "localserver"
-    static let defaultServerURL = "http://localhost:8501"
+    static let defaultServerURL = "http://localhost:8000"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
+    var appearance: AppAppearance {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+    }
+
+    var localJSONDelay: Double {
+        didSet { UserDefaults.standard.set(localJSONDelay, forKey: "localJSONDelay") }
+    }
+
+    var buildTitle: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
+        return "v\(version) · \(commit)"
+    }
 
     var serverURL: String {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
@@ -40,6 +62,8 @@ final class AppConfig {
     }
 
     init() {
+        self.localJSONDelay = UserDefaults.standard.object(forKey: "localJSONDelay") as? Double ?? 1
+        self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
         // Migrate the old boolean key: true -> offline, false -> server.
@@ -101,7 +125,12 @@ final class AppConfig {
         }
         let hostPort = String(withoutSlash[schemeRange.upperBound...])
         guard !hostPort.isEmpty else { throw ConfigError.missingHost }
-        return "\(scheme)://\(bracketIPv6(hostPort))"
+        let normalized = "\(scheme)://\(bracketIPv6(hostPort))"
+        guard let components = URLComponents(string: normalized),
+              let host = components.host, !host.isEmpty,
+              components.url != nil else { throw ConfigError.invalidURL(normalized) }
+        if let port = components.port, !(1...65535).contains(port) { throw ConfigError.invalidURL(normalized) }
+        return normalized
     }
 
     /// Wrap a bare IPv6 host in brackets. Bracketed, IPv4 and hostnames pass through.
