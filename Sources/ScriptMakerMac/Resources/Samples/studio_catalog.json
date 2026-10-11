@@ -1,0 +1,549 @@
+{
+  "version": 1,
+  "reference": "Script Maker v5.1.2, local catalogs, 2026-10-11",
+  "storySources": [
+    "\\u270F\\uFE0F Manual Topic",
+    "🔥 India Trending & Viral",
+    "🇮🇳 India Top Stories & Breaking",
+    "#\\uFE0F\\u20E3 Trending Hashtags (Google)",
+    "😂 Desi Quirky, Jugaad & Funny India",
+    "🏆 Proud India",
+    "❤️ Emotional India",
+    "🏛️ Indian Politics, Elections & Governance",
+    "🪔 Indian Culture, Heritage & Festivals",
+    "🚀 India Tech, Space (ISRO) & Startups",
+    "💻 Technology & AI",
+    "🌍 World News",
+    "📈 Business & Economy"
+  ],
+  "aiSources": [
+    "Antigravity",
+    "Grok",
+    "Codex",
+    "Gemini",
+    "Copilot",
+    "On-device",
+    "Auto"
+  ],
+  "emotions": [
+    "Anger",
+    "Shock",
+    "Joke",
+    "Sorrow",
+    "Curiosity",
+    "Pride",
+    "Fear",
+    "Hope",
+    "Arrogance",
+    "Mocking",
+    "Envy",
+    "Happiness"
+  ],
+  "characterKinds": [
+    "Human",
+    "God",
+    "Animal",
+    "Alien",
+    "Cartoon",
+    "Robot",
+    "Object"
+  ],
+  "formats": [
+    {
+      "character_rule": "'Direct Address' is one person speaking straight to the viewer — set Characters to 1.",
+      "characters": {
+        "max": 1,
+        "min": 1
+      },
+      "details": "One speaker talks straight to the viewer, looking into the camera — a personal, to-camera address.",
+      "id": "direct_address",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Direct Address",
+      "solo": true,
+      "style_directive": "FORMAT DIRECTIVE: DIRECT ADDRESS:\n- ONE speaker talks straight into the camera as if speaking to a friend — intimate, first-person voice.\n- Structure: hook → build → payoff. Open with a striking line, develop the news, land a memorable closer.\n- Rhetorical questions are welcome as setups; answer them with real facts from the news.\n- Keep every line inside the speaker's world — they talk about the news, not about the video.",
+      "dialogue_directive": "DIALOGUE TYPE: DIRECT ADDRESS (one speaker, intimate direct-to-camera)\n- ONLY {A} speaks — every single beat, looking straight into the lens. This is PERSONAL, not a public rally.\n- Speak to the viewer as a confidant: open with a hook, use rhetorical questions as setups, land punchy payoffs.\n- First-person voice ('main aapko bata raha hoon...'). No crowd, no second voice, nobody answering back.",
+      "structure": {
+        "freeform": false,
+        "alternation": false,
+        "qa_beats": false
+      }
+    },
+    {
+      "character_rule": "'Normal Talk' needs at least 2 people talking to each other naturally.",
+      "characters": {
+        "max": 6,
+        "min": 2
+      },
+      "details": "Two or more people have a natural, everyday conversation about the news — relaxed and relatable.",
+      "id": "normal_talk",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Normal Talk",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: NORMAL TALK:\n- This is a natural, everyday conversation between the characters about the news!\n- Characters speak back-and-forth, reacting to each other's words, questioning, and keeping it relatable.\n- Keep every line inside the characters' world — they talk to each other about the news.",
+      "dialogue_directive": "DIALOGUE TYPE: NATURAL CONVERSATION\n- Two people talking like real friends — relaxed, reactive ping-pong.\n- Balance humor with the verified news facts; every joke must come from a real fact.",
+      "structure": {
+        "freeform": true,
+        "alternation": false,
+        "qa_beats": false
+      }
+    },
+    {
+      "character_rule": "'Q&A' needs a host plus at least 1 guest answering the questions.",
+      "characters": {
+        "max": 4,
+        "min": 2
+      },
+      "details": "A host asks sharp, engaging questions; the guest answers with exciting, funny, or deep revelations.",
+      "id": "qa",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Q&A",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: Q&A:\n- The host asks sharp, engaging questions; the guest responds with exciting, funny, or deep revelations.\n- Questions must dig into the news — no softballs. Answers carry the facts with personality.\n- Keep every line inside the characters' world — they talk to each other about the news.",
+      "dialogue_directive": "DIALOGUE TYPE: Q&A (strict host-and-guest)\n- {A} is the HOST: asks ONLY sharp, short questions. Every host line MUST end with '?'.\n- {B} is the GUEST: answers using the verified facts. The guest NEVER asks a question (no '?' in guest lines).\n- Beat order is law: odd beats (1, 3, 5) = host question; even beats (2, 4) = guest answer. No exceptions.",
+      "structure": {
+        "freeform": false,
+        "alternation": true,
+        "qa_beats": true
+      }
+    },
+    {
+      "character_rule": "'Debate' needs at least 2 opposing sides arguing it out.",
+      "characters": {
+        "max": 6,
+        "min": 2
+      },
+      "details": "Two opposing sides clash over the news — claim, rebuttal, and witty counter-points.",
+      "id": "debate",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Debate",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: DEBATE:\n- Two opposing viewpoints clash with witty counter-points, lively banter, and engaging arguments.\n- Structure every exchange as claim → rebuttal → counter. Nobody concedes easily.\n- Ground the clash in real stakes from the news; end with a sharp verdict or twist.\n- Keep every line inside the characters' world — they debate the news itself.",
+      "dialogue_directive": "DIALOGUE TYPE: DEBATE (structured for-vs-against)\n- {A} DEFENDS the news development; {B} ATTACKS it. Sides NEVER swap, NEVER agree.\n- ONE speaker per beat. Beats strictly alternate: {A}, {B}, {A}, {B}, ...\n- Beat 1 ({A}): bold opening claim built on one verified fact.\n- Every later beat must FIRST directly rebut the previous beat's point, THEN add its own claim or fact.\n- Final beat: knockout verdict line for your side. No neutral filler, no changing the subject.",
+      "structure": {
+        "freeform": false,
+        "alternation": true,
+        "qa_beats": false
+      }
+    },
+    {
+      "character_rule": "'Interrogation' needs an interrogator plus 1–2 people being questioned.",
+      "characters": {
+        "max": 3,
+        "min": 2
+      },
+      "details": "Tough, probing questions press for the truth — an investigative grilling that peels back layers.",
+      "id": "interrogation",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Interrogation",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: INTERROGATION:\n- One character grills the other(s) with tough, probing questions — an investigative press for the truth.\n- Questions escalate: start curious, get sharper. The questioned character deflects, then cracks or reveals.\n- Every answer must surface a real fact from the news.\n- Keep every line inside the characters' world — they talk to each other about the news.",
+      "dialogue_directive": "DIALOGUE TYPE: INTERROGATION (grilling for the truth)\n- {A} is the INTERROGATOR: asks ONLY tough, probing questions. Every interrogator line MUST end with '?'.\n- {B} is the SUBJECT: answers, deflects, then reveals — using the verified facts. The subject NEVER asks a question (no '?' in subject lines).\n- Beat order is law: odd beats (1, 3, 5) = interrogator question; even beats (2, 4) = subject answer. Questions escalate in intensity.",
+      "structure": {
+        "freeform": false,
+        "alternation": true,
+        "qa_beats": true
+      }
+    },
+    {
+      "character_rule": "'Reaction' works with 1–6 characters reacting to the news.",
+      "characters": {
+        "max": 6,
+        "min": 1
+      },
+      "details": "Characters react to the news as it breaks — shock, disbelief, hot takes, and running commentary.",
+      "id": "reaction",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Reaction",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: REACTION:\n- Characters react to the news as it unfolds — genuine shock, disbelief, hot takes, running commentary.\n- Reactions must be big and speakable: gasps, exclamations, instant opinions, relatable comparisons to everyday life.\n- Anchor every reaction to a real news beat.\n- Keep every line inside the characters' world — they react to the news together.",
+      "dialogue_directive": "DIALOGUE TYPE: REACTION (live responses to the news)\n- Characters react to the news as it breaks — shock, disbelief, hot takes, running commentary.\n- Big, speakable reactions anchored to real news beats; every reaction must come from a verified fact.",
+      "structure": {
+        "freeform": true,
+        "alternation": false,
+        "qa_beats": false
+      }
+    },
+    {
+      "character_rule": "'Thinking Out Loud' is 1–2 voices reasoning through the news aloud.",
+      "characters": {
+        "max": 2,
+        "min": 1
+      },
+      "details": "A reflective voice reasons through the news aloud — thinking it through in real time, step by step.",
+      "id": "thinking_out_loud",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Thinking Out Loud",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: THINKING OUT LOUD:\n- A reflective voice works through the news aloud in real time — wondering, weighing, connecting dots.\n- Use natural thought-speech: 'wait, so that means…', self-questions answered aloud.\n- The thinking must LAND somewhere: a conclusion, a realisation, a decision.\n- Keep every line inside the thinker's world — they work through the news aloud.",
+      "dialogue_directive": "DIALOGUE TYPE: THINKING OUT LOUD (reasoning aloud)\n- A reflective voice works through the news in real time — wondering, weighing, connecting dots aloud.\n- Natural thought-speech with self-questions answered aloud; the thinking must LAND on a conclusion or a sharp question.",
+      "structure": {
+        "freeform": true,
+        "alternation": false,
+        "qa_beats": false
+      }
+    },
+    {
+      "character_rule": "'Secret-Sharing' is 1–2 voices sharing the inside story confidentially.",
+      "characters": {
+        "max": 2,
+        "min": 1
+      },
+      "details": "A confessional, hush-hush tone — 'come close, here's what really happened' insider energy.",
+      "id": "secret_sharing",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Secret-Sharing",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: SECRET-SHARING:\n- Confessional, hush-hush energy — 'come close, let me tell you what really happened.'\n- The speaker shares the news like insider knowledge: lowered voice, conspiratorial asides, 'nobody is telling you this' framing.\n- Every 'secret' must be grounded in the verified news.\n- Keep every line inside the speaker's world — they share the news directly.",
+      "dialogue_directive": "DIALOGUE TYPE: SECRET-SHARING (confessional insider telling)\n- Hush-hush, confessional energy — 'here is what really happened', told like insider knowledge.\n- Every 'secret' must be grounded in the verified news facts; dramatise the telling, never the facts.",
+      "structure": {
+        "freeform": true,
+        "alternation": false,
+        "qa_beats": false
+      }
+    },
+    {
+      "character_rule": "'Drama' needs 2 to 4 characters in direct emotional conflict or dramatic scene reenactment.",
+      "characters": {
+        "max": 4,
+        "min": 2
+      },
+      "details": "High-stakes dramatic confrontation or theatrical reenactment of the news with emotional tension, pauses, and character stakes.",
+      "id": "drama",
+      "incompatible_emotions": [
+
+      ],
+      "name": "Drama",
+      "solo": false,
+      "style_directive": "FORMAT DIRECTIVE: DRAMA:\n- High-stakes, theatrical interpersonal conflict or cinematic reenactment inspired by the news!\n- Characters don't just chat — their personal stakes, convictions, or livelihoods clash directly.\n- Include dramatic pauses, emotional reactions, and escalating tension before a turning point or revelation.\n- Ground the drama 100% in verified news facts; dramatise character reactions and personal impact, NEVER invent false news claims.\n- Keep every line inside the scene world — characters live the situation, they do not present a news report.",
+      "dialogue_directive": "DIALOGUE TYPE: DRAMATIC SCENE (theatrical conflict & high stakes)\n- Characters clash over real consequences of the news — tension, defensiveness, sharp comebacks, and emotional gravity.\n- Use dramatic pacing: short, sharp confrontations alternating with weight and tension.\n- Audio and SFX should use subtle dramatic beats, tense ambience, or sudden silence — no light comedic effects.\n- Conclude with a dramatic turning point, harsh reality check, or emotional revelation.",
+      "structure": {
+        "freeform": true,
+        "alternation": false,
+        "qa_beats": false
+      }
+    }
+  ],
+  "modelCatalogs": {
+    "Antigravity": {
+      "models": [
+        {
+          "id": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "variants": {
+            "high": "gemini-3.8-flash-high",
+            "medium": "gemini-3.8-flash-medium",
+            "low": "gemini-3.8-flash-low"
+          },
+          "default_id": "gemini-3.8-flash-high"
+        },
+        {
+          "id": "gemini-3.7-flash",
+          "label": "Gemini 3.7 Flash",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "variants": {
+            "high": "gemini-3.7-flash-high",
+            "medium": "gemini-3.7-flash-medium",
+            "low": "gemini-3.7-flash-low"
+          },
+          "default_id": "gemini-3.7-flash-high"
+        },
+        {
+          "id": "gemini-3.6-flash",
+          "label": "Gemini 3.6 Flash",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "variants": {
+            "high": "gemini-3.6-flash-high",
+            "medium": "gemini-3.6-flash-medium",
+            "low": "gemini-3.6-flash-low"
+          },
+          "default_id": "gemini-3.6-flash-high"
+        },
+        {
+          "id": "gemini-3.1-pro",
+          "label": "Gemini 3.1 Pro",
+          "efforts": [
+            "low",
+            "high"
+          ],
+          "variants": {
+            "high": "gemini-3.1-pro-high",
+            "low": "gemini-3.1-pro-low"
+          },
+          "default_id": "gemini-3.1-pro-high"
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6 (Thinking)",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "claude-opus-4-6-thinking",
+          "label": "Claude Opus 4.6 (Thinking)",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-oss-120b",
+          "label": "GPT-OSS 120B",
+          "efforts": [
+            "medium"
+          ],
+          "variants": {
+            "medium": "gpt-oss-120b-medium"
+          },
+          "default_id": "gpt-oss-120b-medium"
+        }
+      ],
+      "fetched_at": 1791637513.476855
+    },
+    "Codex": {
+      "models": [
+        {
+          "id": "gpt-6.1-sol",
+          "label": "GPT-6.1-Sol",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-6-astra",
+          "label": "GPT-6-Astra",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-6-sol",
+          "label": "GPT-6-Sol",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-6-luna",
+          "label": "GPT-6-Luna",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-5.6-sol",
+          "label": "GPT-5.6-Sol",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "label": "GPT-5.6-Terra",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "label": "GPT-5.6-Luna",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "variants": {
+          },
+          "default_id": null
+        }
+      ],
+      "fetched_at": 1791608972.692589
+    },
+    "Gemini": {
+      "models": [
+        {
+          "id": "auto",
+          "label": "Auto",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gemini-3.1-pro-preview-customtools",
+          "label": "gemini-3.1-pro-preview",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gemini-3-flash-preview",
+          "label": "gemini-3-flash-preview",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "label": "gemini-2.5-pro",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gemini-3.8-flash",
+          "label": "gemini-3.8-flash",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        },
+        {
+          "id": "gemini-3.5-flash-lite",
+          "label": "gemini-3.5-flash-lite",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        }
+      ],
+      "fetched_at": 1791445699.372036
+    },
+    "Grok": {
+      "models": [
+        {
+          "id": "grok-4.7",
+          "label": "grok-4.7",
+          "efforts": [
+
+          ],
+          "variants": {
+          },
+          "default_id": null
+        }
+      ],
+      "fetched_at": 1791445828.7211819
+    },
+    "Copilot": {
+      "models": [
+
+      ],
+      "fetched_at": null
+    }
+  },
+  "defaults": {
+    "aiSource": "Antigravity",
+    "aiModel": "Default",
+    "aiPower": "Default",
+    "duration": 10,
+    "emotion": "Curiosity",
+    "scriptCount": 1,
+    "maxRetries": 5,
+    "characterCount": 3,
+    "characterKind": "Human",
+    "format": "Normal Talk",
+    "storySource": "🇮🇳 India Top Stories & Breaking"
+  },
+  "retryRange": [
+    1,
+    5
+  ]
+}
