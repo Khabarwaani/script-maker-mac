@@ -63,7 +63,12 @@ struct StudioDetailView: View {
             }
 
             HStack(spacing: 8) {
-                if viewModel.currentStage != nil {
+                if viewModel.isNetworkError {
+                    Button("Retry") {
+                        Task { await viewModel.retryFresh() }
+                    }
+                    .buttonStyle(StudioPrimaryButtonStyle())
+                } else if viewModel.currentStage != nil {
                     Button("Retry stage") {
                         Task { await viewModel.retryStage() }
                     }
