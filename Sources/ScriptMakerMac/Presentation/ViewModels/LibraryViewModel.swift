@@ -25,6 +25,36 @@ final class LibraryViewModel {
         stories.first { $0.id == selectedStoryID }
     }
 
+    var newStoryTitle = ""
+    var newStoryScript = ""
+    var isAddingStory = false
+
+    var canAddStory: Bool {
+        !StringFormatting.isBlank(newStoryTitle) && !StringFormatting.isBlank(newStoryScript) && !isAddingStory
+    }
+
+    func prepareNewStory() {
+        newStoryTitle = ""
+        newStoryScript = ""
+    }
+
+    func addStory() async -> Bool {
+        guard canAddStory else { return false }
+        isAddingStory = true
+        defer { isAddingStory = false }
+        let story = Story(
+            title: newStoryTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+            status: "saved",
+            scriptText: newStoryScript.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        await repository.save(story)
+        stories.insert(story, at: 0)
+        selectedStoryID = story.id
+        notice = nil
+        copyFeedback = nil
+        return true
+    }
+
     var copyFeedback: String?
 
     func copy(_ text: String, label: String) {
