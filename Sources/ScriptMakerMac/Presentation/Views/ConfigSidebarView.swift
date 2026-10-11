@@ -51,8 +51,8 @@ struct ConfigSidebarView: View {
                             Text(viewModel.isRefreshingHashtags ? "Loading hashtags…" : "No data")
                                 .font(.callout)
                                 .foregroundStyle(AppTheme.secondaryInk)
-                                .padding(.leading, 10)
-                            Spacer()
+                                .padding(.horizontal, 10)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         } else {
                             StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
                                 .disabled(viewModel.isRefreshingHashtags)
@@ -75,8 +75,8 @@ struct ConfigSidebarView: View {
                             Text(viewModel.isRefreshingHeadlines ? "Loading headlines…" : "No data")
                                 .font(.callout)
                                 .foregroundStyle(AppTheme.secondaryInk)
-                                .padding(.leading, 10)
-                            Spacer()
+                                .padding(.horizontal, 10)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         } else {
                             StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
                                 .disabled(viewModel.isRefreshingHeadlines)
@@ -315,9 +315,19 @@ struct StudioRefreshButton: View {
             }
             .frame(width: 20, height: 20)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RefreshButtonStyle())
         .help(helpText)
         .disabled(isRefreshing)
+    }
+}
+
+private struct RefreshButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.82 : 1.0)
+            .rotationEffect(.degrees(configuration.isPressed ? 45 : 0))
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
