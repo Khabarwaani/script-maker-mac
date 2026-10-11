@@ -88,3 +88,23 @@ Local JSON uses the bundled Studio model catalog and configured simulation delay
 Labels are for display; requests use IDs. The catalog endpoint and backend model
 routing are future server work. An unavailable catalog preserves the saved model
 and surfaces an error; the client does not substitute local options in Server mode.
+
+## Native sharing
+
+Library Share exposes Google Drive, Telegram and standard macOS share destinations.
+AI selection remains in Settings only; Library requests use that shared selection.
+
+Google Drive exports UTF-8 story text using the macOS save dialog. Choose a folder
+managed by Drive for desktop to sync it, or save locally for manual upload. This
+client does not create a Drive account, perform OAuth, upload via the Drive API,
+or change sharing permissions. The exported text includes title, screenplay,
+hashtags, media URLs and source URLs. Cancelling writes nothing.
+[Drive for desktop documentation](https://support.google.com/drive/answer/10838124).
+
+Telegram opens its native `tg://msg_url` composer when installed, otherwise its
+`https://t.me/share/url` page. The `url` parameter is the first valid story source
+URL (empty for a manual story), and `text` is the same full story text. Encode both
+query values independently, including plus signs, ampersands, Unicode and newlines.
+The user chooses the recipient and sends the message in Telegram; opening the
+composer does not count as a successful send. Failures are visible in Library.
+[Telegram sharing contract](https://core.telegram.org/widgets/share).

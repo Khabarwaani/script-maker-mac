@@ -666,3 +666,58 @@ final class SharedAISelectionTests: XCTestCase {
 private struct ModelTestChecker: ServerConnectionChecking {
     func isReachable(at url: URL) async -> Bool { false }
 }
+
+@MainActor
+final class LibrarySharingTests: XCTestCase {
+    func testTelegramComposerEncodesTextAndSourceWithoutLosingCharacters() throws {
+        let text = "News + facts & hashtags #नमस्ते\nSecond line"
+        let source = URL(string: "https://example.com/news?a=1&b=2")!
+        for native in [false, true] {
+            let url = try MacStorySharing.telegramURL(text: text, sourceURL: source, native: native)
+            let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+            XCTAssertEqual(items.first { $0.name == "text" }?.value, text)
+            XCTAssertEqual(items.first { $0.name == "url" }?.value, source.absoluteString)
+            XCTAssertTrue(url.absoluteString.contains("%2B"))
+            XCTAssertEqual(url.scheme, native ? "tg" : "https")
+        }
+        let manual = try MacStorySharing.telegramURL(text: "Manual story", sourceURL: nil)
+        XCTAssertEqual(URLComponents(url: manual, resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "")
+    }
+
+    func testShareRoutesFullStoryAndCancellationPreservesLibrary() async {
+        let sharing = SharingSpy()
+        let config = AppConfig()
+        let vm = LibraryViewModel(config: config, sharing: sharing)
+        let story = Story(title: "Story", hashtags: ["#Tag"], sourceLinks: [.init(title: "Source", url: "https://example.com/news", source: "Wire")], scriptText: "Narrator: Full script")
+        vm.stories = [story]; vm.selectedStoryID = story.id
+        await vm.share(story, to: .googleDrive)
+        XCTAssertEqual(sharing.title, "Story")
+        XCTAssertTrue(sharing.text.contains("Full script"))
+        XCTAssertTrue(sharing.text.contains("#Tag"))
+        XCTAssertEqual(sharing.source?.absoluteString, "https://example.com/news")
+        XCTAssertNil(vm.actionNotice)
+        XCTAssertEqual(vm.stories.count, 1)
+        XCTAssertFalse(vm.isSharing)
+        sharing.outcome = .composerOpened
+        await vm.share(story, to: .telegram)
+        XCTAssertTrue(vm.actionNotice?.contains("Telegram opened") ?? false)
+        sharing.fails = true
+        await vm.share(story, to: .googleDrive)
+        XCTAssertTrue(vm.actionNotice?.contains("Share failed") ?? false)
+        XCTAssertFalse(vm.isSharing)
+        XCTAssertEqual(vm.selectedStoryID, story.id)
+    }
+}
+
+@MainActor
+private final class SharingSpy: StorySharing {
+    var title = "", text = ""
+    var source: URL?
+    var outcome: StoryShareOutcome = .cancelled
+    var fails = false
+    func share(to destination: StoryShareDestination, title: String, text: String, sourceURL: URL?) async throws -> StoryShareOutcome {
+        self.title = title; self.text = text; self.source = sourceURL
+        if fails { throw APIError.transport("Share failed") }
+        return outcome
+    }
+}
