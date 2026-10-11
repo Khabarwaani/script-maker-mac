@@ -67,6 +67,21 @@ final class AppConfig {
         dataSource = .offline
     }
 
+    // MARK: - Studio config (smart save on Generate, like Streamlit #563)
+
+    private static let studioConfigKey = "studioConfig"
+
+    func saveStudioConfig(_ config: StudioConfig) {
+        if let data = try? JSONEncoder().encode(config) {
+            UserDefaults.standard.set(data, forKey: Self.studioConfigKey)
+        }
+    }
+
+    func loadStudioConfig() -> StudioConfig? {
+        guard let data = UserDefaults.standard.data(forKey: Self.studioConfigKey) else { return nil }
+        return try? JSONDecoder().decode(StudioConfig.self, from: data)
+    }
+
     // MARK: - Normalization
 
     static func normalize(raw: String) throws -> String {

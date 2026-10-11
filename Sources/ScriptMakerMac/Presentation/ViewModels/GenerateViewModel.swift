@@ -29,31 +29,54 @@ final class GenerateViewModel {
     var headlines: [String] = []
     var selectedHeadline: String = ""
 
-    // Story & Topic (mirrors Streamlit settings panel).
-    var storySources: [String] = ["Manual", "India News", "Trending Hashtags"]
-    var selectedStorySource: String = "India News"
+    // Story & Topic — verified against Streamlit (ai-script-maker) 2026-10-11.
+    // Order: STORY_SECTION_ORDER; labels: SECTION_LABELS.
+    static let manualSourceLabel = "✏️ Manual Topic"
+    var storySources: [String] = [
+        "✏️ Manual Topic",
+        "🔥 India Trending & Viral",
+        "🇮🇳 India Top Stories & Breaking",
+        "#️⃣ Trending Hashtags (Google)",
+        "😂 Desi Quirky, Jugaad & Funny India",
+        "🏆 Proud India",
+        "❤️ Emotional India",
+        "🏛️ Indian Politics, Elections & Governance",
+        "🪔 Indian Culture, Heritage & Festivals",
+        "🚀 India Tech, Space (ISRO) & Startups",
+        "💻 Technology & AI",
+        "🌍 World News",
+        "📈 Business & Economy",
+    ]
+    var selectedStorySource: String = "🇮🇳 India Top Stories & Breaking"
+    var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
     var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
     var selectedHashtag: String = ""
     var customHashtag: String = ""
 
-    // Configuration (mirrors Streamlit config section).
-    var aiSources: [String] = ["Antigravity", "Gemini", "Grok", "Muse"]
+    // Configuration — verified against Streamlit 2026-10-11.
+    // AI_SOURCES order; default Antigravity (#464). AI_POWERS; default Default.
+    var aiSources: [String] = ["Antigravity", "Grok", "Codex", "Gemini", "Copilot", "OnDevice", "Auto"]
     var selectedAISource: String = "Antigravity"
     var aiModels: [String] = ["Default"]
     var selectedAIModel: String = "Default"
-    var aiPowers: [String] = ["Low", "Medium", "High"]
-    var selectedAIPower: String = "Medium"
-    var duration: Int = 12
-    var emotions: [String] = ["Neutral", "Happy", "Sad", "Angry", "Surprised", "Fearful"]
-    var selectedEmotion: String = "Neutral"
+    var aiPowers: [String] = ["Low", "Medium", "High", "Default", "Minimal", "Xhigh", "Max", "Ultra", "None"]
+    var selectedAIPower: String = "Default"
+    /// Duration options mirror the Streamlit step-5 number input (5–60s).
+    var durations: [Int] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+    var duration: Int = 10
+    // ALL_EMOTIONS, frozen order (#354); default Curiosity.
+    var emotions: [String] = ["Anger", "Shock", "Joke", "Sorrow", "Curiosity", "Pride", "Fear", "Hope", "Arrogance", "Mocking", "Envy", "Happiness"]
+    var selectedEmotion: String = "Curiosity"
     var scriptCount: Int = 1
     var maxRetries: Int = 3
     var characterCount: Int = 3
-    var characterKinds: [String] = ["Human", "Non-living", "Mixed"]
+    // CHARACTER_KINDS; default Human.
+    var characterKinds: [String] = ["Human", "God", "Animal", "Alien", "Cartoon", "Robot", "Object"]
     var selectedCharacterKind: String = "Human"
     var characterKindDetail: String = ""
-    var formats: [String] = ["9:16 Vertical", "16:9 Horizontal", "1:1 Square"]
-    var selectedFormat: String = "9:16 Vertical"
+    // Format catalog names; default Normal Talk.
+    var formats: [String] = ["Direct Address", "Normal Talk", "Q&A", "Debate", "Interrogation", "Reaction", "Thinking Out Loud", "Secret-Sharing", "Drama"]
+    var selectedFormat: String = "Normal Talk"
 
     // Generation mode: Continuous (run all stages) or Step-Wise (manual advance).
     enum WorkflowMode: String, CaseIterable, Identifiable {
@@ -71,13 +94,60 @@ final class GenerateViewModel {
         self.config = config
         self.repository = repository
         loadSampleLists()
+        if let saved = config.loadStudioConfig() {
+            applyStudioConfig(saved)
+        }
     }
 
+    /// Smart save: persist the Studio configuration on Generate (Streamlit #563).
+    func saveStudioConfig() {
+        config.saveStudioConfig(StudioConfig(
+            ai: AIConfig(source: selectedAISource, model: selectedAIModel, power: selectedAIPower),
+            duration: duration,
+            emotion: selectedEmotion,
+            scriptCount: scriptCount,
+            maxRetries: maxRetries,
+            characterCount: characterCount,
+            characterKind: selectedCharacterKind,
+            characterKindDetail: characterKindDetail,
+            format: selectedFormat,
+            hashtag: customHashtag.isEmpty ? selectedHashtag : customHashtag,
+            headline: selectedHeadline,
+            storySource: selectedStorySource,
+            topic: topic,
+            sampleStory: sampleStory
+        ))
+    }
+
+    /// Restore a saved Studio configuration. Stored values outside the current
+    /// option lists (e.g. from an older build) are ignored, keeping defaults.
+    private func applyStudioConfig(_ c: StudioConfig) {
+        if aiSources.contains(c.ai.source) { selectedAISource = c.ai.source }
+        if aiModels.contains(c.ai.model) { selectedAIModel = c.ai.model }
+        if aiPowers.contains(c.ai.power) { selectedAIPower = c.ai.power }
+        if durations.contains(c.duration) { duration = c.duration }
+        if emotions.contains(c.emotion) { selectedEmotion = c.emotion }
+        scriptCount = c.scriptCount
+        maxRetries = c.maxRetries
+        characterCount = c.characterCount
+        if characterKinds.contains(c.characterKind) { selectedCharacterKind = c.characterKind }
+        characterKindDetail = c.characterKindDetail
+        if formats.contains(c.format) { selectedFormat = c.format }
+        selectedHashtag = c.hashtag
+        selectedHeadline = c.headline
+        if storySources.contains(c.storySource) { selectedStorySource = c.storySource }
+        topic = c.topic
+        sampleStory = c.sampleStory
+        updateInstruction()
+    }
     /// Load headline dropdowns from sample data.
     func loadSampleLists() {
         if let h = SampleData.json(for: "headlines")?["headlines"] as? [String] {
             headlines = h
             if selectedHeadline.isEmpty { selectedHeadline = h.first ?? "" }
+            // Topic drives the Generate button — default it from the headline
+            // so Generate is enabled on launch (Streamlit parity).
+            if StringFormatting.isBlank(topic) { topic = selectedHeadline }
         }
         updateInstruction()
     }
@@ -109,6 +179,7 @@ final class GenerateViewModel {
 
     /// Start a new session and run the first stage.
     func start() async {
+        saveStudioConfig()
         await reset()
         isRunning = true
         defer { isRunning = false }
@@ -133,6 +204,7 @@ final class GenerateViewModel {
             "ai_source": selectedAISource,
             "ai_model": selectedAIModel,
             "ai_power": selectedAIPower,
+            "ai": ["source": selectedAISource, "model": selectedAIModel, "power": selectedAIPower],
             "duration": duration,
             "emotion": selectedEmotion,
             "script_count": scriptCount,
