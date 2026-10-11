@@ -29,14 +29,14 @@ enum APIError: LocalizedError {
 
     var failureReason: String? {
         switch self {
-        case .unreachable(let url, let detail):
-            return "Unable to establish a connection to \(url). \(detail)"
+        case .unreachable(_, let detail):
+            return detail
         case .server(_, let body):
             return body.isEmpty ? "The server returned an unexpected error." : body
         case .malformed(let what):
-            return "The data received for \(what) was unreadable or formatted incorrectly."
+            return "Unexpected response format: \(what)."
         case .badStatus(let code):
-            return "The stream terminated unexpectedly with HTTP status code \(code)."
+            return "HTTP status \(code)."
         case .transport(let what):
             return what
         case .notImplemented(let what):

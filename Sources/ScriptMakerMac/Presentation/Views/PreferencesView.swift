@@ -51,7 +51,14 @@ struct PreferencesView: View {
             if let notice = viewModel.noticeMessage { Text(notice).foregroundStyle(AppTheme.secondaryInk) }
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(StudioPrimaryButtonStyle())
+                Button("Done") {
+                    Task {
+                        await viewModel.save()
+                        dismiss()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(StudioPrimaryButtonStyle())
             }
         }
         .padding(24).frame(width: 520)
@@ -59,5 +66,9 @@ struct PreferencesView: View {
         .tint(AppTheme.accent)
         .buttonStyle(StudioButtonStyle())
         .preferredColorScheme(viewModel.appearance.colorScheme)
+        .onAppear {
+            viewModel.draftURL = viewModel.currentURL
+            viewModel.dataSource = viewModel.currentDataSource
+        }
     }
 }

@@ -38,10 +38,7 @@ final class GenerateViewModel {
     func setError(_ error: Error) {
         if let apiError = error as? APIError {
             errorTitle = apiError.errorDescription ?? "Error"
-            var parts: [String] = []
-            if let reason = apiError.failureReason { parts.append(reason) }
-            if let recovery = apiError.recoverySuggestion { parts.append(recovery) }
-            errorDetail = parts.isEmpty ? apiError.localizedDescription : parts.joined(separator: "\n\n")
+            errorDetail = apiError.failureReason ?? apiError.localizedDescription
         } else {
             errorTitle = "Error"
             errorDetail = error.localizedDescription
