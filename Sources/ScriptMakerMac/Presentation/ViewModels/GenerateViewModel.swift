@@ -55,9 +55,10 @@ final class GenerateViewModel {
     var storySources: [String] = []
     var selectedStorySource: String = "🇮🇳 India Top Stories & Breaking"
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
-    var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
+    var trendingHashtags: [String] = []
     var selectedHashtag: String = ""
     var customHashtag: String = ""
+    var isRefreshingHashtags = false
 
     // Configuration — verified against Streamlit 2026-10-11.
     // AI_SOURCES order; default Antigravity (#464). AI_POWERS; default Default.
@@ -303,10 +304,40 @@ final class GenerateViewModel {
         config.saveLastSelectedHeadline(headline, forSource: cacheKey)
     }
 
-    /// Handles story source selection change to load headlines for the selected news category.
+    /// Handles story source selection change to load headlines or hashtags.
     func onStorySourceChanged() async {
-        guard !isManualSource && !isHashtagSource else { return }
-        await refreshHeadlines(forceFresh: false)
+        if isHashtagSource {
+            await refreshHashtags()
+        } else if !isManualSource {
+            await refreshHeadlines(forceFresh: false)
+        }
+    }
+
+    /// Refresh trending hashtags dynamically from top titles / trending news.
+    func refreshHashtags() async {
+        isRefreshingHashtags = true
+        defer { isRefreshingHashtags = false }
+        do {
+            let service = try api()
+            let response = try await service.fetchTopTitles(category: "trending", n: 10, mode: nil)
+            // Extract hashtags or generate clean hashtags from titles
+            var extracted: [String] = []
+            for item in response.titles {
+                let words = item.title.components(separatedBy: .whitespacesAndNewlines)
+                for w in words where w.hasPrefix("#") && w.count > 1 {
+                    if !extracted.contains(w) { extracted.append(w) }
+                }
+            }
+            trendingHashtags = extracted
+            if let first = trendingHashtags.first, selectedHashtag.isEmpty {
+                selectedHashtag = first
+            }
+        } catch {
+            trendingHashtags = []
+            if !isLocalJSON {
+                setError(error)
+            }
+        }
     }
 
     var isRefreshingCategories = false
@@ -352,7 +383,11 @@ final class GenerateViewModel {
     func initialLoad() async {
         if config.dataSource == .server {
             await loadNewsCategories()
-            await refreshHeadlines(forceFresh: false)
+            if isHashtagSource {
+                await refreshHashtags()
+            } else if !isManualSource {
+                await refreshHeadlines(forceFresh: false)
+            }
         } else {
             loadCatalog()
             loadSampleLists()
