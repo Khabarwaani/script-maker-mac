@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct ConfigSidebarView: View {
     @Bindable var viewModel: GenerateViewModel
@@ -178,11 +179,13 @@ struct StudioSection<Action: View, Content: View>: View {
     }
 }
 
-struct StudioOptionPicker: View {
+struct StudioOptionPicker: NSViewRepresentable {
     let title: String
     @Binding var selection: String
     let options: [String]
     var label: (String) -> String = { $0 }
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
 
     init(_ title: String, selection: Binding<String>, options: [String], label: @escaping (String) -> String = { $0 }) {
         self.title = title
@@ -191,17 +194,73 @@ struct StudioOptionPicker: View {
         self.label = label
     }
 
-    var body: some View {
-        Picker(title, selection: $selection) {
-            ForEach(options, id: \.self) { option in
-                Text(label(option)).tag(option)
+    func makeCoordinator() -> Coordinator { Coordinator(selection: $selection) }
+
+    func makeNSView(context: Context) -> StudioPopUpButton {
+        let button = StudioPopUpButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectOption(_:))
+        button.isBordered = false
+        button.focusRingType = .default
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: StudioPopUpButton, context: Context) {
+        context.coordinator.selection = $selection
+        let labels = options.map(label)
+        if button.itemTitles != labels {
+            button.removeAllItems()
+            for (index, option) in options.enumerated() {
+                button.addItem(withTitle: label(option))
+                button.item(at: index)?.representedObject = option
             }
         }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .controlSize(.large)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .padding(.horizontal, 10)
-        .accessibilityLabel(title)
+        if let index = options.firstIndex(of: selection) { button.selectItem(at: index) }
+        button.isEnabled = isEnabled
+        button.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+        button.setAccessibilityLabel(title)
+        button.setAccessibilityValue(label(selection))
+        button.needsDisplay = true
+    }
+
+    final class Coordinator: NSObject {
+        var selection: Binding<String>
+        init(selection: Binding<String>) { self.selection = selection }
+        @objc func selectOption(_ button: NSPopUpButton) {
+            if let value = button.selectedItem?.representedObject as? String { selection.wrappedValue = value }
+        }
+    }
+}
+
+/// Native menu tracking with the Studio field's typography and spacing.
+final class StudioPopUpButton: NSPopUpButton {
+    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 44) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let background = NSColor(named: "Sunken") ?? .controlBackgroundColor
+        let foreground = NSColor(named: "Ink") ?? .labelColor
+        let secondary = NSColor(named: "SecondaryInk") ?? .secondaryLabelColor
+        background.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 10, yRadius: 10).fill()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: foreground.withAlphaComponent(isEnabled ? 1 : 0.45), .paragraphStyle: paragraph
+        ]
+        let textHeight = font.ascender - font.descender + font.leading
+        let rect = NSRect(x: 10, y: (bounds.height - textHeight) / 2, width: max(bounds.width - 42, 0), height: textHeight)
+        (title as NSString).draw(in: rect, withAttributes: attributes)
+        if let arrow = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil) {
+            let image = arrow.withSymbolConfiguration(.init(pointSize: 11, weight: .regular)) ?? arrow
+            let tinted = NSImage(size: image.size, flipped: false) { target in
+                secondary.withAlphaComponent(self.isEnabled ? 1 : 0.45).setFill()
+                target.fill()
+                image.draw(in: target, from: .zero, operation: .destinationIn, fraction: 1)
+                return true
+            }
+            tinted.draw(in: NSRect(x: bounds.width - 25, y: (bounds.height - 12) / 2, width: 12, height: 12))
+        }
     }
 }
