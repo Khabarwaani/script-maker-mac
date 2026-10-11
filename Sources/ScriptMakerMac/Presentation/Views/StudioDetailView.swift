@@ -1,56 +1,25 @@
 import SwiftUI
 
-/// Studio right pane: generation controls (fixed header) + scrollable preview.
-/// Mirrors Streamlit's main area: mode radio + Generate button on top,
-/// stage output below. Each section is its own struct; the ViewModel
-/// is created once in ContentView and stays in memory.
+/// Studio right pane: "Preview" label + scrollable stage output.
+/// Mirrors Streamlit's col_output [4]: SectionLabel("Preview"), then output.
+/// No header chrome, no extra space — the pane scrolls.
 struct StudioDetailView: View {
     @Bindable var viewModel: GenerateViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Fixed header: generation mode + Generate (Streamlit main-area parity).
-            HStack(spacing: 12) {
-                Picker("Mode", selection: $viewModel.workflowMode) {
-                    ForEach(GenerateViewModel.WorkflowMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Preview")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                if viewModel.sessionID == nil {
+                    emptyDetail
+                } else {
+                    stageFlow
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 280)
-
-                Spacer()
-
-                if viewModel.isRunning {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
-                Button("Generate") {
-                    Task { await viewModel.start() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
             }
-            .padding([.horizontal, .top], 12)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            // Scrollable preview / stage flow.
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Preview")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    if viewModel.sessionID == nil {
-                        emptyDetail
-                    } else {
-                        stageFlow
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("Studio")
     }

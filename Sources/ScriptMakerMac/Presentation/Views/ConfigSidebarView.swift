@@ -108,6 +108,30 @@ struct ConfigSidebarView: View {
                 }
                 .help("Regenerate instruction from current config")
             }
+
+            Section("Generation Mode") {
+                Picker("Mode", selection: $viewModel.workflowMode) {
+                    ForEach(GenerateViewModel.WorkflowMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("Continuous: runs all stages automatically. Step-Wise: advance manually through each stage.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Generate") {
+                    Task { await viewModel.start() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
+                if viewModel.isRunning {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
         }
     }
 }
