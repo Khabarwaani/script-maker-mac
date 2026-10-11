@@ -334,15 +334,24 @@ final class GenerateViewModel {
         }
     }
 
-    /// Refresh trending hashtags dynamically from top titles / trending news.
+    /// Refresh trending hashtags directly from /api/v1/news/hashtags (with title extraction fallback).
     func refreshHashtags() async {
         isRefreshingHashtags = true
         hashtagsErrorMessage = nil
         defer { isRefreshingHashtags = false }
         do {
             let service = try api()
+            // 1. Direct dedicated hashtags endpoint
+            if let hashtagResponse = try? await service.fetchTrendingHashtags(n: 15), !hashtagResponse.hashtags.isEmpty {
+                trendingHashtags = hashtagResponse.hashtags.map(\.tag)
+                if let first = trendingHashtags.first, selectedHashtag.isEmpty {
+                    selectedHashtag = first
+                }
+                return
+            }
+
+            // 2. Fallback: extract hashtags from top titles
             let response = try await service.fetchTopTitles(category: "trending", n: 10, mode: nil)
-            // Extract hashtags or generate clean hashtags from titles
             var extracted: [String] = []
             for item in response.titles {
                 let words = item.title.components(separatedBy: .whitespacesAndNewlines)

@@ -143,6 +143,30 @@ struct OfflineWebClient: WebClient {
         )
     }
 
+    func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
+        try await pause()
+        let tags = [
+            "#AtmanirbharBharat",
+            "#TNWelcomesModi",
+            "#winOPPOF35",
+            "#OPPOF35Series",
+            "#HappyNavratri",
+            "#InternationalDayOfGirlChild",
+            "#JaiMataDi"
+        ]
+        let requestedCount = n ?? tags.count
+        let items = tags.prefix(max(1, requestedCount)).map {
+            NewsHashtag(tag: $0, headline: $0.replacingOccurrences(of: "#", with: ""), link: nil, source: "X")
+        }
+        return NewsHashtagsResponse(
+            n: items.count,
+            mode: "sample",
+            cached: false,
+            refreshedAt: Date().timeIntervalSince1970,
+            hashtags: items
+        )
+    }
+
     func verifyNewsEndpoints() async throws -> Bool {
         try await pause()
         return true
