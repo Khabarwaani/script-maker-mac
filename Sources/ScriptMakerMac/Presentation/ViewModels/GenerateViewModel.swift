@@ -276,13 +276,11 @@ final class GenerateViewModel {
                 selectedHeadline = ""
             }
         } catch {
+            headlines = []
+            selectedHeadline = ""
             if isLocalJSON {
                 loadSampleLists()
-            } else if let cached = config.getCachedHeadlines(forSource: cacheKey, maxAge: .infinity), !cached.isEmpty {
-                applyHeadlines(cached, forSource: cacheKey)
             } else {
-                headlines = []
-                selectedHeadline = ""
                 setError(error)
             }
         }
