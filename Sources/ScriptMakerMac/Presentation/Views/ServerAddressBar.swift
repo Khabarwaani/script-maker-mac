@@ -3,11 +3,11 @@ import SwiftUI
 /// Connection status indicator in the toolbar.
 /// Data source selection (Server/Offline) lives in Preferences only.
 struct ServerAddressBar: View {
-    @ObservedObject var viewModel: ServerAddressBarViewModel
+    @Bindable var viewModel: ServerAddressBarViewModel
 
     var body: some View {
         HStack(spacing: 6) {
-            if viewModel.dataSource == .server {
+            if viewModel.config.dataSource == .server {
                 Image(systemName: viewModel.isConnected ? "link.circle.fill" : "link.circle")
                     .foregroundStyle(viewModel.isConnected ? Color.green : Color.secondary)
                     .help(viewModel.isConnected ? "Server connected" : "Server not connected")

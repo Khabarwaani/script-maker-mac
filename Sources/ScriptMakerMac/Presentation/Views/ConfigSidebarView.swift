@@ -4,7 +4,7 @@ import SwiftUI
 /// Own struct so SwiftUI keeps a stable view identity; the ViewModel
 /// is created once in ContentView and stays in memory.
 struct ConfigSidebarView: View {
-    @ObservedObject var viewModel: GenerateViewModel
+    @Bindable var viewModel: GenerateViewModel
 
     var body: some View {
         Form {
@@ -107,26 +107,6 @@ struct ConfigSidebarView: View {
                     viewModel.updateInstruction()
                 }
                 .help("Regenerate instruction from current config")
-            }
-
-            Section("Generation Mode") {
-                Picker("Mode", selection: $viewModel.workflowMode) {
-                    ForEach(GenerateViewModel.WorkflowMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-                Text("Continuous: runs all stages automatically. Step-Wise: advance manually through each stage.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Button("Generate") {
-                    Task { await viewModel.start() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
             }
         }
     }

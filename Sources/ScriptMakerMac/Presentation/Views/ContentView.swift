@@ -7,26 +7,26 @@ import SwiftUI
 /// - Every section is its own View struct; ViewModels are created once here
 ///   and stay in memory (never recreated on tab switch).
 struct ContentView: View {
-    @ObservedObject var viewModel: ContentViewModel
-    @StateObject private var generateViewModel: GenerateViewModel
-    @StateObject private var libraryViewModel: LibraryViewModel
-    @StateObject private var addressBarViewModel: ServerAddressBarViewModel
-    @StateObject private var preferencesViewModel: PreferencesViewModel
+    @Bindable var viewModel: ContentViewModel
+    @State private var generateViewModel: GenerateViewModel
+    @State private var libraryViewModel: LibraryViewModel
+    @State private var addressBarViewModel: ServerAddressBarViewModel
+    @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        _generateViewModel = StateObject(
+        _generateViewModel = State(
             wrappedValue: GenerateViewModel(config: viewModel.config)
         )
-        _libraryViewModel = StateObject(
+        _libraryViewModel = State(
             wrappedValue: LibraryViewModel(config: viewModel.config)
         )
-        _addressBarViewModel = StateObject(
+        _addressBarViewModel = State(
             wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
         )
-        _preferencesViewModel = StateObject(
+        _preferencesViewModel = State(
             wrappedValue: PreferencesViewModel(config: viewModel.config)
         )
     }
@@ -68,7 +68,7 @@ struct ContentView: View {
 /// Library: saved stories. Thin section container — the ViewModel is created
 /// once in ContentView and stays in memory; StoryListView owns the split view.
 struct LibraryView: View {
-    @ObservedObject var viewModel: LibraryViewModel
+    @Bindable var viewModel: LibraryViewModel
 
     var body: some View {
         Group {

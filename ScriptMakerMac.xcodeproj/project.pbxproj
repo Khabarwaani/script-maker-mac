@@ -42,6 +42,7 @@
 		F027 /* SceneThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = R030 /* SceneThumbnail.swift */; };
 		F039 /* ConfigSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R043 /* ConfigSidebarView.swift */; };
 		F040 /* StoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R044 /* StoryListView.swift */; };
+		F042 /* StudioDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R046 /* StudioDetailView.swift */; };
 		F041 /* StoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R045 /* StoryDetailView.swift */; };
 		F028 /* StageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = R031 /* StageTracker.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
@@ -87,6 +88,7 @@
 		R027 /* OfflineWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWebClient.swift; sourceTree = "<group>"; };
 		R043 /* ConfigSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigSidebarView.swift; sourceTree = "<group>"; };
 		R044 /* StoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryListView.swift; sourceTree = "<group>"; };
+		R046 /* StudioDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioDetailView.swift; sourceTree = "<group>"; };
 		R045 /* StoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDetailView.swift; sourceTree = "<group>"; };
 		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
@@ -260,6 +262,7 @@
 				R030 /* SceneThumbnail.swift */,
 				R043 /* ConfigSidebarView.swift */,
 				R044 /* StoryListView.swift */,
+				R046 /* StudioDetailView.swift */,
 				R045 /* StoryDetailView.swift */,
 				R031 /* StageTracker.swift */,
 				R009 /* PreferencesView.swift */,
@@ -405,6 +408,7 @@
 				F027 /* SceneThumbnail.swift in Sources */,
 				F039 /* ConfigSidebarView.swift in Sources */,
 				F040 /* StoryListView.swift in Sources */,
+				F042 /* StudioDetailView.swift in Sources */,
 				F041 /* StoryDetailView.swift in Sources */,
 				F028 /* StageTracker.swift in Sources */,
 				F005 /* ContentViewModel.swift in Sources */,

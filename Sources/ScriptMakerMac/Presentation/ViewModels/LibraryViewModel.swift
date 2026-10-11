@@ -1,16 +1,18 @@
 import Foundation
+import Observation
 
 /// Library: saved scripts and renders. Backed by the server API;
 /// shows an explicit not-implemented state until the server provides it.
+@Observable
 @MainActor
-final class LibraryViewModel: ObservableObject {
+final class LibraryViewModel {
     private let config: AppConfig
     private let repository: any StoryRepository
 
-    @Published var stories: [Story] = []
-    @Published var selectedStoryID: String?
-    @Published var isLoading = false
-    @Published var notice: String?
+    var stories: [Story] = []
+    var selectedStoryID: String?
+    var isLoading = false
+    var notice: String?
 
     init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository()) {
         self.config = config

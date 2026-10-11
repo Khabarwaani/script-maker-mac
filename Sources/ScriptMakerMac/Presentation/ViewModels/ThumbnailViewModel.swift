@@ -2,11 +2,12 @@ import SwiftUI
 import AppKit
 
 /// ViewModel for thumbnail loading: View → ViewModel → ImageService → WebClient.
-/// Owns the image cache; the View only binds to @Published state.
+/// Owns the image cache; the View only binds to state.
+@Observable
 @MainActor
-final class ThumbnailViewModel: ObservableObject {
+final class ThumbnailViewModel {
     private let imageService: ImageService
-    @Published private(set) var images: [String: NSImage] = [:]
+    private(set) var images: [String: NSImage] = [:]
 
     init(config: AppConfig) {
         let webClient: any WebClient
