@@ -74,4 +74,21 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(vm.dataSource, .server)
         XCTAssertTrue(vm.noticeMessage?.contains("Warning: server is currently unreachable") == true)
     }
+
+    func testNewsPageSizeDefaultAndPersistence() {
+        let config = AppConfig()
+        XCTAssertEqual(config.newsPageSize, 20)
+        config.newsPageSize = 35
+        XCTAssertEqual(config.newsPageSize, 35)
+        config.resetToDefaults()
+        XCTAssertEqual(config.newsPageSize, 20)
+    }
+
+    func testAPIErrorLocalization() {
+        let err = APIError.unreachable(url: "http://localhost:8000", detail: "Connection refused")
+        XCTAssertEqual(err.errorDescription, "Could Not Connect to Server")
+        XCTAssertTrue(err.failureReason?.contains("http://localhost:8000") == true)
+        XCTAssertTrue(err.failureReason?.contains("Connection refused") == true)
+        XCTAssertEqual(err.recoverySuggestion, "Check your network connection and verify the server URL in Settings.")
+    }
 }

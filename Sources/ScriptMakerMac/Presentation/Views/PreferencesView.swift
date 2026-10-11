@@ -29,6 +29,13 @@ struct PreferencesView: View {
                     .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 if viewModel.dataSource == .server {
                     TextField("Server URL", text: $viewModel.draftURL).textFieldStyle(.roundedBorder)
+                    HStack {
+                        Text("Default news fetch size")
+                        TextField("Count", value: $viewModel.newsPageSize, format: .number)
+                            .frame(width: 50).textFieldStyle(.roundedBorder)
+                        Stepper("", value: $viewModel.newsPageSize, in: 1...50).labelsHidden()
+                        Text("(1–50, default 20)").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                    }
                 }
                 HStack {
                     if viewModel.dataSource == .server {

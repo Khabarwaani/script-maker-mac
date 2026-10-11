@@ -5,7 +5,6 @@ struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
-    @State private var addressBarViewModel: ServerAddressBarViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
@@ -17,9 +16,6 @@ struct ContentView: View {
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
-        )
-        _addressBarViewModel = State(
-            wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
         )
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
@@ -46,9 +42,6 @@ struct ContentView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.line, lineWidth: 1))
                 HStack {
                     Spacer(minLength: 0)
-                    if viewModel.config.dataSource == .server {
-                        ServerAddressBar(viewModel: addressBarViewModel)
-                    }
                     Button { showingPreferences = true } label: { Image(systemName: "gearshape") }
                         .controlSize(.large)
                         .help("Settings… (⌘,)")

@@ -201,7 +201,7 @@ struct NetworkWebClient: WebClient {
         } catch let e as APIError {
             throw e
         } catch {
-            throw APIError.unreachable(baseURL.absoluteString)
+            throw APIError.unreachable(url: baseURL.absoluteString, detail: error.localizedDescription)
         }
     }
 
@@ -256,7 +256,7 @@ struct NetworkWebClient: WebClient {
         } catch let e as APIError {
             throw e
         } catch {
-            throw APIError.unreachable(baseURL.absoluteString)
+            throw APIError.unreachable(url: baseURL.absoluteString, detail: error.localizedDescription)
         }
     }
 

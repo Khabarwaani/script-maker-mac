@@ -35,12 +35,19 @@ final class AppConfig {
     static let defaultServerURL = "http://localhost:8000"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
+    private static let newsPageSizeKey = "newsPageSize"
+    static let defaultNewsPageSize = 20
+
     var appearance: AppAppearance {
         didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
     }
 
     var localJSONDelay: Double {
         didSet { UserDefaults.standard.set(localJSONDelay, forKey: "localJSONDelay") }
+    }
+
+    var newsPageSize: Int {
+        didSet { UserDefaults.standard.set(newsPageSize, forKey: Self.newsPageSizeKey) }
     }
 
     var buildTitle: String {
@@ -63,6 +70,8 @@ final class AppConfig {
 
     init() {
         self.localJSONDelay = UserDefaults.standard.object(forKey: "localJSONDelay") as? Double ?? 1
+        let savedPageSize = UserDefaults.standard.integer(forKey: Self.newsPageSizeKey)
+        self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
         self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
@@ -89,6 +98,7 @@ final class AppConfig {
     func resetToDefaults() {
         serverURL = Self.defaultServerURL
         dataSource = .offline
+        newsPageSize = Self.defaultNewsPageSize
     }
 
     // MARK: - Studio config (smart save on Generate, like Streamlit #563)
