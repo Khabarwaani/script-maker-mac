@@ -20,12 +20,19 @@ struct DialogueStageView: View {
 
             if options.isEmpty {
                 Text("No script options returned.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryInk)
             } else {
-                List(options.indices, id: \.self, selection: $selectedIndex) { idx in
-                    scriptRow(options[idx], index: idx)
+                ForEach(options.indices, id: \.self) { idx in
+                    Button { selectedIndex = idx } label: {
+                        HStack(alignment: .top) {
+                            scriptRow(options[idx], index: idx)
+                            Spacer()
+                            Image(systemName: selectedIndex == idx ? "checkmark.circle.fill" : "circle")
+                        }
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
+                    }.buttonStyle(.plain)
                 }
-                .frame(minHeight: 200)
             }
 
             Spacer()
@@ -37,11 +44,10 @@ struct DialogueStageView: View {
                     onSelect([:])
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(StudioPrimaryButtonStyle())
             .disabled(options.isEmpty)
         }
         .padding()
-        .navigationTitle("Dialogue")
     }
 
     private func scriptRow(_ script: [String: Any], index: Int) -> some View {
@@ -51,13 +57,18 @@ struct DialogueStageView: View {
             if let narration = script["narration"] as? String, !narration.isEmpty {
                 Text(narration)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(4)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
             if let beats = script["beats"] as? [[String: Any]] {
                 Text("\(beats.count) beats")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                ForEach(beats.indices, id: \.self) { idx in
+                    let beat = beats[idx]
+                    if let line = beat["dialogue"] as? String ?? beat["text"] as? String {
+                        Text(line).font(.callout)
+                    }
+                }
             }
         }
         .padding(.vertical, 4)

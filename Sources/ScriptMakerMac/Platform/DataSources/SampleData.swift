@@ -1,14 +1,33 @@
 import Foundation
 
+struct BundledStudioCatalog: StudioCatalogProviding {
+    func load() throws -> StudioCatalog {
+        guard let data = SampleData.data(for: "studio_catalog") else {
+            throw APIError.malformed("Missing Studio option catalog")
+        }
+        do {
+            return try JSONDecoder().decode(StudioCatalog.self, from: data)
+        } catch {
+            throw APIError.malformed("Studio option catalog: \(error.localizedDescription)")
+        }
+    }
+}
+
 /// Bundled sample JSON for UX development and tests.
 /// When enabled (the default), the app runs fully offline against these
 /// fixtures instead of a live server.
 enum SampleData {
     /// Raw JSON data for a sample file (e.g. "verify" -> verify.json).
     static func data(for name: String) -> Data? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "json", subdirectory: "Samples") else {
+        let mappedName: String
+        switch name {
+        case "casting": mappedName = "characters"
+        case "script": mappedName = "validation"
+        default: mappedName = name
+        }
+        guard let url = Bundle.main.url(forResource: mappedName, withExtension: "json", subdirectory: "Samples") else {
             // Fallback for unit tests / SwiftPM layouts.
-            return Bundle.main.url(forResource: name, withExtension: "json")
+            return Bundle.main.url(forResource: mappedName, withExtension: "json")
                 .flatMap { try? Data(contentsOf: $0) }
         }
         return try? Data(contentsOf: url)

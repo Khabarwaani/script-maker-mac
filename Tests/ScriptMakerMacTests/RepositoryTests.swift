@@ -68,34 +68,38 @@ final class StoryRepositoryTests: XCTestCase {
 
 /// Unit tests for UserDefaultsStoryDataSource (infra layer).
 final class StoryDataSourceTests: XCTestCase {
+    private func makeIsolatedStore() -> KeyValueStore {
+        let suite = UserDefaults(suiteName: "test.store.\(UUID().uuidString)")!
+        return KeyValueStore(defaults: suite)
+    }
+
     func testSaveAndLoad() {
-        let ds = UserDefaultsStoryDataSource()
-        let original = ds.load()
+        let store = makeIsolatedStore()
+        let ds = UserDefaultsStoryDataSource(store: store)
         ds.save([Story(id: "ds-ut", title: "DS Test")])
         XCTAssertTrue(ds.load().contains { $0.id == "ds-ut" })
-        ds.save(original) // restore
     }
 
     func testLoadReturnsArray() {
-        let ds = UserDefaultsStoryDataSource()
+        let store = makeIsolatedStore()
+        let ds = UserDefaultsStoryDataSource(store: store)
         let result = ds.load()
         XCTAssertTrue(result is [Story])
     }
 
     func testLegacyDictionaryMigration() {
-        let ds = UserDefaultsStoryDataSource()
-        let original = ds.load()
+        let store = makeIsolatedStore()
+        let ds = UserDefaultsStoryDataSource(store: store)
         // Simulate legacy storage: raw JSON dictionaries.
         let legacy: [[String: Any]] = [
             ["id": "legacy-1", "title": "Legacy Story", "created_at": "2026-01-01T00:00:00Z"]
         ]
         if let data = try? JSONSerialization.data(withJSONObject: legacy) {
-            KeyValueStore().set(data, forKey: "savedStories")
+            store.set(data, forKey: "savedStories")
         }
         let loaded = ds.load()
         XCTAssertTrue(loaded.contains { $0.id == "legacy-1" })
         XCTAssertEqual(loaded.first { $0.id == "legacy-1" }?.title, "Legacy Story")
-        ds.save(original) // restore
     }
 }
 
@@ -138,8 +142,10 @@ final class ImageServiceTests: XCTestCase {
 
     func testInvalidURLReturnsNil() async {
         let service = ImageService(webClient: OfflineWebClient())
-        XCTAssertNil(await service.fetchImage(from: ""))
-        XCTAssertNil(await service.fetchImage(from: "not a url"))
+        let empty = await service.fetchImage(from: "")
+        XCTAssertNil(empty)
+        let invalid = await service.fetchImage(from: "not a url")
+        XCTAssertNil(invalid)
     }
 }
 
@@ -147,7 +153,8 @@ final class ImageServiceTests: XCTestCase {
 final class WebClientSelectionTests: XCTestCase {
     func testOfflineClientPing() async {
         let client = OfflineWebClient()
-        XCTAssertTrue(await client.ping())
+        let reachable = await client.ping()
+        XCTAssertTrue(reachable)
     }
 
     func testOfflineFetchDataThrows() async {

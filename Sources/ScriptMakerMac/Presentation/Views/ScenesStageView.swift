@@ -18,22 +18,22 @@ struct ScenesStageView: View {
 
             if scenes.isEmpty {
                 Text("No scenes returned.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryInk)
             } else {
-                List(scenes.indices, id: \.self) { idx in
+                ForEach(scenes.indices, id: \.self) { idx in
                     sceneRow(scenes[idx], index: idx)
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
                 }
-                .frame(minHeight: 200)
             }
 
             Spacer()
 
             Button("Continue to storyboard") { onContinue() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(StudioPrimaryButtonStyle())
                 .disabled(scenes.isEmpty)
         }
         .padding()
-        .navigationTitle("Scenes")
     }
 
     private func sceneRow(_ scene: [String: Any], index: Int) -> some View {
@@ -43,20 +43,18 @@ struct ScenesStageView: View {
             if let location = scene["location"] as? String, !location.isEmpty {
                 Label(location, systemImage: "mappin")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
             if let action = scene["visual_action"] as? String ?? scene["action"] as? String,
                !action.isEmpty {
                 Text(action)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
             if let dialogue = scene["dialogue"] as? String, !dialogue.isEmpty {
                 Text("“\(dialogue)”")
                     .font(.callout)
                     .italic()
-                    .lineLimit(3)
             }
         }
         .padding(.vertical, 4)

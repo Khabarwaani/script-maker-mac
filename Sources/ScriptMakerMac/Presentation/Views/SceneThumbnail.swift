@@ -25,7 +25,7 @@ struct SceneThumbnail: View {
                     Color(nsColor: .controlBackgroundColor)
                     Image(systemName: "film")
                         .font(.largeTitle)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.secondaryInk)
                 }
             }
         }

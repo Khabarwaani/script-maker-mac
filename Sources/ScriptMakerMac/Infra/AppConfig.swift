@@ -1,6 +1,13 @@
 import Foundation
 import Observation
 
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+    var id: String { rawValue }
+}
+
 /// Where the app gets its data — either a live pipeline server
 /// or the bundled offline sample JSON. Exactly one is active.
 enum DataSource: String, Codable, CaseIterable, Identifiable {
@@ -12,7 +19,7 @@ enum DataSource: String, Codable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .server: return "Server"
-        case .offline: return "Offline Data"
+        case .offline: return "Local JSON"
         }
     }
 }
@@ -25,47 +32,101 @@ enum DataSource: String, Codable, CaseIterable, Identifiable {
 final class AppConfig {
     /// The default endpoint is named "localserver".
     static let localserverName = "localserver"
-    static let defaultServerURL = "http://localhost:8501"
+    static let defaultServerURL = "http://localhost:8000"
     static let defaultRefineAPIBaseURL = "http://127.0.0.1:8080/"
     static let defaultRefineProvider = "antigravity"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
+    private static let newsPageSizeKey = "newsPageSize"
+    static let defaultNewsPageSize = 20
     private static let refineAPIBaseURLKey = "refineAPIBaseURL"
     private static let refineProviderKey = "refineProvider"
 
+    private let defaults: UserDefaults
+
+    var appearance: AppAppearance {
+        didSet { defaults.set(appearance.rawValue, forKey: "appearance") }
+    }
+
+    var localJSONDelay: Double {
+        didSet { defaults.set(localJSONDelay, forKey: "localJSONDelay") }
+    }
+
+    var newsPageSize: Int {
+        didSet { defaults.set(newsPageSize, forKey: Self.newsPageSizeKey) }
+    }
+
+    private static let aiSourceKey = "aiSource"
+    private static let aiModelKey = "aiModel"
+    private static let aiPowerKey = "aiPower"
+
+    var aiSource: String {
+        didSet { defaults.set(aiSource, forKey: Self.aiSourceKey) }
+    }
+
+    var aiModel: String {
+        didSet { defaults.set(aiModel, forKey: Self.aiModelKey) }
+    }
+
+    var aiPower: String {
+        didSet { defaults.set(aiPower, forKey: Self.aiPowerKey) }
+    }
+
+    var buildTitle: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
+        return "v\(version) · \(commit)"
+    }
+
     var serverURL: String {
-        didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
+        didSet { defaults.set(serverURL, forKey: Self.serverURLKey) }
+    }
+
+    /// Script-refine API base URL. The Refine tab POSTs to <url>/execute.
+    var refineAPIBaseURL: String {
+        didSet { defaults.set(refineAPIBaseURL, forKey: Self.refineAPIBaseURLKey) }
+    }
+
+    /// Script-refine provider sent in the agent envelope.
+    var refineProvider: String {
+        didSet { defaults.set(refineProvider, forKey: Self.refineProviderKey) }
     }
 
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
     var dataSource: DataSource {
-        didSet { UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey) }
+        didSet {
+            defaults.set(dataSource.rawValue, forKey: Self.dataSourceKey)
+            defaults.removeObject(forKey: "useSampleData")
+        }
     }
 
-    /// Script-refine API base URL. The Refine tab POSTs to <url>/execute.
-    var refineAPIBaseURL: String {
-        didSet { UserDefaults.standard.set(refineAPIBaseURL, forKey: Self.refineAPIBaseURLKey) }
-    }
-
-    /// Script-refine provider sent in the agent envelope.
-    var refineProvider: String {
-        didSet { UserDefaults.standard.set(refineProvider, forKey: Self.refineProviderKey) }
-    }
-
-    init() {
-        self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
+        let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
+        self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
+        self.aiSource = defaults.string(forKey: Self.aiSourceKey) ?? "Antigravity"
+        self.aiModel = defaults.string(forKey: Self.aiModelKey) ?? "Default"
+        self.aiPower = defaults.string(forKey: Self.aiPowerKey) ?? "Default"
+        self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
+        self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
-        self.refineAPIBaseURL = UserDefaults.standard.string(forKey: Self.refineAPIBaseURLKey)
+        self.refineAPIBaseURL = defaults.string(forKey: Self.refineAPIBaseURLKey)
             ?? Self.defaultRefineAPIBaseURL
-        self.refineProvider = UserDefaults.standard.string(forKey: Self.refineProviderKey)
+        self.refineProvider = defaults.string(forKey: Self.refineProviderKey)
             ?? Self.defaultRefineProvider
-        // Migrate the old boolean key: true -> offline, false -> server.
-        if let raw = UserDefaults.standard.string(forKey: Self.dataSourceKey),
+        if let raw = defaults.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {
             self.dataSource = ds
-        } else if let old = UserDefaults.standard.object(forKey: "useSampleData") as? Bool {
-            self.dataSource = old ? .offline : .server
+            defaults.removeObject(forKey: "useSampleData")
+        } else if let old = defaults.object(forKey: "useSampleData") as? Bool {
+            let migrated: DataSource = old ? .offline : .server
+            self.dataSource = migrated
+            defaults.set(migrated.rawValue, forKey: Self.dataSourceKey)
+            defaults.removeObject(forKey: "useSampleData")
         } else {
             self.dataSource = .offline
         }
@@ -83,6 +144,60 @@ final class AppConfig {
     func resetToDefaults() {
         serverURL = Self.defaultServerURL
         dataSource = .offline
+        newsPageSize = Self.defaultNewsPageSize
+        aiSource = "Antigravity"
+        aiModel = "Default"
+        aiPower = "Default"
+    }
+
+    // MARK: - Studio config (smart save on Generate, like Streamlit #563)
+
+    private static let studioConfigKey = "studioConfig"
+    private static let headlinesCacheKeyPrefix = "headlinesCache_"
+    private static let selectedHeadlineKeyPrefix = "selectedHeadline_"
+
+    func saveStudioConfig(_ config: StudioConfig) {
+        if let data = try? JSONEncoder().encode(config) {
+            defaults.set(data, forKey: Self.studioConfigKey)
+        }
+    }
+
+    func loadStudioConfig() -> StudioConfig? {
+        guard let data = defaults.data(forKey: Self.studioConfigKey) else { return nil }
+        return try? JSONDecoder().decode(StudioConfig.self, from: data)
+    }
+
+    // MARK: - 24-Hour Headlines Cache & Selection Persistence
+
+    struct CachedHeadlinesPayload: Codable {
+        let headlines: [String]
+        let timestamp: Date
+    }
+
+    func cacheHeadlines(_ headlines: [String], forSource source: String) {
+        let payload = CachedHeadlinesPayload(headlines: headlines, timestamp: Date())
+        if let data = try? JSONEncoder().encode(payload) {
+            defaults.set(data, forKey: Self.headlinesCacheKeyPrefix + source)
+        }
+    }
+
+    func getCachedHeadlines(forSource source: String, maxAge: TimeInterval = 86400) -> [String]? {
+        guard let data = defaults.data(forKey: Self.headlinesCacheKeyPrefix + source),
+              let payload = try? JSONDecoder().decode(CachedHeadlinesPayload.self, from: data) else {
+            return nil
+        }
+        if Date().timeIntervalSince(payload.timestamp) > maxAge {
+            return nil
+        }
+        return payload.headlines
+    }
+
+    func saveLastSelectedHeadline(_ headline: String, forSource source: String) {
+        defaults.set(headline, forKey: Self.selectedHeadlineKeyPrefix + source)
+    }
+
+    func getLastSelectedHeadline(forSource source: String) -> String? {
+        defaults.string(forKey: Self.selectedHeadlineKeyPrefix + source)
     }
 
     // MARK: - Normalization
@@ -104,7 +219,12 @@ final class AppConfig {
         }
         let hostPort = String(withoutSlash[schemeRange.upperBound...])
         guard !hostPort.isEmpty else { throw ConfigError.missingHost }
-        return "\(scheme)://\(bracketIPv6(hostPort))"
+        let normalized = "\(scheme)://\(bracketIPv6(hostPort))"
+        guard let components = URLComponents(string: normalized),
+              let host = components.host, !host.isEmpty,
+              components.url != nil else { throw ConfigError.invalidURL(normalized) }
+        if let port = components.port, !(1...65535).contains(port) { throw ConfigError.invalidURL(normalized) }
+        return normalized
     }
 
     /// Wrap a bare IPv6 host in brackets. Bracketed, IPv4 and hostnames pass through.

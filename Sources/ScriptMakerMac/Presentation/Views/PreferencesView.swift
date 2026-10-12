@@ -1,57 +1,107 @@
 import SwiftUI
 
-/// App-level Preferences (Cmd+,). Pipeline settings live on the server —
-/// this page is only about the app itself.
 struct PreferencesView: View {
     @Bindable var viewModel: PreferencesViewModel
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Form {
-            Section("Data source") {
-                Picker("Source", selection: $viewModel.dataSource) {
-                    ForEach(DataSource.allCases) { source in
-                        Text(source.label).tag(source)
+        VStack(alignment: .leading, spacing: 24) {
+            Text("Settings").font(.title2.weight(.semibold))
+            VStack(alignment: .leading, spacing: 12) {
+                Text("APPEARANCE").font(.caption.weight(.bold)).tracking(0.7)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                StudioChoiceGroup(title: "Theme", selection: $viewModel.appearance, options: AppAppearance.allCases, label: { $0.rawValue })
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                Text("SOURCE").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
+                StudioChoiceGroup(title: "Source", selection: $viewModel.dataSource, options: [.offline, .server], label: { $0.label })
+                if viewModel.dataSource == .offline {
+                    HStack {
+                        Text("Network delay (s)")
+                        TextField("Seconds", value: $viewModel.localJSONDelay, format: .number)
+                            .frame(width: 60).textFieldStyle(.roundedBorder)
+                        Stepper("", value: $viewModel.localJSONDelay, in: 0...60, step: 0.5).labelsHidden()
                     }
                 }
-                .pickerStyle(.radioGroup)
-                Text("Server: connect to a live pipeline server. Offline Data: bundled sample JSON, full UX without a server.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Local server (\(AppConfig.localserverName))") {
-                TextField("Server URL", text: $viewModel.draftURL)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(viewModel.dataSource == .offline)
-                Text("Default is this Mac (localhost:8501). IPv6 addresses are accepted, e.g. http://[::1]:8501.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
+                Text(viewModel.dataSource != .server
+                     ? "Bundled examples are ready to use. Explore every generation stage without a connection."
+                     : "Generation uses your configured pipeline server.")
+                    .font(.callout).foregroundStyle(AppTheme.secondaryInk)
+                if viewModel.dataSource == .server {
+                    TextField("Server URL", text: $viewModel.draftURL).textFieldStyle(.roundedBorder)
+                }
                 HStack {
-                    Button("Test connection") {
-                        Task { await viewModel.testConnection() }
+                    if viewModel.dataSource == .server {
+                        Button("Test connection") { Task { await viewModel.testConnection() } }
                     }
-                    .disabled(viewModel.isTesting)
+                    Button("Apply") { Task { await viewModel.save() } }
+                }.disabled(viewModel.isTesting)
+            }
+            .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
 
-                    Button("Reset to default") {
-                        viewModel.resetToDefaults()
+            VStack(alignment: .leading, spacing: 12) {
+                Text("CONTENT & FETCH").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
+                HStack {
+                    Text("Default news fetch size")
+                    TextField("Count", value: $viewModel.newsPageSize, format: .number)
+                        .frame(width: 50).textFieldStyle(.roundedBorder)
+                    Stepper("", value: $viewModel.newsPageSize, in: 1...50).labelsHidden()
+                    Text("(1–50, default 20)").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                }
+            }
+            .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("AI ENGINE").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
+                StudioRow("AI Source", inset: 0) {
+                    StudioOptionPicker("AI Source", selection: $viewModel.aiSource, options: viewModel.aiSources)
+                        .onChange(of: viewModel.aiSource) { _, _ in viewModel.updateAIOptions(resetModel: true) }
+                }
+                StudioRow("AI Model", inset: 0) {
+                    StudioOptionPicker("AI Model", selection: $viewModel.aiModel, options: viewModel.aiModels, label: viewModel.modelLabel)
+                        .onChange(of: viewModel.aiModel) { _, _ in viewModel.updateAIOptions() }
+                }
+                StudioRow("AI Power", inset: 0) {
+                    StudioOptionPicker("AI Power", selection: $viewModel.aiPower, options: viewModel.aiPowers)
+                }
+            }
+            .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+
+            if let error = viewModel.errorMessage { Text(error).foregroundStyle(AppTheme.danger) }
+            if let notice = viewModel.noticeMessage { Text(notice).foregroundStyle(AppTheme.secondaryInk) }
+            HStack {
+                Button("Restore Defaults") {
+                    viewModel.resetToDefaults()
+                }
+                Spacer()
+                Button("Done") {
+                    Task {
+                        await viewModel.save()
+                        dismiss()
                     }
                 }
-
-                Button("Save") { viewModel.save() }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-            }
-
-            if let error = viewModel.errorMessage {
-                Text(error).foregroundStyle(.red)
-            }
-            if let notice = viewModel.noticeMessage {
-                Text(notice).foregroundStyle(.green)
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(StudioPrimaryButtonStyle())
             }
         }
-        .padding()
-        .frame(minWidth: 420, minHeight: 260)
-        .navigationTitle("Preferences")
+        .padding(24).frame(width: 520)
+        .foregroundStyle(AppTheme.ink).background(AppTheme.paper)
+        .tint(AppTheme.accent)
+        .buttonStyle(StudioButtonStyle())
+        .preferredColorScheme(viewModel.appearance.colorScheme)
+        .onAppear {
+            viewModel.draftURL = viewModel.currentURL
+            viewModel.dataSource = viewModel.currentDataSource
+            viewModel.aiSource = viewModel.currentAISource
+            viewModel.aiModel = viewModel.currentAIModel
+            viewModel.aiPower = viewModel.currentAIPower
+            viewModel.updateAIOptions()
+        }
     }
 }

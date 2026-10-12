@@ -3,7 +3,7 @@ import Foundation
 /// Typed errors from the WebClient layer. Fail-loud — the UI decides
 /// how to present them, never silently.
 enum APIError: LocalizedError {
-    case unreachable(String)
+    case unreachable(url: String, detail: String)
     case server(Int, String)
     case malformed(String)
     case badStatus(Int)
@@ -12,18 +12,48 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unreachable(let url):
-            return "Cannot reach the pipeline server at \(url). Start the server or update the URL in Preferences."
-        case .server(let code, let body):
-            return "Server error \(code): \(body)"
-        case .malformed(let what):
-            return "Unexpected server response: \(what)."
+        case .unreachable:
+            return "Could Not Connect to Server"
+        case .server(let code, _):
+            return "Server Error (\(code))"
+        case .malformed:
+            return "Invalid Server Response"
         case .badStatus(let code):
-            return "Server stream failed with status \(code)."
+            return "Server Stream Failed (\(code))"
+        case .transport:
+            return "Network Connection Failed"
+        case .notImplemented:
+            return "Feature Not Supported"
+        }
+    }
+
+    var failureReason: String? {
+        switch self {
+        case .unreachable(_, let detail):
+            return detail
+        case .server(_, let body):
+            return body.isEmpty ? "The server returned an unexpected error." : body
+        case .malformed(let what):
+            return "Unexpected response format: \(what)."
+        case .badStatus(let code):
+            return "HTTP status \(code)."
         case .transport(let what):
-            return "Network error: \(what)."
+            return what
         case .notImplemented(let what):
-            return "Not implemented: \(what)."
+            return what
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .unreachable:
+            return "Check your network connection and verify the server URL in Settings."
+        case .server:
+            return "Please try again later or verify server logs."
+        case .malformed, .badStatus, .transport:
+            return "Please try again."
+        case .notImplemented:
+            return "Ensure the server is running an up-to-date version."
         }
     }
 }

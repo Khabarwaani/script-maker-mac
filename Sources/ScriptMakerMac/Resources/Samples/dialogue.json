@@ -1,1 +1,23 @@
-{"scripts":[{"beats":[{"character":"Kallu","dialogue":"Arre bhai, odd number aaj? Meri taxi to even hai!"},{"character":"Havaldar Sharma","dialogue":"Challan katega. Niyam niyam hota hai."},{"character":"Kallu","dialogue":"Hawa saaf chahiye, lekin roti bhi to chahiye!"}],"narration":"Kallu's taxi is stopped at ITO crossing on an odd day.","title":"The Odd Day"}]}
+{
+  "scripts": [
+    {
+      "beats": [
+        {
+          "character": "Kallu",
+          "dialogue": "Arre bhai, odd number aaj? Meri taxi to even hai!"
+        },
+        {
+          "character": "Havaldar Sharma",
+          "dialogue": "Challan katega. Niyam niyam hota hai."
+        },
+        {
+          "character": "Kallu",
+          "dialogue": "Hawa saaf chahiye, lekin roti bhi to chahiye!"
+        }
+      ],
+      "narration": "Kallu's taxi is stopped at ITO crossing on an odd day.",
+      "title": "The Odd Day",
+      "script_md": "SCENE 1 · ITO crossing, morning smog\n\nKallu's taxi is stopped at ITO crossing on an odd day.\n\nKallu: Arre bhai, odd number aaj? Meri taxi to even hai!\n\nHavaldar Sharma: Challan katega. Niyam niyam hota hai.\n\nKallu: Hawa saaf chahiye, lekin roti bhi to chahiye!\n\nScene direction: Kallu pleads with the constable, gesturing at his even number plate.\nOn-screen text: ODD-EVEN IS BACK\nAudio/SFX: Traffic horns, distant siren"
+    }
+  ]
+}

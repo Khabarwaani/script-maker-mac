@@ -15,24 +15,23 @@ struct StoryboardStageView: View {
     }
 
     var body: some View {
-        ScrollView {
+        Group {
             VStack(alignment: .leading, spacing: 12) {
                 Text("\(storyboards.count) storyboard(s) ready")
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryInk)
 
                 ForEach(storyboards.indices, id: \.self) { idx in
                     storyboardCard(storyboards[idx], index: idx)
                 }
 
-                Button("Continue to render") { onContinue() }
-                    .buttonStyle(.borderedProminent)
+                Button("Continue to final validation") { onContinue() }
+                    .buttonStyle(StudioPrimaryButtonStyle())
                     .disabled(storyboards.isEmpty)
                     .padding(.top, 8)
             }
             .padding()
         }
-        .navigationTitle("Storyboards")
     }
 
     private func storyboardCard(_ board: [String: Any], index: Int) -> some View {
@@ -82,34 +81,34 @@ struct StoryboardStageView: View {
             }
             if !location.isEmpty {
                 Label("Location: \(location)", systemImage: "mappin")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             }
             if !action.isEmpty {
-                Label("Action: \(String(action.prefix(300)))", systemImage: "film")
-                    .font(.callout).foregroundStyle(.secondary)
+                Label("Action: \(action)", systemImage: "film")
+                    .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             }
             if !overlay.isEmpty {
                 Label("Overlay: \(overlay)", systemImage: "tag")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             }
             if !sfx.isEmpty {
                 Label("SFX: \(sfx)", systemImage: "speaker.wave.2")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             }
             if !veoPrompt.isEmpty {
                 Text("AI video prompt (Veo):")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(AppTheme.secondaryInk)
                 Text(veoPrompt)
                     .font(.callout).monospaced()
                     .padding(8)
-                    .background(Color(nsColor: .textBackgroundColor))
+                    .background(AppTheme.sunken)
                     .cornerRadius(6)
                 Label(
                     verified ? "verified" : "need verification",
                     systemImage: verified ? "checkmark.circle" : "exclamationmark.triangle"
                 )
                 .font(.caption)
-                .foregroundStyle(verified ? Color.green : Color.orange)
+                .foregroundStyle(verified ? AppTheme.success : AppTheme.warning)
             }
         }
         .padding(.vertical, 4)

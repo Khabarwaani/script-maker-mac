@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppKit
 
 /// Library: saved scripts and renders. Backed by the server API;
 /// shows an explicit not-implemented state until the server provides it.
@@ -27,8 +28,19 @@ final class LibraryViewModel {
         // Prevent redundant refreshes (view .task can fire multiple times).
         guard !isLoading else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            if !stories.contains(where: { $0.id == selectedStoryID }) {
+                selectedStoryID = stories.first?.id
+            }
+        }
         notice = nil
+        if config.dataSource != .server {
+            do { _ = try await PipelineService(config: config).listStories() }
+            catch { notice = error.localizedDescription }
+            stories = await repository.all()
+            return
+        }
         do {
             let api = try PipelineService(config: config)
             let serverDicts = try await api.listStories()
@@ -38,9 +50,6 @@ final class LibraryViewModel {
             // Deduplicate: local wins on id conflict.
             let localIDs = Set(local.map(\.id))
             stories = local + serverStories.filter { !localIDs.contains($0.id) }
-            if selectedStoryID == nil {
-                selectedStoryID = stories.first?.id
-            }
         } catch let e as APIError {
             switch e {
             case .notImplemented(let what):
@@ -55,14 +64,113 @@ final class LibraryViewModel {
         }
     }
 
+    /// Add a new story manually to the library.
+    func addStory(title: String, summary: String = "", screenplay: String = "", instruction: String = "", emotion: String = "", format: String = "", videoURL: String? = nil) async {
+        let initialVersions: [StoryScriptVersion]? = screenplay.isEmpty ? nil : [
+            StoryScriptVersion(number: 1, text: screenplay, createdAt: DateFormatting.iso8601Now(), instruction: instruction.isEmpty ? nil : instruction)
+        ]
+        let newStory = Story(
+            id: UUID().uuidString,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Story" : title,
+            summary: summary,
+            headline: "",
+            createdAt: DateFormatting.iso8601Now(),
+            status: "completed",
+            emotion: emotion,
+            format: format,
+            videoURL: videoURL,
+            scriptText: screenplay.isEmpty ? nil : screenplay,
+            instruction: instruction.isEmpty ? nil : instruction,
+            scriptVersions: initialVersions,
+            generationNumber: nil,
+            stageOutputs: nil
+        )
+        await repository.save(newStory)
+        stories.insert(newStory, at: 0)
+        selectedStoryID = newStory.id
+    }
+
+    /// Update title, instruction, summary, and screenplay of an existing story.
+    func updateStory(id: String, title: String, instruction: String? = nil, summary: String? = nil, screenplay: String? = nil) async {
+        guard let idx = stories.firstIndex(where: { $0.id == id }) else { return }
+        var story = stories[idx]
+        if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            story.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let instruction {
+            story.instruction = instruction
+        }
+        if let summary {
+            story.summary = summary
+        }
+        if let screenplay {
+            let trimmed = screenplay.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != (story.scriptText ?? "") {
+                var versions = story.scriptVersions ?? []
+                let nextNum = (versions.map(\.number).max() ?? 0) + 1
+                versions.append(StoryScriptVersion(
+                    number: nextNum,
+                    text: trimmed,
+                    createdAt: DateFormatting.iso8601Now(),
+                    instruction: instruction
+                ))
+                story.scriptVersions = versions
+                story.scriptText = trimmed
+            }
+        }
+        stories[idx] = story
+        await repository.save(story)
+    }
+
+    /// Revert/select a specific script version.
+    func selectScriptVersion(_ version: StoryScriptVersion, for storyID: String) async {
+        guard let idx = stories.firstIndex(where: { $0.id == storyID }) else { return }
+        var story = stories[idx]
+        story.scriptText = version.text
+        if let inst = version.instruction {
+            story.instruction = inst
+        }
+        stories[idx] = story
+        await repository.save(story)
+    }
+
+    /// Share story via Telegram Web/App URI.
+    func shareToTelegram(story: Story) {
+        let script = story.scriptText ?? ""
+        let textToShare = "\(story.title)\n\n\(script)"
+        guard let encoded = textToShare.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://t.me/share/url?url=&text=\(encoded)") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
     /// Delete a story (from local store; server deletion when API supports it).
     func deleteStory(id: String) async {
+        let local = await repository.all()
+        guard local.contains(where: { $0.id == id }) else {
+            notice = "This story is on the server. Server deletion is not available yet."
+            return
+        }
         await repository.remove(id: id)
         stories.removeAll { $0.id == id }
         if selectedStoryID == id {
             selectedStoryID = stories.first?.id
         }
         // TODO: server-side delete when the API provides it.
+    }
+
+    func deleteAllStories() async {
+        let local = await repository.all()
+        let localIDs = Set(local.map(\.id))
+        guard stories.allSatisfy({ localIDs.contains($0.id) }) else {
+            notice = "Server deletion is not available yet. No stories were deleted."
+            return
+        }
+        for story in local { await repository.remove(id: story.id) }
+        stories = []
+        selectedStoryID = nil
+        notice = nil
     }
 
     /// Merge the default closing clip at the end of the story's video.

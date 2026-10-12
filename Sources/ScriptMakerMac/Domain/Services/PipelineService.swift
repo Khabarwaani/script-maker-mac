@@ -1,5 +1,9 @@
 import Foundation
 
+protocol ServerConnectionChecking: Sendable {
+    func isReachable(at url: URL) async -> Bool
+}
+
 /// Service layer: ViewModels call this, never the WebClient directly.
 ///
 /// The WebClient is chosen from config — NetworkWebClient for a live server,
@@ -10,10 +14,15 @@ struct PipelineService: Sendable {
 
     /// Choose the WebClient from config.
     init(config: AppConfig) throws {
-        self.baseURL = try config.baseURL()
+        if config.dataSource == .server {
+            self.baseURL = try config.baseURL()
+        } else {
+            guard let url = URL(string: AppConfig.defaultServerURL) else { throw ConfigError.invalidURL(AppConfig.defaultServerURL) }
+            self.baseURL = url
+        }
         switch config.dataSource {
         case .offline:
-            self.client = OfflineWebClient()
+            self.client = OfflineWebClient(delay: config.localJSONDelay)
         case .server:
             self.client = NetworkWebClient(baseURL: baseURL)
         }
@@ -45,7 +54,7 @@ struct PipelineService: Sendable {
         try await client.listStories()
     }
 
-    func startJob(sessionID: String, stage: PipelineStage, inputs: [String: Any] = [:]) async throws -> String {
+    func startJob(sessionID: String, stage: PipelineJob, inputs: [String: Any] = [:]) async throws -> String {
         try await client.startJob(sessionID: sessionID, stage: stage, inputs: inputs)
     }
 
@@ -60,4 +69,85 @@ struct PipelineService: Sendable {
     func eventStream(sessionID: String) -> AsyncThrowingStream<SubstepEvent, Error> {
         client.eventStream(sessionID: sessionID)
     }
+
+    func fetchNewsCategories() async throws -> NewsCategoriesResponse {
+        try await client.get(path: "api/v1/news/category", queryItems: nil)
+    }
+
+    func fetchTopTitles(category: String? = nil, n: Int? = nil, mode: String? = nil) async throws -> TopTitlesResponse {
+        var queryItems: [URLQueryItem] = []
+        if let category, !category.isEmpty {
+            queryItems.append(URLQueryItem(name: "category", value: category))
+        }
+        if let n {
+            queryItems.append(URLQueryItem(name: "n", value: String(n)))
+        }
+        if let mode, !mode.isEmpty {
+            queryItems.append(URLQueryItem(name: "mode", value: mode))
+        }
+        return try await client.get(path: "api/v1/news/title", queryItems: queryItems.isEmpty ? nil : queryItems)
+    }
+
+    func fetchTrendingHashtags(n: Int? = nil) async throws -> NewsHashtagsResponse {
+        var queryItems: [URLQueryItem]? = nil
+        if let n {
+            queryItems = [URLQueryItem(name: "n", value: String(n))]
+        }
+        return try await client.get(path: "api/v1/news/hashtags", queryItems: queryItems)
+    }
+
+    func createAndStreamStory(params: [String: Any]) -> AsyncThrowingStream<CreatorStreamEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await sse in client.streamSSE(path: "api/v1/stories/stream", json: params) {
+                        if let event = Self.parseCreatorEvent(name: sse.event, json: sse.data) {
+                            continuation.yield(event)
+                            if case .end = event {
+                                continuation.finish()
+                                return
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    private static func parseCreatorEvent(name: String, json: String) -> CreatorStreamEvent? {
+        guard let data = json.data(using: .utf8) else {
+            if name == "end" { return .end(nil) }
+            return nil
+        }
+        let rawDict = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+
+        // Use typed JSONDecoder for Stream API Contract v1
+        if let decoded = try? JSONDecoder().decode(CreatorStreamEvent.self, from: data) {
+            // Extract raw dictionaries for stage/substep output payloads
+            if case .outputStage(let step, let status, let outputType, let elapsedMs, _, let llmCalls) = decoded,
+               let output = rawDict["output"] as? [String: Any] {
+                return .outputStage(step: step, status: status, outputType: outputType, elapsedMs: elapsedMs, output: output, llmCalls: llmCalls)
+            } else if case .outputSubstep(let step, let substep, let substepType, let subName, let status, let elapsedMs, _) = decoded,
+                      let output = rawDict["output"] as? [String: Any] {
+                return .outputSubstep(step: step, substep: substep, substepType: substepType, name: subName, status: status, elapsedMs: elapsedMs, output: output)
+            } else if case .unknown(let type, _) = decoded {
+                return .unknown(type: type, data: rawDict)
+            }
+            return decoded
+        } else if !rawDict.isEmpty {
+            let type = rawDict["type"] as? String ?? name
+            return .unknown(type: type, data: rawDict)
+        }
+        return nil
+    }
+
+    func verifyNewsEndpoints() async throws -> Bool {
+        _ = try await fetchNewsCategories()
+        _ = try await fetchTopTitles(category: nil, n: 1, mode: "sample")
+        return true
+    }
 }
+
