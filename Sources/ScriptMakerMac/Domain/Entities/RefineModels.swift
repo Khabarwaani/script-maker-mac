@@ -103,27 +103,23 @@ struct RefineInput: Codable, Sendable {
 }
 
 /// Agent envelope: the POST body for /execute.
-/// Matches the server curl contract: `{ agent_id, version, provider, input }`.
+/// Matches the server curl contract: `{ agent_id, provider, input }`
+/// (agent_id required, version omitted).
 struct RefineRequest: Codable, Sendable {
     static let scriptRefinerID = "ScriptRefiner"
-    static let apiVersion = "1.0.0"
 
     var agentID: String
-    var version: String
     var provider: String
     var input: RefineInput
 
-    init(provider: String, input: RefineInput,
-         agentID: String = scriptRefinerID, version: String = apiVersion) {
+    init(provider: String, input: RefineInput, agentID: String = scriptRefinerID) {
         self.agentID = agentID
-        self.version = version
         self.provider = provider
         self.input = input
     }
 
     enum CodingKeys: String, CodingKey {
         case agentID = "agent_id"
-        case version
         case provider
         case input
     }

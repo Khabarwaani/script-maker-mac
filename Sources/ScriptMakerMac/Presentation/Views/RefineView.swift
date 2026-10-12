@@ -73,6 +73,13 @@ struct RefineView: View {
                     .textSelection(.enabled)
                     .accessibilityLabel("Request URL")
             }
+            Toggle("Stream progress", isOn: $viewModel.streamProgress)
+                .font(.caption)
+                .toggleStyle(.checkbox)
+                .foregroundStyle(.secondary)
+                .help("Add ?status=true and stream server-sent progress events into the log")
+                .disabled(viewModel.isLoading)
+                .accessibilityLabel("Stream progress events")
             DisclosureGroup("Request JSON", isExpanded: $showRequestJSON) {
                 Text(viewModel.requestPreviewJSON)
                     .font(.caption.monospaced())
@@ -143,6 +150,7 @@ struct RefineView: View {
             case .request: return AppTheme.accent
             case .response: return AppTheme.success
             case .error: return AppTheme.danger
+            case .info: return AppTheme.secondaryInk
             }
         }()
         return Text("[\(line.time)] \(line.text)")
