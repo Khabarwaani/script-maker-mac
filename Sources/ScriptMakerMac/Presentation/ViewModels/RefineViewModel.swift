@@ -4,7 +4,7 @@ import Observation
 
 /// Script Refine tab state: the URL bar + Go, the refine input form,
 /// and the parsed output. All network goes through RefineService;
-/// every failure lands in errorMessage (shown as an alert).
+/// every failure lands in errorMessage (shown inline, never an alert).
 @Observable
 @MainActor
 final class RefineViewModel {
