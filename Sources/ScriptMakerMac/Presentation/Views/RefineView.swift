@@ -37,29 +37,39 @@ struct RefineView: View {
     }
 
     /// The URL bar: base URL field + Go. Go owns its loading state
-    /// (spinner inside, disabled while running — HIG §3).
+    /// (spinner inside, disabled while running — HIG §3). The resolved
+    /// POST target is shown underneath, live.
     private var urlBar: some View {
-        HStack(spacing: 8) {
-            TextField("Refine API URL", text: $viewModel.apiBaseURL)
-                .textFieldStyle(.roundedBorder)
-                .help("Base URL of the script-refine API. Go POSTs to <url>/execute.")
-                .disabled(viewModel.isLoading)
-                .onSubmit { Task { await viewModel.refine() } }
-            Button {
-                Task { await viewModel.refine() }
-            } label: {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(width: 20, height: 20)
-                } else {
-                    Text("Go")
-                        .frame(minWidth: 44)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                TextField("Refine API URL", text: $viewModel.apiBaseURL)
+                    .textFieldStyle(.roundedBorder)
+                    .help("Base URL of the script-refine API. Go POSTs to <url>/execute.")
+                    .disabled(viewModel.isLoading)
+                    .onSubmit { Task { await viewModel.refine() } }
+                Button {
+                    Task { await viewModel.refine() }
+                } label: {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("Go")
+                            .frame(minWidth: 44)
+                    }
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(!viewModel.canGo)
+                .help("Send the script to the refine API")
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(!viewModel.canGo)
-            .help("Send the script to the refine API")
+            if !viewModel.resolvedURLString.isEmpty {
+                Text("POST \(viewModel.resolvedURLString)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Request URL")
+            }
         }
         .padding()
     }

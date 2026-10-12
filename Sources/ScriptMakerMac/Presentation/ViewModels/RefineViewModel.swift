@@ -44,6 +44,14 @@ final class RefineViewModel {
         !isLoading && !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// The exact POST target for the current bar value, shown under the bar
+    /// so the user can always see where Go will send the request.
+    var resolvedURLString: String {
+        guard let normalized = try? AppConfig.normalize(raw: apiBaseURL),
+              let baseURL = URL(string: normalized) else { return "" }
+        return RefineService.executeURL(baseURL: baseURL).absoluteString
+    }
+
     init(config: AppConfig, service: RefineService? = nil) {
         self.config = config
         self.apiBaseURL = config.refineAPIBaseURL
