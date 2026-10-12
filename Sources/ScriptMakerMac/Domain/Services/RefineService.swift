@@ -91,17 +91,14 @@ struct RefineService: Sendable {
                     )
                     var gotResult = false
                     for try await event in transport.postStream(to: url, body: body) {
-                        if !gotResult,
-                           let data = event.data.data(using: .utf8),
-                           let output = try? JSONDecoder().decode(RefineResponse.self, from: data).output
-                        {
+                        if !gotResult, let decoded = Self.decodeOutput(from: event.data) {
                             gotResult = true
                             continuation.yield(.result(RefineResult(
-                                output: output,
+                                output: decoded.output,
                                 requestURL: url,
                                 requestBody: body,
                                 statusCode: 200,
-                                responseBody: data
+                                responseBody: decoded.raw
                             )))
                         } else if !gotResult {
                             continuation.yield(.progress(name: event.name, data: event.data))
@@ -117,6 +114,32 @@ struct RefineService: Sendable {
                 }
             }
         }
+    }
+
+    /// Tries the whole text, then suffixes that drop leading lines, then
+    /// single lines (with an optional `data:` prefix stripped) — tolerates
+    /// servers that merge progress payloads ahead of the result without
+    /// blank-line dispatch.
+    private static func decodeOutput(from text: String) -> (output: RefineOutput, raw: Data)? {
+        let lines = text.components(separatedBy: "\n")
+        var candidates = [text]
+        for start in lines.indices {
+            candidates.append(lines[start...].joined(separator: "\n"))
+        }
+        candidates.append(contentsOf: lines)
+        for var candidate in candidates {
+            candidate = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if candidate.hasPrefix("data:") {
+                candidate = String(candidate.dropFirst("data:".count))
+                    .trimmingCharacters(in: .whitespaces)
+            }
+            guard candidate.hasPrefix("{"),
+                  let data = candidate.data(using: .utf8),
+                  let output = try? JSONDecoder().decode(RefineResponse.self, from: data).output
+            else { continue }
+            return (output, data)
+        }
+        return nil
     }
 
     /// Maps a non-2xx response: the agent API's `{ error: { code, message } }`
