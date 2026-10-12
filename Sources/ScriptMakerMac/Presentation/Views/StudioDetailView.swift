@@ -9,12 +9,44 @@ struct StudioDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Preview")
-                    .font(.caption.weight(.bold))
-                    .textCase(.uppercase)
-                    .tracking(0.7)
-                    .foregroundStyle(AppTheme.secondaryInk)
-                    .frame(height: 34, alignment: .leading)
+                HStack(alignment: .center, spacing: 12) {
+                    Text("Preview")
+                        .font(.caption.weight(.bold))
+                        .textCase(.uppercase)
+                        .tracking(0.7)
+                        .foregroundStyle(AppTheme.secondaryInk)
+
+                    if let totalElapsed = viewModel.formattedTotalElapsed {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.caption2)
+                            Text("Total: \(totalElapsed)")
+                                .font(.caption2.monospaced().weight(.semibold))
+                        }
+                        .foregroundStyle(AppTheme.ink)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(AppTheme.sunken, in: Capsule())
+                    }
+
+                    Spacer()
+
+                    if viewModel.isRunning {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(AppTheme.accent)
+                                .frame(width: 8, height: 8)
+                            Text("Ongoing: \(viewModel.ongoingDescription ?? "Running…")")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                    }
+                }
+                .frame(height: 34)
+
                 if viewModel.errorMessage != nil {
                     errorBannerView
                 }
@@ -120,12 +152,37 @@ struct StudioDetailView: View {
             // Active stage detail view when stage output is available
             if let stage = viewModel.currentStage,
                let payload = viewModel.stagePayloads[stage] {
+                let matchingStreamStage = viewModel.streamStages.first(where: { $0.type == stage.rawValue })
+                let isStageRunning = matchingStreamStage?.status.lowercased() == "running"
+                let stageElapsed = matchingStreamStage?.formattedElapsed
+
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Stage Detail: \(stage.title)")
-                        .font(.caption.weight(.bold))
-                        .textCase(.uppercase)
-                        .tracking(0.7)
-                        .foregroundStyle(AppTheme.secondaryInk)
+                    HStack(spacing: 8) {
+                        Text("Stage Detail: \(stage.title)")
+                            .font(.caption.weight(.bold))
+                            .textCase(.uppercase)
+                            .tracking(0.7)
+                            .foregroundStyle(AppTheme.secondaryInk)
+
+                        if let elapsed = stageElapsed {
+                            Text(elapsed)
+                                .font(.caption2.monospaced().weight(.semibold))
+                                .foregroundStyle(AppTheme.ink)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(AppTheme.sunken, in: Capsule())
+                        }
+
+                        if isStageRunning {
+                            Text("Ongoing")
+                                .font(.caption2.weight(.bold))
+                                .textCase(.uppercase)
+                                .foregroundStyle(AppTheme.accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(AppTheme.accent.opacity(0.15), in: Capsule())
+                        }
+                    }
 
                     stageDetailView(for: stage, payload: payload)
                         .disabled(viewModel.isRunning || (viewModel.workflowMode == .continuous && viewModel.generationCompleted))
@@ -254,14 +311,28 @@ struct StudioDetailView: View {
         let isDone = stage.status.lowercased() == "success" || stage.status.lowercased() == "complete"
         let isRunning = stage.status.lowercased() == "running"
         let isSelected = viewModel.currentStage?.rawValue == stage.type
-        return HStack(spacing: 5) {
+        return HStack(spacing: 6) {
             Image(systemName: isDone ? "checkmark.circle.fill" : isRunning ? "arrow.triangle.2.circlepath" : "circle")
             Text("Stage \(stage.id): \(stage.label)")
+
+            if let elapsed = stage.formattedElapsed {
+                Text(elapsed)
+                    .font(.caption2.monospaced())
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(AppTheme.sunken, in: Capsule())
+            }
+
+            if isRunning {
+                Circle()
+                    .fill(AppTheme.accent)
+                    .frame(width: 6, height: 6)
+            }
         }
         .font(.caption)
         .foregroundStyle(isSelected ? AppTheme.accent : isDone ? AppTheme.success : isRunning ? AppTheme.accent : AppTheme.secondaryInk)
         .padding(10)
         .background(isSelected ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.line, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(isRunning ? AppTheme.accent.opacity(0.5) : AppTheme.line, lineWidth: 1))
     }
 }

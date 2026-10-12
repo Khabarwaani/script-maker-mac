@@ -80,24 +80,36 @@ struct StreamProgressAccordionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("Stream Progress")
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .tracking(0.7)
                     .foregroundStyle(AppTheme.secondaryInk)
 
+                if let total = viewModel.formattedTotalElapsed {
+                    Text(total)
+                        .font(.caption2.monospaced().weight(.semibold))
+                        .foregroundStyle(AppTheme.ink)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AppTheme.sunken, in: Capsule())
+                }
+
                 Spacer()
 
                 if viewModel.isRunning {
                     HStack(spacing: 6) {
-                        Image(systemName: "dot.radiowaves.left.and.right")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.accent)
-                        Text("Live Stream")
-                            .font(.caption.weight(.medium))
+                        Circle()
+                            .fill(AppTheme.accent)
+                            .frame(width: 7, height: 7)
+                        Text(viewModel.ongoingDescription ?? "Live Stream")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(AppTheme.accent)
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
                 }
             }
 

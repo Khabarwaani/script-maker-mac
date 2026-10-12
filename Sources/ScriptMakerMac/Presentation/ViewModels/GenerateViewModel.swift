@@ -40,10 +40,69 @@ final class GenerateViewModel {
         }
     }
     var jobProgress: Double?
+    /// Stream timing tracking
+    var streamStartTime: Date?
+    var streamTotalElapsedMs: Int?
     /// True after completed generation is automatically saved to the local library.
     var isSavedToLibrary: Bool = false
     /// Callback triggered to navigate to the Library tab.
     var onNavigateToLibrary: (() -> Void)?
+
+    /// Total elapsed milliseconds across all completed phases or from the stream end event.
+    var totalElapsedMs: Int? {
+        if let total = streamTotalElapsedMs, total > 0 {
+            return total
+        }
+        let stageSums = streamStages.compactMap(\.elapsedMs).reduce(0, +)
+        if stageSums > 0 { return stageSums }
+        if let start = streamStartTime {
+            return Int(Date().timeIntervalSince(start) * 1000)
+        }
+        return nil
+    }
+
+    /// Formatted total elapsed time across the entire pipeline.
+    var formattedTotalElapsed: String? {
+        guard let ms = totalElapsedMs, ms > 0 else { return nil }
+        if ms < 1000 {
+            return "\(ms)ms"
+        } else {
+            return String(format: "%.1fs", Double(ms) / 1000.0)
+        }
+    }
+
+    /// The ongoing stage, if any.
+    var ongoingStage: PipelineStageState? {
+        streamStages.first(where: { $0.status.lowercased() == "running" })
+    }
+
+    /// The ongoing substep, if any.
+    var ongoingSubstep: PipelineSubstepState? {
+        for stage in streamStages {
+            if let sub = stage.substeps.first(where: { $0.status.lowercased() == "running" }) {
+                return sub
+            }
+        }
+        return nil
+    }
+
+    /// Concise description of what is currently executing in the pipeline.
+    var ongoingDescription: String? {
+        guard isRunning else { return nil }
+        if let sub = ongoingSubstep, let stage = ongoingStage {
+            return "Stage \(stage.id) · \(stage.label) (\(sub.name))"
+        }
+        if let stage = ongoingStage {
+            return "Stage \(stage.id) · \(stage.label)"
+        }
+        if let current = currentStage {
+            return current.title
+        }
+        if !streamStages.isEmpty {
+            return "Executing pipeline…"
+        }
+        return "Initializing stream…"
+    }
 
     func goToLibrary() {
         onNavigateToLibrary?()
@@ -541,6 +600,7 @@ final class GenerateViewModel {
         saveStudioConfig()
         await reset()
         isRunning = true
+        streamStartTime = Date()
         defer { isRunning = false }
         do {
             let api = try api()
@@ -760,6 +820,9 @@ final class GenerateViewModel {
                     }
 
                 case .end(let endPayload):
+                    if let endMs = endPayload?.elapsedMs {
+                        streamTotalElapsedMs = endMs
+                    }
                     if let endPayload, endPayload.result == "failure" {
                         errorMessage = endPayload.error ?? "Generation failed on server."
                         if let lastRunning = streamStages.lastIndex(where: { $0.status == "running" }) {
@@ -949,6 +1012,8 @@ final class GenerateViewModel {
         renderCompleted = false
         generationCompleted = false
         isSavedToLibrary = false
+        streamStartTime = nil
+        streamTotalElapsedMs = nil
         generatedStoryIDs = [:]
         generationCreatedAt = DateFormatting.iso8601Now()
     }
