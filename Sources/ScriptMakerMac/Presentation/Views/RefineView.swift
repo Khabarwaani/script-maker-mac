@@ -5,6 +5,7 @@ import SwiftUI
 /// Dumb view — all state lives in RefineViewModel.
 struct RefineView: View {
     @Bindable var viewModel: RefineViewModel
+    @State private var showRequestJSON = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +23,8 @@ struct RefineView: View {
                 }
                 .padding()
             }
+            Divider()
+            logPanel
         }
         .alert(
             "Refine failed",
@@ -70,6 +73,15 @@ struct RefineView: View {
                     .textSelection(.enabled)
                     .accessibilityLabel("Request URL")
             }
+            DisclosureGroup("Request JSON", isExpanded: $showRequestJSON) {
+                Text(viewModel.requestPreviewJSON)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Request JSON preview")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding()
     }
@@ -78,5 +90,65 @@ struct RefineView: View {
         Text("Enter a script below and press Go — the API returns detected issues and refined variations.")
             .font(.callout)
             .foregroundStyle(.secondary)
+    }
+
+    /// Xcode-terminal-style log: request URL, request body, response.
+    /// Cleared on every Go; auto-scrolls; copyable.
+    private var logPanel: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Text("Log")
+                    .font(.caption)
+                    .bold()
+                    .foregroundStyle(AppTheme.secondaryInk)
+                Spacer()
+                Button("Copy") { viewModel.copyLog() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                    .help("Copy the log to the clipboard")
+                    .accessibilityLabel("Copy log")
+                Button("Clear") { viewModel.clearLog() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                    .help("Clear the log")
+                    .accessibilityLabel("Clear log")
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 3) {
+                        ForEach(viewModel.logLines) { line in
+                            logLineView(line)
+                                .id(line.id)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: viewModel.logLines.count) { _, _ in
+                    if let last = viewModel.logLines.last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .frame(height: 180)
+        .background(AppTheme.sunken)
+    }
+
+    private func logLineView(_ line: RefineViewModel.LogLine) -> some View {
+        let color: Color = {
+            switch line.kind {
+            case .request: return AppTheme.accent
+            case .response: return AppTheme.success
+            case .error: return AppTheme.danger
+            }
+        }()
+        return Text("[\(line.time)] \(line.text)")
+            .font(.caption.monospaced())
+            .foregroundStyle(color)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

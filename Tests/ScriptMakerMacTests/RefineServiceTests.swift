@@ -63,7 +63,7 @@ final class RefineServiceTests: XCTestCase {
         mock.stub = (Data(refineOutputJSON.utf8), 200)
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         _ = try await RefineService(transport: mock)
-            .refine(baseURL: base, provider: "antigravity", input: makeInput())
+            .refine(baseURL: base, provider: .antigravity, input: makeInput())
         XCTAssertEqual(mock.lastURL?.absoluteString, "http://127.0.0.1:8080/execute")
     }
 
@@ -84,10 +84,11 @@ final class RefineServiceTests: XCTestCase {
         mock.stub = (Data(refineOutputJSON.utf8), 200)
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         _ = try await RefineService(transport: mock)
-            .refine(baseURL: base, provider: "antigravity", input: makeInput())
+            .refine(baseURL: base, provider: .antigravity, input: makeInput())
 
         let body = try jsonBody(mock)
         XCTAssertEqual(body["agent_id"] as? String, "ScriptRefiner")
+        XCTAssertEqual(body["version"] as? String, "1.0.0")
         XCTAssertEqual(body["provider"] as? String, "antigravity")
         let input = try XCTUnwrap(body["input"] as? [String: Any])
         XCTAssertEqual(input["script"] as? String, "INT. OFFICE - DAY")
@@ -106,7 +107,7 @@ final class RefineServiceTests: XCTestCase {
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         let bare = RefineInput(script: "x", outputCount: 1, issuesFound: nil, correctionFocus: [])
         _ = try await RefineService(transport: mock)
-            .refine(baseURL: base, provider: "antigravity", input: bare)
+            .refine(baseURL: base, provider: .antigravity, input: bare)
 
         let body = try jsonBody(mock)
         let input = try XCTUnwrap(body["input"] as? [String: Any])
@@ -119,7 +120,7 @@ final class RefineServiceTests: XCTestCase {
         mock.stub = (Data(refineOutputJSON.utf8), 200)
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         let output = try await RefineService(transport: mock)
-            .refine(baseURL: base, provider: "antigravity", input: makeInput())
+            .refine(baseURL: base, provider: .antigravity, input: makeInput()).output
         XCTAssertEqual(output.detectedIssues.count, 1)
         XCTAssertEqual(output.detectedIssues[0].category, .emotionInconsistency)
         XCTAssertEqual(output.refinedScripts.count, 2)
@@ -133,8 +134,41 @@ final class RefineServiceTests: XCTestCase {
             let mock = MockRefineTransport()
             mock.stub = (Data("{\"\(wrapper)\":\(refineOutputJSON)}".utf8), 200)
             let output = try await RefineService(transport: mock)
-                .refine(baseURL: base, provider: "antigravity", input: makeInput())
+                .refine(baseURL: base, provider: .antigravity, input: makeInput()).output
             XCTAssertEqual(output.refinedScripts.count, 2, "wrapper: \(wrapper)")
+        }
+    }
+
+    func testRefineResultCarriesWireDetails() async throws {
+        let mock = MockRefineTransport()
+        mock.stub = (Data(refineOutputJSON.utf8), 200)
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        let result = try await RefineService(transport: mock)
+            .refine(baseURL: base, provider: .antigravity, input: makeInput())
+        XCTAssertEqual(result.requestURL.absoluteString, "http://127.0.0.1:8080/execute")
+        XCTAssertEqual(result.statusCode, 200)
+        XCTAssertTrue(String(data: result.requestBody, encoding: .utf8)?.contains("ScriptRefiner") == true)
+        XCTAssertEqual(result.responseBody, Data(refineOutputJSON.utf8))
+        XCTAssertEqual(result.output.refinedScripts.count, 2)
+    }
+
+    func testServerErrorEnvelopeParsed() async throws {
+        let mock = MockRefineTransport()
+        mock.stub = (Data("""
+            {"error": {"code": "unsupported_provider",
+                       "message": "The selected provider is not configured or supported."}}
+            """.utf8), 400)
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        do {
+            _ = try await RefineService(transport: mock)
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
+            XCTFail("expected RefineAPIError.serverError")
+        } catch RefineAPIError.serverError(let code, let message, let status) {
+            XCTAssertEqual(code, "unsupported_provider")
+            XCTAssertTrue(message.contains("not configured or supported"))
+            XCTAssertEqual(status, 400)
+        } catch {
+            XCTFail("wrong error: \(error)")
         }
     }
 
@@ -144,7 +178,7 @@ final class RefineServiceTests: XCTestCase {
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         do {
             _ = try await RefineService(transport: mock)
-                .refine(baseURL: base, provider: "antigravity", input: makeInput())
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
             XCTFail("expected APIError.server")
         } catch APIError.server(let code, _) {
             XCTAssertEqual(code, 500)
@@ -159,7 +193,7 @@ final class RefineServiceTests: XCTestCase {
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         do {
             _ = try await RefineService(transport: mock)
-                .refine(baseURL: base, provider: "antigravity", input: makeInput())
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
             XCTFail("expected APIError.malformed")
         } catch APIError.malformed {
             // expected
@@ -174,7 +208,7 @@ final class RefineServiceTests: XCTestCase {
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         do {
             _ = try await RefineService(transport: mock)
-                .refine(baseURL: base, provider: "antigravity", input: makeInput())
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
             XCTFail("expected APIError.transport")
         } catch APIError.transport {
             // expected

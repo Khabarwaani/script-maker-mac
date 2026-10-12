@@ -90,4 +90,52 @@ final class RefineViewModelTests: XCTestCase {
         vm.apiBaseURL = "   "
         XCTAssertEqual(vm.resolvedURLString, "")
     }
+
+    func testLogRecordsRequestAndResponse() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data(refineOutputJSON.utf8), 200)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertFalse(vm.logLines.isEmpty)
+        XCTAssertTrue(vm.logLines[0].text.hasPrefix("POST http://127.0.0.1:8080/execute"))
+        XCTAssertEqual(vm.logLines[0].kind, .request)
+        XCTAssertTrue(vm.logLines.contains { $0.kind == .response && $0.text.contains("200 OK") })
+    }
+
+    func testLogClearedOnEachGo() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data(refineOutputJSON.utf8), 200)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        let firstCount = vm.logLines.count
+        XCTAssertGreaterThan(firstCount, 0)
+        await vm.refine()
+        XCTAssertEqual(vm.logLines.count, firstCount)
+        XCTAssertTrue(vm.logLines[0].text.hasPrefix("POST http://127.0.0.1:8080/execute"))
+    }
+
+    func testLogRecordsError() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data("boom".utf8), 500)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertTrue(vm.logLines.contains { $0.kind == .error })
+    }
+
+    func testRequestPreviewJSONShowsEnvelope() {
+        let vm = makeViewModel(MockRefineTransport())
+        vm.script = "INT. OFFICE - DAY"
+        vm.outputCount = 3
+        vm.provider = .antigravity
+        vm.toggleFocus(.textCorrection)
+        let json = vm.requestPreviewJSON
+        XCTAssertTrue(json.contains("ScriptRefiner"))
+        XCTAssertTrue(json.contains("antigravity"))
+        XCTAssertTrue(json.contains("output_count"))
+        XCTAssertTrue(json.contains("correction_focus"))
+        XCTAssertTrue(json.contains("INT. OFFICE - DAY"))
+    }
 }

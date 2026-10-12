@@ -57,6 +57,17 @@ enum CorrectionFocus: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Supported refine providers (per server contract).
+enum RefineProvider: String, Codable, CaseIterable, Identifiable, Sendable {
+    case codex = "codex"
+    case antigravity = "antigravity"
+    case grok = "grok"
+
+    var id: String { rawValue }
+
+    var label: String { rawValue.capitalized }
+}
+
 /// One user-supplied known issue (input `issues_found` entry).
 struct RefineKnownIssue: Codable, Sendable {
     var category: RefineIssueCategory
@@ -92,21 +103,27 @@ struct RefineInput: Codable, Sendable {
 }
 
 /// Agent envelope: the POST body for /execute.
+/// Matches the server curl contract: `{ agent_id, version, provider, input }`.
 struct RefineRequest: Codable, Sendable {
     static let scriptRefinerID = "ScriptRefiner"
+    static let apiVersion = "1.0.0"
 
     var agentID: String
+    var version: String
     var provider: String
     var input: RefineInput
 
-    init(provider: String, input: RefineInput, agentID: String = scriptRefinerID) {
+    init(provider: String, input: RefineInput,
+         agentID: String = scriptRefinerID, version: String = apiVersion) {
         self.agentID = agentID
+        self.version = version
         self.provider = provider
         self.input = input
     }
 
     enum CodingKeys: String, CodingKey {
         case agentID = "agent_id"
+        case version
         case provider
         case input
     }
