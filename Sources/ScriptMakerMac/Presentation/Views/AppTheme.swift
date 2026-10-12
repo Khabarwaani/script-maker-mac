@@ -14,6 +14,8 @@ enum AppTheme {
     static let accentTint = Color("AccentTint")
     static let accentHover = Color("AccentHover")
     static let onAccent = Color("OnAccent")
+    /// Vibrant orange for active and ongoing status indicators
+    static let ongoingColor = Color.orange
 }
 
 struct StudioButtonStyle: ButtonStyle {
