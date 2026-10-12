@@ -231,7 +231,7 @@
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
 				R025 /* WebClient.swift */,
-				R048 /* RefineService.swift */,
+				R051 /* RefineService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -275,7 +275,7 @@
 			children = (
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
-				R049 /* HTTPRefineTransport.swift */,
+				R052 /* HTTPRefineTransport.swift */,
 			);
 			path = WebClients;
 			sourceTree = "<group>";
@@ -342,7 +342,7 @@
 				R035 /* ThumbnailViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
-				R050 /* RefineViewModel.swift */,
+				R053 /* RefineViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
