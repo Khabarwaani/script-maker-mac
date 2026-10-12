@@ -5,6 +5,7 @@ struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
+    @State private var refineViewModel: RefineViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
@@ -23,6 +24,9 @@ struct ContentView: View {
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
+        )
+        _refineViewModel = State(
+            wrappedValue: viewModel.refineViewModel
         )
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
@@ -63,6 +67,7 @@ struct ContentView: View {
                 switch viewModel.selectedTab {
                 case .studio: GenerateView(viewModel: generateViewModel)
                 case .library: LibraryView(viewModel: libraryViewModel)
+                case .refine: RefineView(viewModel: refineViewModel)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

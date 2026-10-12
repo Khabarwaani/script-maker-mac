@@ -33,10 +33,14 @@ final class AppConfig {
     /// The default endpoint is named "localserver".
     static let localserverName = "localserver"
     static let defaultServerURL = "http://localhost:8000"
+    static let defaultRefineAPIBaseURL = "http://127.0.0.1:8080/"
+    static let defaultRefineProvider = "antigravity"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
     private static let newsPageSizeKey = "newsPageSize"
     static let defaultNewsPageSize = 20
+    private static let refineAPIBaseURLKey = "refineAPIBaseURL"
+    private static let refineProviderKey = "refineProvider"
 
     private let defaults: UserDefaults
 
@@ -80,6 +84,16 @@ final class AppConfig {
         didSet { defaults.set(serverURL, forKey: Self.serverURLKey) }
     }
 
+    /// Script-refine API base URL. The Refine tab POSTs to <url>/execute.
+    var refineAPIBaseURL: String {
+        didSet { defaults.set(refineAPIBaseURL, forKey: Self.refineAPIBaseURLKey) }
+    }
+
+    /// Script-refine provider sent in the agent envelope.
+    var refineProvider: String {
+        didSet { defaults.set(refineProvider, forKey: Self.refineProviderKey) }
+    }
+
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
     var dataSource: DataSource {
@@ -100,6 +114,10 @@ final class AppConfig {
         self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
+        self.refineAPIBaseURL = defaults.string(forKey: Self.refineAPIBaseURLKey)
+            ?? Self.defaultRefineAPIBaseURL
+        self.refineProvider = defaults.string(forKey: Self.refineProviderKey)
+            ?? Self.defaultRefineProvider
         if let raw = defaults.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {
             self.dataSource = ds

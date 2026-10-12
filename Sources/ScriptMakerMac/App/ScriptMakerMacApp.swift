@@ -35,6 +35,7 @@ enum CompositionRoot {
         let repository = LocalStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
         let library = LibraryViewModel(config: config, repository: repository)
-        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library)
+        let refiner = RefineViewModel(config: config)
+        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, refineViewModel: refiner)
     }
 }
