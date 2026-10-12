@@ -224,7 +224,7 @@ struct StageDropboxView: View {
 
                     Spacer()
 
-                    statusBadge(for: stage.status)
+                    statusBadge(for: stage)
                 }
                 .contentShape(Rectangle())
             }
@@ -260,23 +260,31 @@ struct StageDropboxView: View {
     }
 
     @ViewBuilder
-    private func statusBadge(for status: String) -> some View {
-        Text(statusLabel(for: status))
+    private func statusBadge(for stage: PipelineStageState) -> some View {
+        Text(statusBadgeText(for: stage))
             .font(.caption2.weight(.semibold))
             .textCase(.uppercase)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(badgeBackground(for: status))
-            .foregroundStyle(badgeForeground(for: status))
+            .background(badgeBackground(for: stage.status))
+            .foregroundStyle(badgeForeground(for: stage.status))
             .clipShape(Capsule())
     }
 
-    private func statusLabel(for status: String) -> String {
-        switch status.lowercased() {
-        case "running": return "Running"
-        case "success", "done", "complete", "passed": return "Complete"
-        case "failed", "error": return "Failed"
-        default: return "Pending"
+    private func statusBadgeText(for stage: PipelineStageState) -> String {
+        let status = stage.status.lowercased()
+        switch status {
+        case "running":
+            return "Running"
+        case "success", "done", "complete", "passed":
+            if let elapsed = stage.formattedElapsed {
+                return "Complete(\(elapsed))"
+            }
+            return "Complete"
+        case "failed", "error":
+            return "Failed"
+        default:
+            return "Pending"
         }
     }
 

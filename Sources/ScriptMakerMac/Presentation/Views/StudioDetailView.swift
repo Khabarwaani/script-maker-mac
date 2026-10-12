@@ -25,7 +25,7 @@ struct StudioDetailView: View {
                         }
                         .foregroundStyle(AppTheme.ink)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.vertical, 4)
                         .background(AppTheme.sunken, in: Capsule())
                     }
 
@@ -39,13 +39,15 @@ struct StudioDetailView: View {
                             Text("Ongoing: \(viewModel.ongoingDescription ?? "Running…")")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
+                                .lineLimit(1)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(AppTheme.accent.opacity(0.12), in: Capsule())
                     }
                 }
-                .frame(height: 34)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 34)
 
                 if viewModel.errorMessage != nil {
                     errorBannerView
