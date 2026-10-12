@@ -141,6 +141,57 @@ final class RefineViewModelTests: XCTestCase {
         XCTAssertEqual(vm.output?.refinedScripts.count, 2)
     }
 
+    func testLogExpandsOnGo() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data(refineOutputJSON.utf8), 200)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        vm.logExpanded = false
+        await vm.refine()
+        XCTAssertTrue(vm.logExpanded)
+    }
+
+    func testSelectedVariationPersistsAcrossLaunches() {
+        let defaults = UserDefaults(suiteName: "test-refine-variation")!
+        defaults.removePersistentDomain(forName: "test-refine-variation")
+        let config = AppConfig(defaults: defaults)
+        let vm = RefineViewModel(config: config, service: RefineService(transport: MockRefineTransport()))
+        vm.selectedVariation = 1
+        XCTAssertEqual(config.refineSelectedVariation, 1)
+        let relaunched = RefineViewModel(config: AppConfig(defaults: defaults),
+                                         service: RefineService(transport: MockRefineTransport()))
+        XCTAssertEqual(relaunched.selectedVariation, 1)
+        defaults.removePersistentDomain(forName: "test-refine-variation")
+    }
+
+    func testAdoptOutputRestoresPersistedVariation() async {
+        let defaults = UserDefaults(suiteName: "test-refine-adopt")!
+        defaults.removePersistentDomain(forName: "test-refine-adopt")
+        let config = AppConfig(defaults: defaults)
+        config.refineSelectedVariation = 1
+        let mock = MockRefineTransport()
+        mock.stub = (Data(refineOutputJSON.utf8), 200)
+        let vm = RefineViewModel(config: config, service: RefineService(transport: mock))
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertEqual(vm.selectedVariation, 1, "persisted tab should survive a new result")
+        defaults.removePersistentDomain(forName: "test-refine-adopt")
+    }
+
+    func testAdoptOutputClampsOutOfRangeVariation() async {
+        let defaults = UserDefaults(suiteName: "test-refine-clamp")!
+        defaults.removePersistentDomain(forName: "test-refine-clamp")
+        let config = AppConfig(defaults: defaults)
+        config.refineSelectedVariation = 9
+        let mock = MockRefineTransport()
+        mock.stub = (Data(refineOutputJSON.utf8), 200)
+        let vm = RefineViewModel(config: config, service: RefineService(transport: mock))
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertEqual(vm.selectedVariation, 1, "clamped to the last variation")
+        defaults.removePersistentDomain(forName: "test-refine-clamp")
+    }
+
     func testRequestPreviewJSONShowsEnvelope() {
         let vm = makeViewModel(MockRefineTransport())
         vm.script = "INT. OFFICE - DAY"

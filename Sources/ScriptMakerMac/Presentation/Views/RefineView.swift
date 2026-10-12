@@ -27,15 +27,20 @@ struct RefineView: View {
             logPanel
         }
         .alert(
-            "Refine failed",
+            "Couldn't Refine the Script",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             ),
             actions: {
-                Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
+                Button("Try Again") {
+                    viewModel.errorMessage = nil
+                    Task { await viewModel.refine() }
+                }
             },
-            message: { Text(viewModel.errorMessage ?? "") }
+            message: {
+                Text("\(viewModel.errorMessage ?? "")\n\nSee the log below for the request and response.")
+            }
         )
     }
 
@@ -99,15 +104,68 @@ struct RefineView: View {
             .foregroundStyle(.secondary)
     }
 
-    /// Xcode-terminal-style log: request URL, request body, response.
-    /// Cleared on every Go; auto-scrolls; copyable.
+    /// Xcode-style console: a one-line bar at the bottom when collapsed,
+    /// the full scrollable log when expanded. Auto-expands on every Go.
     private var logPanel: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
+            logBar
+            if viewModel.logExpanded {
+                Divider()
+                logConsole
+            }
+        }
+        .background(AppTheme.sunken)
+    }
+
+    /// The one-line bar: tap to expand/collapse.
+    private var logBar: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.logExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: viewModel.logExpanded ? "chevron.down" : "chevron.up")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.secondaryInk)
                 Text("Log")
                     .font(.caption)
                     .bold()
                     .foregroundStyle(AppTheme.secondaryInk)
+                if let last = viewModel.logLines.last, !viewModel.logExpanded {
+                    Text(last.text)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                } else if viewModel.logLines.isEmpty {
+                    Text("No requests yet")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+                Spacer()
+                if !viewModel.logLines.isEmpty {
+                    Text("\(viewModel.logLines.count)")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 28, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(viewModel.logExpanded ? "Collapse the log" : "Expand the log")
+        .accessibilityLabel(viewModel.logExpanded ? "Collapse log" : "Expand log")
+    }
+
+    private var logConsole: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
                 Spacer()
                 Button("Copy") { viewModel.copyLog() }
                     .buttonStyle(.plain)
@@ -141,7 +199,6 @@ struct RefineView: View {
         }
         .padding(8)
         .frame(height: 180)
-        .background(AppTheme.sunken)
     }
 
     private func logLineView(_ line: RefineViewModel.LogLine) -> some View {

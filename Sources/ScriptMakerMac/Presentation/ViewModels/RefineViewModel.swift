@@ -42,7 +42,9 @@ final class RefineViewModel {
     var isLoading = false
     var errorMessage: String?
     var output: RefineOutput?
-    var selectedVariation = 0
+    var selectedVariation = 0 {
+        didSet { config.refineSelectedVariation = selectedVariation }
+    }
 
     // MARK: - Terminal log
 
@@ -55,6 +57,10 @@ final class RefineViewModel {
     }
 
     var logLines: [LogLine] = []
+
+    /// Collapsed = one-line bar at the bottom (Xcode-style); expanded =
+    /// the full console. Auto-expands on every Go.
+    var logExpanded = false
 
     private static let logTime: DateFormatter = {
         let formatter = DateFormatter()
@@ -120,6 +126,7 @@ final class RefineViewModel {
         self.config = config
         self.apiBaseURL = config.refineAPIBaseURL
         self.provider = RefineProvider(rawValue: config.refineProvider) ?? .antigravity
+        self.selectedVariation = config.refineSelectedVariation
         self.service = service ?? RefineService(transport: HTTPRefineTransport())
     }
 
@@ -144,6 +151,7 @@ final class RefineViewModel {
     /// Every Go clears the terminal log and records the full exchange.
     func refine() async {
         clearLog()
+        logExpanded = true
         let normalized: String
         do {
             normalized = try AppConfig.normalize(raw: apiBaseURL)
@@ -178,8 +186,7 @@ final class RefineViewModel {
                 let elapsed = Date().timeIntervalSince(startedAt)
                 log(.response, "\(result.statusCode) OK (\(String(format: "%.1f", elapsed))s)")
                 log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
-                output = result.output
-                selectedVariation = 0
+                adoptOutput(result.output)
             } catch {
                 fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
             }
@@ -197,13 +204,20 @@ final class RefineViewModel {
                     let elapsed = Date().timeIntervalSince(startedAt)
                     log(.response, "\(result.statusCode) OK (\(String(format: "%.1f", elapsed))s)")
                     log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
-                    output = result.output
-                    selectedVariation = 0
+                    adoptOutput(result.output)
                 }
             }
         } catch {
             fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
+    }
+
+    /// Adopts a new result, restoring the persisted variation tab
+    /// (clamped to the new result's variation count).
+    private func adoptOutput(_ output: RefineOutput) {
+        self.output = output
+        let last = max(output.refinedScripts.count - 1, 0)
+        selectedVariation = min(max(config.refineSelectedVariation, 0), last)
     }
 
     private func fail(_ message: String) {

@@ -41,6 +41,7 @@ final class AppConfig {
     static let defaultNewsPageSize = 20
     private static let refineAPIBaseURLKey = "refineAPIBaseURL"
     private static let refineProviderKey = "refineProvider"
+    private static let refineSelectedVariationKey = "refineSelectedVariation"
 
     private let defaults: UserDefaults
 
@@ -94,6 +95,12 @@ final class AppConfig {
         didSet { defaults.set(refineProvider, forKey: Self.refineProviderKey) }
     }
 
+    /// Last-selected refined-variation tab index. Restored on launch
+    /// (clamped to the new result's variation count).
+    var refineSelectedVariation: Int {
+        didSet { defaults.set(refineSelectedVariation, forKey: Self.refineSelectedVariationKey) }
+    }
+
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
     var dataSource: DataSource {
@@ -118,6 +125,7 @@ final class AppConfig {
             ?? Self.defaultRefineAPIBaseURL
         self.refineProvider = defaults.string(forKey: Self.refineProviderKey)
             ?? Self.defaultRefineProvider
+        self.refineSelectedVariation = defaults.integer(forKey: Self.refineSelectedVariationKey)
         if let raw = defaults.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {
             self.dataSource = ds

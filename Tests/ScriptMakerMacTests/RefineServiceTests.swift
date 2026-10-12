@@ -232,8 +232,31 @@ final class RefineServiceTests: XCTestCase {
         XCTAssertEqual(results, 1)
     }
 
-    func testStreamWithoutResultThrows() async throws {
+    func testStreamDecodesResultFromMergedLines() async throws {
+        // Server merged several JSON payloads into one event without
+        // blank-line dispatch: progress line + result line.
         let mock = MockRefineTransport()
+        mock.streamEvents = [
+            RefineStreamEvent(name: "message",
+                              data: "{\"progress\": \"working\"}\n" + refineOutputJSON)
+        ]
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        var progress = 0
+        var results = 0
+        for try await item in RefineService(transport: mock)
+            .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {
+            switch item {
+            case .progress: progress += 1
+            case .result(let result):
+                results += 1
+                XCTAssertEqual(result.output.refinedScripts.count, 2)
+            }
+        }
+        XCTAssertEqual(progress, 0, "no separate progress event; the result line decodes")
+        XCTAssertEqual(results, 1)
+    }
+
+    func testStreamWithoutResultThrows() async throws {        let mock = MockRefineTransport()
         mock.streamEvents = [RefineStreamEvent(name: "progress", data: "still working")]
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
         do {

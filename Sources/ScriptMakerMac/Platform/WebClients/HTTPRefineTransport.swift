@@ -22,6 +22,10 @@ struct HTTPRefineTransport: RefineTransport {
         }
     }
 
+    /// Streams the response, tolerating whatever shape the server sends:
+    /// standard SSE (`data:` lines with blank-line dispatch), JSON lines,
+    /// or a plain body. A synthetic `meta` event first reports the HTTP
+    /// status and content type, so the log shows what the wire delivered.
     func postStream(to url: URL, body: Data) -> AsyncThrowingStream<RefineStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -35,6 +39,11 @@ struct HTTPRefineTransport: RefineTransport {
                     guard let httpResponse = response as? HTTPURLResponse else {
                         throw APIError.transport("No HTTP response from \(url.host ?? "server").")
                     }
+                    let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "(none)"
+                    continuation.yield(RefineStreamEvent(
+                        name: "meta",
+                        data: "HTTP \(httpResponse.statusCode), content-type: \(contentType)"
+                    ))
                     guard 200..<300 ~= httpResponse.statusCode else {
                         var errorData = Data()
                         for try await line in bytes.lines {
@@ -45,20 +54,7 @@ struct HTTPRefineTransport: RefineTransport {
                         ))
                         return
                     }
-                    let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? ""
-                    if contentType.contains("text/event-stream") {
-                        try await Self.yieldSSEEvents(from: bytes, to: continuation)
-                    } else {
-                        // Not SSE — single event with the whole body.
-                        var data = Data()
-                        for try await line in bytes.lines {
-                            data.append(contentsOf: (line + "\n").utf8)
-                        }
-                        continuation.yield(RefineStreamEvent(
-                            name: "result",
-                            data: String(data: data, encoding: .utf8) ?? ""
-                        ))
-                    }
+                    try await Self.yieldTolerantEvents(from: bytes, to: continuation)
                     continuation.finish()
                 } catch {
                     if error is APIError || error is RefineAPIError {
@@ -71,33 +67,55 @@ struct HTTPRefineTransport: RefineTransport {
         }
     }
 
-    private static func yieldSSEEvents(
+    /// Yields one event per SSE `data:` payload (blank-line dispatch).
+    /// Lines that are not SSE at all fall back to one event per
+    /// non-empty line (JSON-lines shape), or a single `result` event
+    /// for a one-blob body.
+    private static func yieldTolerantEvents(
         from bytes: URLSession.AsyncBytes,
         to continuation: AsyncThrowingStream<RefineStreamEvent, Error>.Continuation
     ) async throws {
         var eventName = "message"
         var dataLines: [String] = []
-        for try await line in bytes.lines {
-            if line.hasPrefix("event:") {
-                eventName = String(line.dropFirst("event:".count))
-                    .trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("data:") {
-                dataLines.append(String(line.dropFirst("data:".count))
-                    .trimmingCharacters(in: .whitespaces))
-            } else if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                if !dataLines.isEmpty {
-                    continuation.yield(RefineStreamEvent(
-                        name: eventName, data: dataLines.joined(separator: "\n")
-                    ))
-                    dataLines.removeAll()
-                    eventName = "message"
-                }
-            }
-        }
-        if !dataLines.isEmpty {
+        var sawDataLine = false
+        var rawLines: [String] = []
+
+        func flushSSE() {
+            guard !dataLines.isEmpty else { return }
             continuation.yield(RefineStreamEvent(
                 name: eventName, data: dataLines.joined(separator: "\n")
             ))
+            dataLines.removeAll()
+            eventName = "message"
+        }
+
+        for try await line in bytes.lines {
+            if line.hasPrefix("data:") {
+                sawDataLine = true
+                dataLines.append(String(line.dropFirst("data:".count))
+                    .trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("event:") {
+                eventName = String(line.dropFirst("event:".count))
+                    .trimmingCharacters(in: .whitespaces)
+            } else if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                flushSSE()
+            } else {
+                rawLines.append(line)
+            }
+        }
+        flushSSE()
+
+        if !sawDataLine {
+            let nonEmpty = rawLines.filter {
+                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            if nonEmpty.count > 1 {
+                for (index, raw) in nonEmpty.enumerated() {
+                    continuation.yield(RefineStreamEvent(name: "line-\(index)", data: raw))
+                }
+            } else if let blob = nonEmpty.first {
+                continuation.yield(RefineStreamEvent(name: "result", data: blob))
+            }
         }
     }
 }
