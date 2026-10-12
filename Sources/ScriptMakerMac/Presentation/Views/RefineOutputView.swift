@@ -45,31 +45,46 @@ struct RefineOutputView: View {
     private func variations(_ scripts: [RefinedScriptVariation]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Refined scripts").font(.headline)
-            if scripts.count > 1 {
-                Picker("Variation", selection: $viewModel.selectedVariation) {
-                    ForEach(scripts.indices, id: \.self) { index in
-                        Text("Variation \(scripts[index].variationIndex)").tag(index)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .accessibilityLabel("Refined variation")
-            }
-            if scripts.indices.contains(viewModel.selectedVariation) {
-                let variation = scripts[viewModel.selectedVariation]
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(variation.script)
-                        .font(.body.monospaced())
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .background(Color.secondary.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .accessibilityLabel("Refined script variation \(variation.variationIndex)")
-                    Text(variation.notes)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+            TabView(selection: $viewModel.selectedVariation) {
+                ForEach(scripts.indices, id: \.self) { index in
+                    variationCard(scripts[index])
+                        .tabItem {
+                            Text("Variation \(scripts[index].variationIndex)")
+                        }
+                        .tag(index)
                 }
             }
+            .accessibilityLabel("Refined variations")
         }
+    }
+
+    private func variationCard(_ variation: RefinedScriptVariation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Spacer()
+                Button {
+                    viewModel.copyScript(variation.script)
+                } label: {
+                    Label("Copy script", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(AppTheme.secondaryInk)
+                .help("Copy this refined script to the clipboard")
+                .accessibilityLabel("Copy refined script")
+            }
+            Text(variation.script)
+                .font(.body.monospaced())
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.secondary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .accessibilityLabel("Refined script variation \(variation.variationIndex)")
+            Text(variation.notes)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
     }
 }

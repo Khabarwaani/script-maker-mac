@@ -125,6 +125,22 @@ final class RefineViewModelTests: XCTestCase {
         XCTAssertTrue(vm.logLines.contains { $0.kind == .error })
     }
 
+    func testStreamingLogsProgressAndResult() async {
+        let mock = MockRefineTransport()
+        mock.streamEvents = [
+            RefineStreamEvent(name: "progress", data: "analyzing script"),
+            RefineStreamEvent(name: "result", data: refineOutputJSON),
+        ]
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        vm.streamProgress = true
+        await vm.refine()
+        XCTAssertTrue(mock.lastURL?.absoluteString.contains("status=true") == true)
+        XCTAssertTrue(vm.logLines.contains { $0.kind == .info && $0.text.contains("analyzing script") })
+        XCTAssertNotNil(vm.output)
+        XCTAssertEqual(vm.output?.refinedScripts.count, 2)
+    }
+
     func testRequestPreviewJSONShowsEnvelope() {
         let vm = makeViewModel(MockRefineTransport())
         vm.script = "INT. OFFICE - DAY"

@@ -33,6 +33,25 @@ final class MockRefineTransport: RefineTransport, @unchecked Sendable {
     var stub: (data: Data, statusCode: Int) = (Data(), 200)
     var stubError: Error?
 
+    var streamEvents: [RefineStreamEvent] = []
+    var streamError: Error?
+
+    func postStream(to url: URL, body: Data) -> AsyncThrowingStream<RefineStreamEvent, Error> {
+        calls += 1
+        lastURL = url
+        lastBody = body
+        let events = streamEvents
+        let err = streamError
+        return AsyncThrowingStream { continuation in
+            if let err {
+                continuation.finish(throwing: err)
+                return
+            }
+            for event in events { continuation.yield(event) }
+            continuation.finish()
+        }
+    }
+
     func post(to url: URL, body: Data) async throws -> (data: Data, statusCode: Int) {
         calls += 1
         lastURL = url
@@ -88,7 +107,7 @@ final class RefineServiceTests: XCTestCase {
 
         let body = try jsonBody(mock)
         XCTAssertEqual(body["agent_id"] as? String, "ScriptRefiner")
-        XCTAssertEqual(body["version"] as? String, "1.0.0")
+        XCTAssertNil(body["version"])
         XCTAssertEqual(body["provider"] as? String, "antigravity")
         let input = try XCTUnwrap(body["input"] as? [String: Any])
         XCTAssertEqual(input["script"] as? String, "INT. OFFICE - DAY")
@@ -169,6 +188,60 @@ final class RefineServiceTests: XCTestCase {
             XCTAssertEqual(status, 400)
         } catch {
             XCTFail("wrong error: \(error)")
+        }
+    }
+
+    func testStreamURLHasStatusQuery() async throws {
+        let mock = MockRefineTransport()
+        mock.streamEvents = [
+            RefineStreamEvent(name: "result", data: refineOutputJSON)
+        ]
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        var items: [RefineStreamItem] = []
+        for try await item in RefineService(transport: mock)
+            .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {
+            items.append(item)
+        }
+        XCTAssertTrue(mock.lastURL?.absoluteString.contains("execute?status=true") == true)
+        XCTAssertEqual(items.count, 1)
+        if case .result(let result) = items[0] {
+            XCTAssertEqual(result.output.refinedScripts.count, 2)
+        } else {
+            XCTFail("expected .result")
+        }
+    }
+
+    func testStreamYieldsProgressThenResult() async throws {
+        let mock = MockRefineTransport()
+        mock.streamEvents = [
+            RefineStreamEvent(name: "progress", data: "analyzing script"),
+            RefineStreamEvent(name: "progress", data: "generating variations"),
+            RefineStreamEvent(name: "result", data: refineOutputJSON),
+        ]
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        var progress: [String] = []
+        var results = 0
+        for try await item in RefineService(transport: mock)
+            .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {
+            switch item {
+            case .progress(_, let data): progress.append(data)
+            case .result: results += 1
+            }
+        }
+        XCTAssertEqual(progress, ["analyzing script", "generating variations"])
+        XCTAssertEqual(results, 1)
+    }
+
+    func testStreamWithoutResultThrows() async throws {
+        let mock = MockRefineTransport()
+        mock.streamEvents = [RefineStreamEvent(name: "progress", data: "still working")]
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        do {
+            for try await _ in RefineService(transport: mock)
+                .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {}
+            XCTFail("expected malformed error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("without a result"))
         }
     }
 

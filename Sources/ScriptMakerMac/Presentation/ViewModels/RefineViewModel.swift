@@ -21,6 +21,9 @@ final class RefineViewModel {
         didSet { config.refineProvider = provider.rawValue }
     }
 
+    /// When on, Go POSTs to ?status=true and streams SSE progress events.
+    var streamProgress = false
+
     // MARK: - Input form
 
     var script = ""
@@ -44,7 +47,7 @@ final class RefineViewModel {
     // MARK: - Terminal log
 
     struct LogLine: Identifiable {
-        enum Kind { case request, response, error }
+        enum Kind { case request, response, error, info }
         let id = UUID()
         let kind: Kind
         let time: String
@@ -73,6 +76,11 @@ final class RefineViewModel {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    func copyScript(_ script: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(script, forType: .string)
+    }
+
     /// Pretty-prints JSON data for the log; falls back to the raw string.
     static func prettyJSONString(_ data: Data) -> String {
         if let json = try? JSONSerialization.jsonObject(with: data),
@@ -94,7 +102,7 @@ final class RefineViewModel {
     var resolvedURLString: String {
         guard let normalized = try? AppConfig.normalize(raw: apiBaseURL),
               let baseURL = URL(string: normalized) else { return "" }
-        return RefineService.executeURL(baseURL: baseURL).absoluteString
+        return RefineService.executeURL(baseURL: baseURL, stream: streamProgress).absoluteString
     }
 
     /// Pretty-printed JSON of the exact request envelope Go will send,
@@ -158,17 +166,41 @@ final class RefineViewModel {
         output = nil
         defer { isLoading = false }
 
-        let target = RefineService.executeURL(baseURL: baseURL)
+        let target = RefineService.executeURL(baseURL: baseURL, stream: streamProgress)
         log(.request, "POST \(target.absoluteString)")
         log(.request, "body:\n\(requestPreviewJSON)")
         let startedAt = Date()
+        if streamProgress {
+            await refineStreaming(baseURL: baseURL, startedAt: startedAt)
+        } else {
+            do {
+                let result = try await service.refine(baseURL: baseURL, provider: provider, input: makeInput())
+                let elapsed = Date().timeIntervalSince(startedAt)
+                log(.response, "\(result.statusCode) OK (\(String(format: "%.1f", elapsed))s)")
+                log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
+                output = result.output
+                selectedVariation = 0
+            } catch {
+                fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            }
+        }
+    }
+
+    /// Streaming variant: ?status=true, progress events land in the log live.
+    private func refineStreaming(baseURL: URL, startedAt: Date) async {
         do {
-            let result = try await service.refine(baseURL: baseURL, provider: provider, input: makeInput())
-            let elapsed = Date().timeIntervalSince(startedAt)
-            log(.response, "\(result.statusCode) OK (\(String(format: "%.1f", elapsed))s)")
-            log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
-            output = result.output
-            selectedVariation = 0
+            for try await item in service.refineStream(baseURL: baseURL, provider: provider, input: makeInput()) {
+                switch item {
+                case .progress(let name, let data):
+                    log(.info, "… [\(name)] \(data)")
+                case .result(let result):
+                    let elapsed = Date().timeIntervalSince(startedAt)
+                    log(.response, "\(result.statusCode) OK (\(String(format: "%.1f", elapsed))s)")
+                    log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
+                    output = result.output
+                    selectedVariation = 0
+                }
+            }
         } catch {
             fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
