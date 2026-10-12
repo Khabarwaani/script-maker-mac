@@ -9,10 +9,15 @@ struct RefineInputForm: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 16) {
                 LabeledContent("Provider") {
-                    TextField("Provider", text: $viewModel.provider)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 160)
-                        .disabled(viewModel.isLoading)
+                    Picker("Provider", selection: $viewModel.provider) {
+                        ForEach(RefineProvider.allCases) { provider in
+                            Text(provider.label).tag(provider)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 160)
+                    .disabled(viewModel.isLoading)
+                    .help("Refine provider: codex, antigravity or grok")
                 }
                 Stepper("Variations: \(viewModel.outputCount)",
                         value: $viewModel.outputCount, in: 1...5)

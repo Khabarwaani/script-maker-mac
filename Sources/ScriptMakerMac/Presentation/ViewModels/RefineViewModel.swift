@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -16,8 +17,8 @@ final class RefineViewModel {
         didSet { config.refineAPIBaseURL = apiBaseURL }
     }
 
-    var provider: String {
-        didSet { config.refineProvider = provider }
+    var provider: RefineProvider {
+        didSet { config.refineProvider = provider.rawValue }
     }
 
     // MARK: - Input form
@@ -40,6 +41,50 @@ final class RefineViewModel {
     var output: RefineOutput?
     var selectedVariation = 0
 
+    // MARK: - Terminal log
+
+    struct LogLine: Identifiable {
+        enum Kind { case request, response, error }
+        let id = UUID()
+        let kind: Kind
+        let time: String
+        let text: String
+    }
+
+    var logLines: [LogLine] = []
+
+    private static let logTime: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
+
+    func log(_ kind: LogLine.Kind, _ text: String) {
+        logLines.append(LogLine(kind: kind, time: Self.logTime.string(from: Date()), text: text))
+    }
+
+    func clearLog() {
+        logLines.removeAll()
+    }
+
+    func copyLog() {
+        let text = logLines.map { "[\($0.time)] \($0.text)" }.joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// Pretty-prints JSON data for the log; falls back to the raw string.
+    static func prettyJSONString(_ data: Data) -> String {
+        if let json = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(
+               withJSONObject: json, options: [.prettyPrinted, .sortedKeys]
+           ),
+           let string = String(data: pretty, encoding: .utf8) {
+            return string
+        }
+        return String(data: data, encoding: .utf8) ?? "<\(data.count) bytes>"
+    }
+
     var canGo: Bool {
         !isLoading && !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -52,10 +97,21 @@ final class RefineViewModel {
         return RefineService.executeURL(baseURL: baseURL).absoluteString
     }
 
+    /// Pretty-printed JSON of the exact request envelope Go will send,
+    /// rebuilt live from the form state.
+    var requestPreviewJSON: String {
+        let request = RefineRequest(provider: provider.rawValue, input: makeInput())
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(request),
+              let json = String(data: data, encoding: .utf8) else { return "" }
+        return json
+    }
+
     init(config: AppConfig, service: RefineService? = nil) {
         self.config = config
         self.apiBaseURL = config.refineAPIBaseURL
-        self.provider = config.refineProvider
+        self.provider = RefineProvider(rawValue: config.refineProvider) ?? .antigravity
         self.service = service ?? RefineService(transport: HTTPRefineTransport())
     }
 
@@ -77,21 +133,23 @@ final class RefineViewModel {
 
     /// POSTs the envelope to <url>/execute. Fail-loud: transport errors,
     /// non-2xx, bad URL, and empty script all surface via errorMessage.
+    /// Every Go clears the terminal log and records the full exchange.
     func refine() async {
+        clearLog()
         let normalized: String
         do {
             normalized = try AppConfig.normalize(raw: apiBaseURL)
         } catch {
-            errorMessage = error.localizedDescription
+            fail(error.localizedDescription)
             return
         }
         guard let baseURL = URL(string: normalized) else {
-            errorMessage = "Could not parse API URL: \(apiBaseURL)."
+            fail("Could not parse API URL: \(apiBaseURL).")
             return
         }
         let trimmed = script.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            errorMessage = "Enter a script to refine first."
+            fail("Enter a script to refine first.")
             return
         }
 
@@ -100,22 +158,41 @@ final class RefineViewModel {
         output = nil
         defer { isLoading = false }
 
+        let target = RefineService.executeURL(baseURL: baseURL)
+        log(.request, "POST \(target.absoluteString)")
+        log(.request, "body:\n\(requestPreviewJSON)")
+        let startedAt = Date()
+        do {
+            let result = try await service.refine(baseURL: baseURL, provider: provider, input: makeInput())
+            let elapsed = Date().timeIntervalSince(startedAt)
+            log(.response, "\(result.statusCode) OK (\(String(format: "%.1f", elapsed))s)")
+            log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
+            output = result.output
+            selectedVariation = 0
+        } catch {
+            fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    private func fail(_ message: String) {
+        errorMessage = message
+        log(.error, "ERROR: \(message)")
+    }
+
+    /// Builds the request input from the current form state.
+    /// Shared by refine() and the request JSON preview.
+    private func makeInput() -> RefineInput {
+        let trimmed = script.trimmingCharacters(in: .whitespacesAndNewlines)
         let known = issueDrafts.compactMap { draft -> RefineKnownIssue? in
             let desc = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !desc.isEmpty else { return nil }
             return RefineKnownIssue(category: draft.category, description: desc)
         }
-        let input = RefineInput(
+        return RefineInput(
             script: trimmed,
             outputCount: min(max(outputCount, 1), 5),
             issuesFound: known.isEmpty ? nil : known,
             correctionFocus: selectedFocus.isEmpty ? nil : Array(selectedFocus)
         )
-        do {
-            output = try await service.refine(baseURL: baseURL, provider: provider, input: input)
-            selectedVariation = 0
-        } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
     }
 }
