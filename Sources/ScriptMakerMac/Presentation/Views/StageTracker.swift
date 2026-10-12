@@ -21,7 +21,7 @@ struct StageTracker: View {
                 if isRunning {
                     Text("— Running")
                         .font(.subheadline)
-                        .foregroundStyle(AppTheme.secondaryInk)
+                        .foregroundStyle(AppTheme.accent)
                 } else {
                     Text("— Complete")
                         .font(.subheadline)
@@ -62,7 +62,7 @@ struct StageTracker: View {
     private func colorFor(status: String) -> Color {
         switch status.lowercased() {
         case "done", "complete", "passed", "success": return AppTheme.success
-        case "running": return .accentColor
+        case "running": return AppTheme.accent
         case "failed", "error": return AppTheme.danger
         case "waiting": return AppTheme.secondaryInk
         default: return AppTheme.secondaryInk
