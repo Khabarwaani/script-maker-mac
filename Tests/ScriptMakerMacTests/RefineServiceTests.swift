@@ -67,6 +67,18 @@ final class RefineServiceTests: XCTestCase {
         XCTAssertEqual(mock.lastURL?.absoluteString, "http://127.0.0.1:8080/execute")
     }
 
+    func testExecuteURLAppendsPath() throws {
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        XCTAssertEqual(RefineService.executeURL(baseURL: base).absoluteString,
+                       "http://127.0.0.1:8080/execute")
+    }
+
+    func testExecuteURLDoesNotDoublePath() throws {
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/execute"))
+        XCTAssertEqual(RefineService.executeURL(baseURL: base).absoluteString,
+                       "http://127.0.0.1:8080/execute")
+    }
+
     func testEnvelopeKeys() async throws {
         let mock = MockRefineTransport()
         mock.stub = (Data(refineOutputJSON.utf8), 200)

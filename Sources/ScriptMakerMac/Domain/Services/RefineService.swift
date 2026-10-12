@@ -19,8 +19,17 @@ struct RefineService: Sendable {
         self.transport = transport
     }
 
+    /// The POST target: <baseURL>/execute, unless the base URL already
+    /// ends with /execute (never double it).
+    static func executeURL(baseURL: URL) -> URL {
+        if baseURL.pathComponents.last == executePath {
+            return baseURL
+        }
+        return baseURL.appendingPathComponent(executePath)
+    }
+
     func refine(baseURL: URL, provider: String, input: RefineInput) async throws -> RefineOutput {
-        let url = baseURL.appendingPathComponent(Self.executePath)
+        let url = Self.executeURL(baseURL: baseURL)
         let body = try JSONEncoder().encode(RefineRequest(provider: provider, input: input))
         let (data, status) = try await transport.post(to: url, body: body)
         guard 200..<300 ~= status else {

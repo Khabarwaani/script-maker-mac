@@ -80,4 +80,14 @@ final class RefineViewModelTests: XCTestCase {
         vm.isLoading = true
         XCTAssertFalse(vm.canGo)
     }
+
+    func testResolvedURLStringShowsExecuteTarget() {
+        let vm = makeViewModel(MockRefineTransport())
+        vm.apiBaseURL = "http://127.0.0.1:8080/"
+        XCTAssertEqual(vm.resolvedURLString, "http://127.0.0.1:8080/execute")
+        vm.apiBaseURL = "http://127.0.0.1:8080/execute"
+        XCTAssertEqual(vm.resolvedURLString, "http://127.0.0.1:8080/execute")
+        vm.apiBaseURL = "   "
+        XCTAssertEqual(vm.resolvedURLString, "")
+    }
 }
