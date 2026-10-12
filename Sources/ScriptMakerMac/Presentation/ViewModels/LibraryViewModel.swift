@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppKit
 
 /// Library: saved scripts and renders. Backed by the server API;
 /// shows an explicit not-implemented state until the server provides it.
