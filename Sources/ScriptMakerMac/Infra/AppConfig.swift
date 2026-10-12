@@ -26,8 +26,12 @@ final class AppConfig {
     /// The default endpoint is named "localserver".
     static let localserverName = "localserver"
     static let defaultServerURL = "http://localhost:8501"
+    static let defaultRefineAPIBaseURL = "http://127.0.0.1:8080/"
+    static let defaultRefineProvider = "antigravity"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
+    private static let refineAPIBaseURLKey = "refineAPIBaseURL"
+    private static let refineProviderKey = "refineProvider"
 
     var serverURL: String {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
@@ -39,9 +43,23 @@ final class AppConfig {
         didSet { UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey) }
     }
 
+    /// Script-refine API base URL. The Refine tab POSTs to <url>/execute.
+    var refineAPIBaseURL: String {
+        didSet { UserDefaults.standard.set(refineAPIBaseURL, forKey: Self.refineAPIBaseURLKey) }
+    }
+
+    /// Script-refine provider sent in the agent envelope.
+    var refineProvider: String {
+        didSet { UserDefaults.standard.set(refineProvider, forKey: Self.refineProviderKey) }
+    }
+
     init() {
         self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
+        self.refineAPIBaseURL = UserDefaults.standard.string(forKey: Self.refineAPIBaseURLKey)
+            ?? Self.defaultRefineAPIBaseURL
+        self.refineProvider = UserDefaults.standard.string(forKey: Self.refineProviderKey)
+            ?? Self.defaultRefineProvider
         // Migrate the old boolean key: true -> offline, false -> server.
         if let raw = UserDefaults.standard.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {

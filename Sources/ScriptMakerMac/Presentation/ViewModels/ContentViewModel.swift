@@ -6,12 +6,13 @@ import Observation
 @MainActor
 final class ContentViewModel {
     enum Tab: String, CaseIterable, Identifiable {
-        case studio, library
+        case studio, library, refine
         var id: String { rawValue }
         var title: String {
             switch self {
             case .studio: return "Studio"
             case .library: return "Library"
+            case .refine: return "Script Refine"
             }
         }
     }

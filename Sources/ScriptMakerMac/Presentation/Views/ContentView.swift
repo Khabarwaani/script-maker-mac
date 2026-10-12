@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Native macOS layout:
-/// - Top tabs: Studio | Library. Each tab owns exactly ONE NavigationSplitView;
-///   nesting split views throws inside AppKit layout (+[NSApplication _crashOnException:]).
+/// - Top tabs: Studio | Library | Script Refine. Each tab owns exactly ONE
+///   NavigationSplitView; nesting split views throws inside AppKit layout
+///   (+[NSApplication _crashOnException:]).
 /// - Toolbar: connection status, Preferences.
 /// - Every section is its own View struct; ViewModels are created once here
 ///   and stay in memory (never recreated on tab switch).
@@ -10,6 +11,7 @@ struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
+    @State private var refineViewModel: RefineViewModel
     @State private var addressBarViewModel: ServerAddressBarViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
@@ -22,6 +24,9 @@ struct ContentView: View {
         )
         _libraryViewModel = State(
             wrappedValue: LibraryViewModel(config: viewModel.config)
+        )
+        _refineViewModel = State(
+            wrappedValue: RefineViewModel(config: viewModel.config)
         )
         _addressBarViewModel = State(
             wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
@@ -44,6 +49,12 @@ struct ContentView: View {
                     Label("Library", systemImage: "books.vertical")
                 }
                 .tag(ContentViewModel.Tab.library)
+
+            RefineView(viewModel: refineViewModel)
+                .tabItem {
+                    Label("Script Refine", systemImage: "doc.text.magnifyingglass")
+                }
+                .tag(ContentViewModel.Tab.refine)
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

@@ -34,6 +34,19 @@
 		F019 /* RenderStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R021 /* RenderStageView.swift */; };
 		F020 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = R022 /* SampleData.swift */; };
 		F021 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R023 /* LibraryViewModel.swift */; };
+		F043 /* RefineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = R047 /* RefineModels.swift */; };
+		F044 /* RefineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R048 /* RefineService.swift */; };
+		F045 /* HTTPRefineTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = R049 /* HTTPRefineTransport.swift */; };
+		F046 /* RefineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R050 /* RefineViewModel.swift */; };
+		F047 /* RefineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R051 /* RefineView.swift */; };
+		F048 /* RefineInputForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = R052 /* RefineInputForm.swift */; };
+		F049 /* RefineOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R053 /* RefineOutputView.swift */; };
+		E011 /* AppConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E001 /* AppConfigTests.swift */; };
+		T007 /* RepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T006 /* RepositoryTests.swift */; };
+		E012 /* SampleDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E002 /* SampleDataTests.swift */; };
+		E013 /* SampleAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E003 /* SampleAPITests.swift */; };
+		E014 /* RefineServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E005 /* RefineServiceTests.swift */; };
+		E015 /* RefineViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E006 /* RefineViewModelTests.swift */; };
 		F022 /* WebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R025 /* WebClient.swift */; };
 		F023 /* NetworkWebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R026 /* NetworkWebClient.swift */; };
 		F024 /* OfflineWebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R027 /* OfflineWebClient.swift */; };
@@ -89,6 +102,20 @@
 		R043 /* ConfigSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigSidebarView.swift; sourceTree = "<group>"; };
 		R044 /* StoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryListView.swift; sourceTree = "<group>"; };
 		R046 /* StudioDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioDetailView.swift; sourceTree = "<group>"; };
+		R047 /* RefineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineModels.swift; sourceTree = "<group>"; };
+		R048 /* RefineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineService.swift; sourceTree = "<group>"; };
+		R049 /* HTTPRefineTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRefineTransport.swift; sourceTree = "<group>"; };
+		R050 /* RefineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineViewModel.swift; sourceTree = "<group>"; };
+		R051 /* RefineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineView.swift; sourceTree = "<group>"; };
+		R052 /* RefineInputForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineInputForm.swift; sourceTree = "<group>"; };
+		R053 /* RefineOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineOutputView.swift; sourceTree = "<group>"; };
+		E001 /* AppConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigTests.swift; sourceTree = "<group>"; };
+		T006 /* RepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryTests.swift; sourceTree = "<group>"; };
+		E002 /* SampleDataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataTests.swift; sourceTree = "<group>"; };
+		E003 /* SampleAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleAPITests.swift; sourceTree = "<group>"; };
+		E004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E005 /* RefineServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineServiceTests.swift; sourceTree = "<group>"; };
+		E006 /* RefineViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineViewModelTests.swift; sourceTree = "<group>"; };
 		R045 /* StoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDetailView.swift; sourceTree = "<group>"; };
 		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
@@ -170,6 +197,7 @@
 			children = (
 				R002 /* PipelineModels.swift */,
 				R040 /* Story.swift */,
+				R047 /* RefineModels.swift */,
 			);
 			path = Entities;
 			sourceTree = "<group>";
@@ -182,6 +210,7 @@
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
 				R025 /* WebClient.swift */,
+				R048 /* RefineService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -225,6 +254,7 @@
 			children = (
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
+				R049 /* HTTPRefineTransport.swift */,
 			);
 			path = WebClients;
 			sourceTree = "<group>";
@@ -274,6 +304,9 @@
 				R019 /* ServerAddressBar.swift */,
 				R020 /* StoryboardStageView.swift */,
 				R021 /* RenderStageView.swift */,
+				R051 /* RefineView.swift */,
+				R052 /* RefineInputForm.swift */,
+				R053 /* RefineOutputView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -287,6 +320,7 @@
 				R035 /* ThumbnailViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
+				R050 /* RefineViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -337,6 +371,8 @@
 				E002 /* SampleDataTests.swift */,
 				E003 /* SampleAPITests.swift */,
 				E004 /* Info.plist */,
+				E005 /* RefineServiceTests.swift */,
+				E006 /* RefineViewModelTests.swift */,
 			);
 			path = Tests/ScriptMakerMacTests;
 			sourceTree = "<group>";
@@ -434,6 +470,13 @@
 				F019 /* RenderStageView.swift in Sources */,
 				F020 /* SampleData.swift in Sources */,
 				F021 /* LibraryViewModel.swift in Sources */,
+				F043 /* RefineModels.swift in Sources */,
+				F044 /* RefineService.swift in Sources */,
+				F045 /* HTTPRefineTransport.swift in Sources */,
+				F046 /* RefineViewModel.swift in Sources */,
+				F047 /* RefineView.swift in Sources */,
+				F048 /* RefineInputForm.swift in Sources */,
+				F049 /* RefineOutputView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,6 +494,8 @@
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
 				E013 /* SampleAPITests.swift in Sources */,
+				E014 /* RefineServiceTests.swift in Sources */,
+				E015 /* RefineViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
