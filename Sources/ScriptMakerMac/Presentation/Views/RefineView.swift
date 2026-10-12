@@ -14,7 +14,10 @@ struct RefineView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     RefineInputForm(viewModel: viewModel)
-                    if viewModel.output != nil {
+                    if let message = viewModel.errorMessage {
+                        Divider()
+                        inlineError(message)
+                    } else if viewModel.output != nil {
                         Divider()
                         RefineOutputView(viewModel: viewModel)
                     } else if !viewModel.isLoading {
@@ -26,22 +29,6 @@ struct RefineView: View {
             Divider()
             logPanel
         }
-        .alert(
-            "Couldn't Refine the Script",
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            ),
-            actions: {
-                Button("Try Again") {
-                    viewModel.errorMessage = nil
-                    Task { await viewModel.refine() }
-                }
-            },
-            message: {
-                Text("\(viewModel.errorMessage ?? "")\n\nSee the log below for the request and response.")
-            }
-        )
     }
 
     /// The URL bar: base URL field + Go. Go owns its loading state
@@ -102,6 +89,33 @@ struct RefineView: View {
         Text("Enter a script below and press Go — the API returns detected issues and refined variations.")
             .font(.callout)
             .foregroundStyle(.secondary)
+    }
+
+    /// Inline error (HIG: communicate inline, never a modal alert).
+    /// No buttons — Go itself retries.
+    private func inlineError(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(AppTheme.danger)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Couldn't refine the script")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.danger)
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(AppTheme.ink)
+                    .textSelection(.enabled)
+                Text("The full request and response are in the log below.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.danger.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityLabel("Refine error: \(message)")
     }
 
     /// Xcode-style console: a one-line bar at the bottom when collapsed,
