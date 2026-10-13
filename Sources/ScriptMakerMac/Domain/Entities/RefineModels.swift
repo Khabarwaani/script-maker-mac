@@ -16,6 +16,11 @@ enum RefineIssueCategory: String, Codable, CaseIterable, Identifiable, Sendable 
     case characterRoleMismatch = "character_role_mismatch"
     case locationMismatch = "location_mismatch"
     case pacingTiming = "pacing_timing"
+    case characterContinuity = "character_continuity"
+    case propContinuity = "prop_continuity"
+    case spatialContinuity = "spatial_continuity"
+    case actionContinuity = "action_continuity"
+    case dialogueOverflow = "dialogue_overflow"
 
     var id: String { rawValue }
 
@@ -28,6 +33,11 @@ enum RefineIssueCategory: String, Codable, CaseIterable, Identifiable, Sendable 
         case .characterRoleMismatch: return "Character role mismatch"
         case .locationMismatch: return "Location mismatch"
         case .pacingTiming: return "Pacing / timing"
+        case .characterContinuity: return "Character continuity"
+        case .propContinuity: return "Prop continuity"
+        case .spatialContinuity: return "Spatial continuity"
+        case .actionContinuity: return "Action continuity"
+        case .dialogueOverflow: return "Dialogue overflow"
         }
     }
 }
@@ -41,6 +51,11 @@ enum CorrectionFocus: String, Codable, CaseIterable, Identifiable, Sendable {
     case cameraContinuity = "camera_continuity"
     case characterVoice = "character_voice"
     case timingPreservation = "timing_preservation"
+    case characterContinuity = "character_continuity"
+    case propContinuity = "prop_continuity"
+    case spatialContinuity = "spatial_continuity"
+    case actionContinuity = "action_continuity"
+    case dialogueOverflow = "dialogue_overflow"
 
     var id: String { rawValue }
 
@@ -53,6 +68,11 @@ enum CorrectionFocus: String, Codable, CaseIterable, Identifiable, Sendable {
         case .cameraContinuity: return "Camera continuity"
         case .characterVoice: return "Character voice"
         case .timingPreservation: return "Timing preservation"
+        case .characterContinuity: return "Character continuity"
+        case .propContinuity: return "Prop continuity"
+        case .spatialContinuity: return "Spatial continuity"
+        case .actionContinuity: return "Action continuity"
+        case .dialogueOverflow: return "Dialogue overflow"
         }
     }
 }
@@ -74,19 +94,32 @@ struct RefineKnownIssue: Codable, Sendable {
     var description: String
 }
 
+/// Target words-per-second pacing range for dialogue timing.
+struct WPSRange: Codable, Sendable {
+    var min: Double
+    var max: Double
+}
+
 /// The refinement input: the `input` object inside the agent envelope.
-/// Empty optionals are omitted from the JSON (schema: additionalProperties false).
+/// Empty optionals are omitted from the JSON (schema: additionalProperties false);
+/// the scalar timing fields always encode (schema defaults match the UI defaults).
 struct RefineInput: Codable, Sendable {
     var script: String
     var outputCount: Int
     var issuesFound: [RefineKnownIssue]?
     var correctionFocus: [CorrectionFocus]?
+    var sceneDurationSeconds: Double
+    var wpsRange: WPSRange
+    var sceneCount: Int
 
     enum CodingKeys: String, CodingKey {
         case script
         case outputCount = "output_count"
         case issuesFound = "issues_found"
         case correctionFocus = "correction_focus"
+        case sceneDurationSeconds = "scene_duration_seconds"
+        case wpsRange = "wps_range"
+        case sceneCount = "scene_count"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -99,6 +132,9 @@ struct RefineInput: Codable, Sendable {
         if let correctionFocus, !correctionFocus.isEmpty {
             try container.encode(correctionFocus, forKey: .correctionFocus)
         }
+        try container.encode(sceneDurationSeconds, forKey: .sceneDurationSeconds)
+        try container.encode(wpsRange, forKey: .wpsRange)
+        try container.encode(sceneCount, forKey: .sceneCount)
     }
 }
 

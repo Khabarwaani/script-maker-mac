@@ -242,6 +242,29 @@ final class RefineViewModelTests: XCTestCase {
         defaults.removePersistentDomain(forName: "test-refine-clamp")
     }
 
+    func testLoadExampleFillsForm() {
+        let vm = makeViewModel(MockRefineTransport())
+        vm.loadExample()
+        XCTAssertTrue(vm.script.contains("JOHN (laughing happily)"))
+        XCTAssertEqual(vm.outputCount, 3)
+        XCTAssertEqual(vm.sceneDurationSeconds, 10)
+        XCTAssertEqual(vm.wpsMin, 2.5)
+        XCTAssertEqual(vm.wpsMax, 3.5)
+        XCTAssertEqual(vm.sceneCount, 1)
+        XCTAssertEqual(vm.selectedFocus,
+                       [.textCorrection, .emotionDetection, .locationContinuity])
+        XCTAssertEqual(vm.issueDrafts.count, 1)
+        XCTAssertEqual(vm.issueDrafts[0].category, .emotionInconsistency)
+    }
+
+    func testWpsRangeSelfCorrects() {
+        let vm = makeViewModel(MockRefineTransport())
+        vm.wpsMin = 4.0
+        XCTAssertEqual(vm.wpsMax, 4.0, "max follows min up")
+        vm.wpsMax = 2.0
+        XCTAssertEqual(vm.wpsMin, 2.0, "min follows max down")
+    }
+
     func testRequestPreviewJSONShowsEnvelope() {
         let vm = makeViewModel(MockRefineTransport())
         vm.script = "INT. OFFICE - DAY"
@@ -254,5 +277,8 @@ final class RefineViewModelTests: XCTestCase {
         XCTAssertTrue(json.contains("output_count"))
         XCTAssertTrue(json.contains("correction_focus"))
         XCTAssertTrue(json.contains("INT. OFFICE - DAY"))
+        XCTAssertTrue(json.contains("scene_duration_seconds"))
+        XCTAssertTrue(json.contains("wps_range"))
+        XCTAssertTrue(json.contains("scene_count"))
     }
 }

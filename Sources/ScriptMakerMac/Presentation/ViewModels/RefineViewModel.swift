@@ -31,6 +31,16 @@ final class RefineViewModel {
     var issueDrafts: [IssueDraft] = []
     var selectedFocus: Set<CorrectionFocus> = []
 
+    /// Timing fields from the input schema (defaults match the schema).
+    var sceneDurationSeconds = 10.0
+    var wpsMin = 2.5 {
+        didSet { if wpsMin > wpsMax { wpsMax = wpsMin } }
+    }
+    var wpsMax = 3.5 {
+        didSet { if wpsMax < wpsMin { wpsMin = wpsMax } }
+    }
+    var sceneCount = 1
+
     struct IssueDraft: Identifiable {
         let id = UUID()
         var category: RefineIssueCategory = .emotionInconsistency
@@ -149,6 +159,26 @@ final class RefineViewModel {
         } else {
             selectedFocus.insert(focus)
         }
+    }
+
+    /// Fills the form with the input schema's documented example.
+    func loadExample() {
+        script = """
+            INT. OFFICE - DAY
+            JOHN (laughing happily)
+            I just lost everything.
+            EXT. BEACH - NIGHT
+            MARY (whispering)
+            Why did we move here so suddenly?
+            """
+        outputCount = 3
+        sceneDurationSeconds = 10
+        wpsMin = 2.5
+        wpsMax = 3.5
+        sceneCount = 1
+        selectedFocus = [.textCorrection, .emotionDetection, .locationContinuity]
+        issueDrafts = [IssueDraft(category: .emotionInconsistency,
+                                  description: "John is laughing while stating he lost everything.")]
     }
 
     /// POSTs the envelope to <url>/execute. Fail-loud: transport errors,
@@ -281,7 +311,10 @@ final class RefineViewModel {
             script: trimmed,
             outputCount: min(max(outputCount, 1), 5),
             issuesFound: known.isEmpty ? nil : known,
-            correctionFocus: selectedFocus.isEmpty ? nil : Array(selectedFocus)
+            correctionFocus: selectedFocus.isEmpty ? nil : Array(selectedFocus),
+            sceneDurationSeconds: max(sceneDurationSeconds, 0),
+            wpsRange: WPSRange(min: wpsMin, max: wpsMax),
+            sceneCount: max(sceneCount, 1)
         )
     }
 }
