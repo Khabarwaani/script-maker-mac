@@ -68,7 +68,10 @@ final class RefineServiceTests: XCTestCase {
             outputCount: 3,
             issuesFound: [RefineKnownIssue(category: .emotionInconsistency,
                                           description: "Laughing at bad news.")],
-            correctionFocus: [.textCorrection, .emotionDetection]
+            correctionFocus: [.textCorrection, .emotionDetection],
+            sceneDurationSeconds: 10,
+            wpsRange: WPSRange(min: 2.5, max: 3.5),
+            sceneCount: 1
         )
     }
 
@@ -118,13 +121,27 @@ final class RefineServiceTests: XCTestCase {
         let focus = try XCTUnwrap(input["correction_focus"] as? [String])
         XCTAssertTrue(focus.contains("text_correction"))
         XCTAssertTrue(focus.contains("emotion_detection"))
+        XCTAssertEqual(input["scene_duration_seconds"] as? Double, 10)
+        let wps = try XCTUnwrap(input["wps_range"] as? [String: Double])
+        XCTAssertEqual(wps["min"], 2.5)
+        XCTAssertEqual(wps["max"], 3.5)
+        XCTAssertEqual(input["scene_count"] as? Int, 1)
+    }
+
+    func testIssueCategoryAndFocusValueSets() {
+        // The schema defines 12 values each.
+        XCTAssertEqual(RefineIssueCategory.allCases.count, 12)
+        XCTAssertEqual(CorrectionFocus.allCases.count, 12)
+        XCTAssertTrue(RefineIssueCategory.allCases.map(\.rawValue).contains("dialogue_overflow"))
+        XCTAssertTrue(CorrectionFocus.allCases.map(\.rawValue).contains("dialogue_overflow"))
     }
 
     func testOmitsEmptyOptionals() async throws {
         let mock = MockRefineTransport()
         mock.stub = (Data(refineOutputJSON.utf8), 200)
         let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
-        let bare = RefineInput(script: "x", outputCount: 1, issuesFound: nil, correctionFocus: [])
+        let bare = RefineInput(script: "x", outputCount: 1, issuesFound: nil, correctionFocus: [],
+                              sceneDurationSeconds: 10, wpsRange: WPSRange(min: 2.5, max: 3.5), sceneCount: 1)
         _ = try await RefineService(transport: mock)
             .refine(baseURL: base, provider: .antigravity, input: bare)
 

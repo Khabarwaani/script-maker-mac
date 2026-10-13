@@ -24,8 +24,16 @@ struct RefineInputForm: View {
                     .disabled(viewModel.isLoading)
                     .help("Number of refined script variations to request (1–5)")
             }
+            timingSection
             VStack(alignment: .leading, spacing: 4) {
-                Text("Script").font(.headline)
+                HStack {
+                    Text("Script").font(.headline)
+                    Spacer()
+                    Button("Load example") { viewModel.loadExample() }
+                        .disabled(viewModel.isLoading)
+                        .help("Fill the form with the input schema's example")
+                        .accessibilityLabel("Load example input")
+                }
                 TextEditor(text: $viewModel.script)
                     .font(.body.monospaced())
                     .frame(minHeight: 160)
@@ -35,6 +43,32 @@ struct RefineInputForm: View {
             }
             issuesSection
             focusSection
+        }
+    }
+
+    private var timingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Timing").font(.headline)
+            HStack(spacing: 16) {
+                Stepper("Scene duration: \(viewModel.sceneDurationSeconds, specifier: "%g")s",
+                        value: $viewModel.sceneDurationSeconds, in: 1...120, step: 1)
+                    .disabled(viewModel.isLoading)
+                    .help("Target duration allocated per scene in seconds")
+                Stepper("Scenes: \(viewModel.sceneCount)",
+                        value: $viewModel.sceneCount, in: 1...20)
+                    .disabled(viewModel.isLoading)
+                    .help("Maximum scenes allowed")
+            }
+            HStack(spacing: 16) {
+                Stepper("WPS min: \(viewModel.wpsMin, specifier: "%g")",
+                        value: $viewModel.wpsMin, in: 0.5...10, step: 0.5)
+                    .disabled(viewModel.isLoading)
+                    .help("Minimum words per second for spoken dialogue")
+                Stepper("WPS max: \(viewModel.wpsMax, specifier: "%g")",
+                        value: $viewModel.wpsMax, in: 0.5...10, step: 0.5)
+                    .disabled(viewModel.isLoading)
+                    .help("Maximum words per second for spoken dialogue")
+            }
         }
     }
 
