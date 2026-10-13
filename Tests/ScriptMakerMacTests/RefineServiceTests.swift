@@ -374,9 +374,10 @@ final class RefineServiceTests: XCTestCase {
         do {
             _ = try await RefineService(transport: mock)
                 .refine(baseURL: base, provider: .antigravity, input: makeInput())
-            XCTFail("expected APIError.malformed")
-        } catch APIError.malformed {
-            // expected
+            XCTFail("expected RefineAPIError.malformedResponse")
+        } catch RefineAPIError.malformedResponse(let detail, let rawBody) {
+            XCTAssertTrue(detail.contains("refine response"))
+            XCTAssertEqual(rawBody, "not json")
         } catch {
             XCTFail("wrong error: \(error)")
         }
