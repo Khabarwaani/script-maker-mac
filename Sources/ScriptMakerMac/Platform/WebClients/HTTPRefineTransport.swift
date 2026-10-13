@@ -54,7 +54,7 @@ struct HTTPRefineTransport: RefineTransport {
                         ))
                         return
                     }
-                    try await Self.yieldTolerantEvents(from: bytes, to: continuation)
+                    try await Self.yieldLiveEvents(from: bytes.lines, to: continuation)
                     continuation.finish()
                 } catch {
                     if error is APIError || error is RefineAPIError {
@@ -67,20 +67,26 @@ struct HTTPRefineTransport: RefineTransport {
         }
     }
 
-    /// Yields one event per SSE `data:` payload (blank-line dispatch).
-    /// Lines that are not SSE at all fall back to one event per
-    /// non-empty line (JSON-lines shape), or a single `result` event
-    /// for a one-blob body.
-    private static func yieldTolerantEvents(
-        from bytes: URLSession.AsyncBytes,
+    /// Yields one event per payload as lines arrive — live, never buffered
+    /// to stream end. Tolerates whatever shape the server sends:
+    /// - True SSE (`data:` blocks ended by a blank line): multi-line
+    ///   payloads still coalesce at the blank line.
+    /// - `data:`/raw JSON lines without blank-line dispatch: any line that
+    ///   completes a whole JSON document is flushed immediately, so
+    ///   JSON-lines shapes stream live too. Fragments of a pretty-printed
+    ///   payload don't parse as complete JSON, so they keep accumulating.
+    /// - SSE comments (`: ...`, e.g. keepalives) are skipped.
+    static func yieldLiveEvents<Lines: AsyncSequence>(
+        from lines: Lines,
         to continuation: AsyncThrowingStream<RefineStreamEvent, Error>.Continuation
-    ) async throws {
+    ) async throws where Lines.Element == String {
         var eventName = "message"
         var dataLines: [String] = []
-        var sawDataLine = false
         var rawLines: [String] = []
+        var sawDataLine = false
+        var lineIndex = 0
 
-        func flushSSE() {
+        func flushData() {
             guard !dataLines.isEmpty else { return }
             continuation.yield(RefineStreamEvent(
                 name: eventName, data: dataLines.joined(separator: "\n")
@@ -89,33 +95,56 @@ struct HTTPRefineTransport: RefineTransport {
             eventName = "message"
         }
 
-        for try await line in bytes.lines {
+        func flushRaw() {
+            let text = rawLines.joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            rawLines.removeAll()
+            guard !text.isEmpty else { return }
+            continuation.yield(RefineStreamEvent(name: "line-\(lineIndex)", data: text))
+            lineIndex += 1
+        }
+
+        for try await line in lines {
             if line.hasPrefix("data:") {
                 sawDataLine = true
+                // The previous line was a standalone event: flush it live
+                // instead of waiting for the stream to end.
+                if !dataLines.isEmpty,
+                   Self.isCompleteJSON(dataLines.joined(separator: "\n")) {
+                    flushData()
+                }
                 dataLines.append(String(line.dropFirst("data:".count))
                     .trimmingCharacters(in: .whitespaces))
             } else if line.hasPrefix("event:") {
+                if !dataLines.isEmpty,
+                   Self.isCompleteJSON(dataLines.joined(separator: "\n")) {
+                    flushData()
+                }
                 eventName = String(line.dropFirst("event:".count))
                     .trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix(":") {
+                continue // SSE comment / keepalive
             } else if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                flushSSE()
+                flushData()
+                if !sawDataLine { flushRaw() }
             } else {
+                if !rawLines.isEmpty,
+                   Self.isCompleteJSON(rawLines.joined(separator: "\n")) {
+                    flushRaw()
+                }
                 rawLines.append(line)
             }
         }
-        flushSSE()
-
+        flushData()
         if !sawDataLine {
-            let nonEmpty = rawLines.filter {
-                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            }
-            if nonEmpty.count > 1 {
-                for (index, raw) in nonEmpty.enumerated() {
-                    continuation.yield(RefineStreamEvent(name: "line-\(index)", data: raw))
-                }
-            } else if let blob = nonEmpty.first {
-                continuation.yield(RefineStreamEvent(name: "result", data: blob))
-            }
+            flushRaw()
         }
+    }
+
+    /// Best-effort "is this a whole JSON document" — drives live flushing.
+    private static func isCompleteJSON(_ text: String) -> Bool {
+        guard let data = text.data(using: .utf8) else { return false }
+        return (try? JSONSerialization.jsonObject(
+            with: data, options: [.fragmentsAllowed])) != nil
     }
 }
