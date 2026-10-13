@@ -161,6 +161,20 @@ final class RefineViewModelTests: XCTestCase {
         }, "non-envelope errors must also log the raw server bytes")
     }
 
+    func testLogShowsRawBodyOnUndecodable200() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data("not json at all".utf8), 200)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertTrue(vm.logLines.contains {
+            $0.kind == .error && $0.text.contains("Invalid Server Response")
+        })
+        XCTAssertTrue(vm.logLines.contains {
+            $0.kind == .error && $0.text.contains("body:") && $0.text.contains("not json at all")
+        }, "undecodable 2xx bodies must log the raw server bytes")
+    }
+
     func testStreamingLogsProgressAndResult() async {
         let mock = MockRefineTransport()
         mock.streamEvents = [

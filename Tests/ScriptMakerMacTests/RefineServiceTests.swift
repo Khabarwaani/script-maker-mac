@@ -284,11 +284,69 @@ final class RefineServiceTests: XCTestCase {
             for try await _ in RefineService(transport: mock)
                 .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {}
             XCTFail("expected malformed error")
-        } catch let apiError as APIError {
-            guard case .malformed(let what) = apiError else {
-                return XCTFail("wrong APIError: \(apiError)")
+        } catch let refineError as RefineAPIError {
+            guard case .malformedResponse(let detail, let rawBody) = refineError else {
+                return XCTFail("wrong RefineAPIError: \(refineError)")
             }
-            XCTAssertTrue(what.contains("without a result"), "got: \(what)")
+            XCTAssertTrue(detail.contains("without a result"), "got: \(detail)")
+            XCTAssertTrue(rawBody.contains("still working"),
+                          "the stream transcript must travel with the error")
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    func testErrorEnvelopeOn200ThrowsTypedError() async throws {
+        // A 2xx carrying {error:{...}} is a failure, not a malformed body.
+        let mock = MockRefineTransport()
+        mock.stub = (Data("""
+            {"error": {"code": "provider_execution_failed",
+                       "message": "Provider execution failed."}}
+            """.utf8), 200)
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        do {
+            _ = try await RefineService(transport: mock)
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
+            XCTFail("expected RefineAPIError.serverError")
+        } catch RefineAPIError.serverError(let code, _, _, let rawBody) {
+            XCTAssertEqual(code, "provider_execution_failed")
+            XCTAssertTrue(rawBody.contains("provider_execution_failed"))
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    func testStreamErrorEventThrowsTypedError() async throws {
+        let mock = MockRefineTransport()
+        mock.streamEvents = [
+            RefineStreamEvent(name: "progress", data: "working"),
+            RefineStreamEvent(name: "error", data: """
+                {"error": {"code": "provider_execution_failed",
+                           "message": "Provider execution failed."}}
+                """),
+        ]
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        do {
+            for try await _ in RefineService(transport: mock)
+                .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {}
+            XCTFail("expected RefineAPIError.serverError")
+        } catch RefineAPIError.serverError(let code, _, _, _) {
+            XCTAssertEqual(code, "provider_execution_failed")
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    func testUndecodable200CarriesRawBody() async throws {
+        let mock = MockRefineTransport()
+        mock.stub = (Data("not json at all".utf8), 200)
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        do {
+            _ = try await RefineService(transport: mock)
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
+            XCTFail("expected RefineAPIError.malformedResponse")
+        } catch RefineAPIError.malformedResponse(_, let rawBody) {
+            XCTAssertEqual(rawBody, "not json at all")
         } catch {
             XCTFail("wrong error: \(error)")
         }
