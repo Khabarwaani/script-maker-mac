@@ -125,6 +125,36 @@ final class RefineViewModelTests: XCTestCase {
         XCTAssertTrue(vm.logLines.contains { $0.kind == .error })
     }
 
+    func testLogShowsRawServerBodyOnEnvelopeError() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data("""
+            {"error": {"code": "provider_execution_failed",
+                       "message": "Provider execution failed. Check provider authentication."}}
+            """.utf8), 500)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertTrue(vm.logLines.contains {
+            $0.kind == .error && $0.text.contains("provider_execution_failed")
+        })
+        XCTAssertTrue(vm.logLines.contains {
+            $0.kind == .error && $0.text.contains("body:") && $0.text.contains("Check provider authentication")
+        }, "the exact server bytes must appear in the log")
+    }
+
+    func testLogShowsRawServerBodyOnFlatError() async {
+        let mock = MockRefineTransport()
+        mock.stub = (Data("""
+            {"code": "provider_execution_failed", "message": "Provider execution failed."}
+            """.utf8), 500)
+        let vm = makeViewModel(mock)
+        vm.script = "INT. OFFICE - DAY"
+        await vm.refine()
+        XCTAssertTrue(vm.logLines.contains {
+            $0.kind == .error && $0.text.contains("body:") && $0.text.contains("provider_execution_failed")
+        }, "non-envelope errors must also log the raw server bytes")
+    }
+
     func testStreamingLogsProgressAndResult() async {
         let mock = MockRefineTransport()
         mock.streamEvents = [

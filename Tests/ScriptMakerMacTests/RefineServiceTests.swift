@@ -182,10 +182,31 @@ final class RefineServiceTests: XCTestCase {
             _ = try await RefineService(transport: mock)
                 .refine(baseURL: base, provider: .antigravity, input: makeInput())
             XCTFail("expected RefineAPIError.serverError")
-        } catch RefineAPIError.serverError(let code, let message, let status) {
+        } catch RefineAPIError.serverError(let code, let message, let status, let rawBody) {
             XCTAssertEqual(code, "unsupported_provider")
             XCTAssertTrue(message.contains("not configured or supported"))
             XCTAssertEqual(status, 400)
+            XCTAssertTrue(rawBody.contains("unsupported_provider"),
+                          "raw server bytes must travel with the error")
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    func testNonEnvelopeErrorFallsBackWithRawBody() async throws {
+        // A flat (non-{error:{...}}) error body: the raw bytes must survive.
+        let mock = MockRefineTransport()
+        mock.stub = (Data("""
+            {"code": "provider_execution_failed", "message": "Provider execution failed."}
+            """.utf8), 500)
+        let base = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/"))
+        do {
+            _ = try await RefineService(transport: mock)
+                .refine(baseURL: base, provider: .antigravity, input: makeInput())
+            XCTFail("expected APIError.server")
+        } catch APIError.server(let status, let body) {
+            XCTAssertEqual(status, 500)
+            XCTAssertTrue(body.contains("provider_execution_failed"))
         } catch {
             XCTFail("wrong error: \(error)")
         }
