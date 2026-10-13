@@ -259,6 +259,8 @@ final class RefineViewModel {
         switch error {
         case RefineAPIError.serverError(_, _, _, let rawBody):
             return rawBody
+        case RefineAPIError.malformedResponse(_, let rawBody):
+            return rawBody
         case APIError.server(_, let body):
             return body
         default:

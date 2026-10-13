@@ -61,6 +61,11 @@ struct RefineService: Sendable {
         guard 200..<300 ~= status else {
             throw Self.serverError(status: status, data: data)
         }
+        let text = String(data: data, encoding: .utf8) ?? ""
+        // A 2xx carrying an error envelope is still a failure.
+        if let serverError = Self.decodeErrorEnvelope(from: text, status: status) {
+            throw serverError
+        }
         do {
             let output = try JSONDecoder().decode(RefineResponse.self, from: data).output
             return RefineResult(
@@ -71,14 +76,18 @@ struct RefineService: Sendable {
                 responseBody: data
             )
         } catch {
-            throw APIError.malformed("refine response: \(error.localizedDescription)")
+            throw RefineAPIError.malformedResponse(
+                detail: "refine response: \(error.localizedDescription)",
+                rawBody: text
+            )
         }
     }
 
     /// Streaming refine: POST `{baseURL}/execute?status=true`, yielding
     /// progress events as they arrive, then the parsed result. The first
-    /// event whose data decodes as the output schema wins; a stream that
-    /// ends without one fails loud.
+    /// event whose data decodes as the output schema wins; an error
+    /// envelope event fails fast with the typed error; a stream that ends
+    /// without either fails loud with the full transcript attached.
     func refineStream(baseURL: URL, provider: RefineProvider, input: RefineInput)
         -> AsyncThrowingStream<RefineStreamItem, Error>
     {
@@ -90,7 +99,11 @@ struct RefineService: Sendable {
                         RefineRequest(provider: provider.rawValue, input: input)
                     )
                     var gotResult = false
+                    var transcript: [String] = []
                     for try await event in transport.postStream(to: url, body: body) {
+                        if !gotResult, let serverError = Self.decodeErrorEnvelope(from: event.data, status: 200) {
+                            throw serverError
+                        }
                         if !gotResult, let decoded = Self.decodeOutput(from: event.data) {
                             gotResult = true
                             continuation.yield(.result(RefineResult(
@@ -101,13 +114,17 @@ struct RefineService: Sendable {
                                 responseBody: decoded.raw
                             )))
                         } else if !gotResult {
+                            transcript.append("[\(event.name)] \(event.data)")
                             continuation.yield(.progress(name: event.name, data: event.data))
                         }
                     }
                     if gotResult {
                         continuation.finish()
                     } else {
-                        continuation.finish(throwing: APIError.malformed("stream ended without a result"))
+                        continuation.finish(throwing: RefineAPIError.malformedResponse(
+                            detail: "stream ended without a result",
+                            rawBody: transcript.joined(separator: "\n")
+                        ))
                     }
                 } catch {
                     continuation.finish(throwing: error)
@@ -116,28 +133,48 @@ struct RefineService: Sendable {
         }
     }
 
-    /// Tries the whole text, then suffixes that drop leading lines, then
-    /// single lines (with an optional `data:` prefix stripped) — tolerates
-    /// servers that merge progress payloads ahead of the result without
-    /// blank-line dispatch.
-    private static func decodeOutput(from text: String) -> (output: RefineOutput, raw: Data)? {
+    /// JSON candidates from event text: the whole text, suffixes that drop
+    /// leading lines, then single lines — with an optional `data:` prefix
+    /// stripped. Tolerates servers that merge payloads without blank-line
+    /// dispatch.
+    private static func jsonCandidates(from text: String) -> [String] {
         let lines = text.components(separatedBy: "\n")
         var candidates = [text]
         for start in lines.indices {
             candidates.append(lines[start...].joined(separator: "\n"))
         }
         candidates.append(contentsOf: lines)
-        for var candidate in candidates {
-            candidate = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        return candidates.map { raw in
+            var candidate = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if candidate.hasPrefix("data:") {
                 candidate = String(candidate.dropFirst("data:".count))
                     .trimmingCharacters(in: .whitespaces)
             }
-            guard candidate.hasPrefix("{"),
-                  let data = candidate.data(using: .utf8),
+            return candidate
+        }.filter { $0.hasPrefix("{") }
+    }
+
+    private static func decodeOutput(from text: String) -> (output: RefineOutput, raw: Data)? {
+        for candidate in jsonCandidates(from: text) {
+            guard let data = candidate.data(using: .utf8),
                   let output = try? JSONDecoder().decode(RefineResponse.self, from: data).output
             else { continue }
             return (output, data)
+        }
+        return nil
+    }
+
+    /// Typed server error from an `{ error: { code, message } }` payload,
+    /// wherever it arrives (non-2xx body, 2xx body, or stream event).
+    private static func decodeErrorEnvelope(from text: String, status: Int) -> RefineAPIError? {
+        for candidate in jsonCandidates(from: text) {
+            guard let data = candidate.data(using: .utf8),
+                  let envelope = try? JSONDecoder().decode(ServerErrorEnvelope.self, from: data)
+            else { continue }
+            return .serverError(code: envelope.error.code,
+                                message: envelope.error.message,
+                                status: status,
+                                rawBody: candidate)
         }
         return nil
     }
@@ -184,11 +221,14 @@ struct ServerErrorEnvelope: Decodable {
 /// verbatim so the app's summary can never differ from the server output.
 enum RefineAPIError: LocalizedError {
     case serverError(code: String, message: String, status: Int, rawBody: String)
+    case malformedResponse(detail: String, rawBody: String)
 
     var errorDescription: String? {
         switch self {
         case .serverError(let code, let message, let status, _):
             return "\(code): \(message) (HTTP \(status))"
+        case .malformedResponse(let detail, _):
+            return "Invalid Server Response: \(detail)"
         }
     }
 }
