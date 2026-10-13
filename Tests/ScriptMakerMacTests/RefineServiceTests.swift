@@ -284,8 +284,13 @@ final class RefineServiceTests: XCTestCase {
             for try await _ in RefineService(transport: mock)
                 .refineStream(baseURL: base, provider: .antigravity, input: makeInput()) {}
             XCTFail("expected malformed error")
+        } catch let apiError as APIError {
+            guard case .malformed(let what) = apiError else {
+                return XCTFail("wrong APIError: \(apiError)")
+            }
+            XCTAssertTrue(what.contains("without a result"), "got: \(what)")
         } catch {
-            XCTAssertTrue(error.localizedDescription.contains("without a result"))
+            XCTFail("wrong error: \(error)")
         }
     }
 

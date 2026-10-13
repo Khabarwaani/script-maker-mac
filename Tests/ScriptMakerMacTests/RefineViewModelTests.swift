@@ -3,8 +3,14 @@ import XCTest
 
 @MainActor
 final class RefineViewModelTests: XCTestCase {
+    /// Isolated UserDefaults per VM: apiBaseURL/provider/variation persist
+    /// via didSet, so sharing .standard across tests poisons later tests
+    /// (e.g. a blank URL persisted by the bad-URL test breaks every
+    /// subsequent refine() at normalize).
     private func makeViewModel(_ mock: MockRefineTransport) -> RefineViewModel {
-        RefineViewModel(config: AppConfig(), service: RefineService(transport: mock))
+        let defaults = UserDefaults(suiteName: "test-refine-\(UUID().uuidString)")!
+        return RefineViewModel(config: AppConfig(defaults: defaults),
+                               service: RefineService(transport: mock))
     }
 
     func testEmptyScriptFailsLoudWithoutNetwork() async {
