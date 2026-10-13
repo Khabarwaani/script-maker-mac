@@ -87,6 +87,11 @@ final class RefineViewModel {
         NSPasteboard.general.setString(script, forType: .string)
     }
 
+    func copyRequestJSON() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(requestPreviewJSON, forType: .string)
+    }
+
     /// Pretty-prints JSON data for the log; falls back to the raw string.
     static func prettyJSONString(_ data: Data) -> String {
         if let json = try? JSONSerialization.jsonObject(with: data),
@@ -156,7 +161,7 @@ final class RefineViewModel {
         do {
             normalized = try AppConfig.normalize(raw: apiBaseURL)
         } catch {
-            fail(error.localizedDescription)
+            fail(error)
             return
         }
         guard let baseURL = URL(string: normalized) else {
@@ -188,7 +193,7 @@ final class RefineViewModel {
                 log(.response, "body:\n\(Self.prettyJSONString(result.responseBody))")
                 adoptOutput(result.output)
             } catch {
-                fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+                fail(error)
             }
         }
     }
@@ -208,7 +213,7 @@ final class RefineViewModel {
                 }
             }
         } catch {
-            fail((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            fail(error)
         }
     }
 
@@ -220,9 +225,45 @@ final class RefineViewModel {
         selectedVariation = min(max(config.refineSelectedVariation, 0), last)
     }
 
+    private func fail(_ error: Error) {
+        let message = Self.displayMessage(for: error)
+        errorMessage = message
+        log(.error, "ERROR: \(message)")
+        // The exact bytes the server sent — the log must never differ
+        // from the server output.
+        if let rawBody = Self.rawBody(of: error),
+           !rawBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            log(.error, "body:\n\(rawBody)")
+        }
+    }
+
     private func fail(_ message: String) {
         errorMessage = message
         log(.error, "ERROR: \(message)")
+    }
+
+    /// Full detail: errorDescription plus failureReason. APIError keeps
+    /// the real cause in failureReason (e.g. the transport's root error),
+    /// which errorDescription alone drops.
+    static func displayMessage(for error: Error) -> String {
+        let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        if let reason = (error as? LocalizedError)?.failureReason,
+           !reason.isEmpty, reason != description {
+            return "\(description): \(reason)"
+        }
+        return description
+    }
+
+    /// The exact bytes the server sent, when the error carries them.
+    static func rawBody(of error: Error) -> String? {
+        switch error {
+        case RefineAPIError.serverError(_, _, _, let rawBody):
+            return rawBody
+        case APIError.server(_, let body):
+            return body
+        default:
+            return nil
+        }
     }
 
     /// Builds the request input from the current form state.

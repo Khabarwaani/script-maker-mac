@@ -144,15 +144,19 @@ struct RefineService: Sendable {
 
     /// Maps a non-2xx response: the agent API's `{ error: { code, message } }`
     /// envelope becomes a typed error; anything else falls back to APIError.server.
+    /// Either way the raw body is carried along so the log can show exactly
+    /// what the server sent.
     static func serverError(status: Int, data: Data) -> Error {
+        let rawBody = String(data: data, encoding: .utf8) ?? ""
         if let envelope = try? JSONDecoder().decode(ServerErrorEnvelope.self, from: data) {
             return RefineAPIError.serverError(
                 code: envelope.error.code,
                 message: envelope.error.message,
-                status: status
+                status: status,
+                rawBody: rawBody
             )
         }
-        return APIError.server(status, String(data: data, encoding: .utf8) ?? "")
+        return APIError.server(status, rawBody)
     }
 }
 
@@ -175,13 +179,15 @@ struct ServerErrorEnvelope: Decodable {
     var error: Detail
 }
 
-/// Typed refine failures, surfaced to the user via the alert.
+/// Typed refine failures, surfaced to the user via the inline error card.
+/// rawBody is the exact bytes the server sent — the log always shows it
+/// verbatim so the app's summary can never differ from the server output.
 enum RefineAPIError: LocalizedError {
-    case serverError(code: String, message: String, status: Int)
+    case serverError(code: String, message: String, status: Int, rawBody: String)
 
     var errorDescription: String? {
         switch self {
-        case .serverError(let code, let message, let status):
+        case .serverError(let code, let message, let status, _):
             return "\(code): \(message) (HTTP \(status))"
         }
     }
