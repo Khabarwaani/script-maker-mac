@@ -87,6 +87,11 @@ final class RefineViewModel {
         NSPasteboard.general.setString(script, forType: .string)
     }
 
+    func copyRequestJSON() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(requestPreviewJSON, forType: .string)
+    }
+
     /// Pretty-prints JSON data for the log; falls back to the raw string.
     static func prettyJSONString(_ data: Data) -> String {
         if let json = try? JSONSerialization.jsonObject(with: data),

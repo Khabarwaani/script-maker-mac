@@ -73,6 +73,15 @@ struct RefineView: View {
                 .disabled(viewModel.isLoading)
                 .accessibilityLabel("Stream progress events")
             DisclosureGroup("Request JSON", isExpanded: $showRequestJSON) {
+                HStack {
+                    Spacer()
+                    Button("Copy") { viewModel.copyRequestJSON() }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .help("Copy the request JSON to the clipboard")
+                        .accessibilityLabel("Copy request JSON")
+                }
                 Text(viewModel.requestPreviewJSON)
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
