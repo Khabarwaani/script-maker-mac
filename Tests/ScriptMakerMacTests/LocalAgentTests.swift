@@ -270,6 +270,11 @@ final class TerminalLocalAgentServiceTests: XCTestCase {
         let session = StubTerminalSession(response: .success("{}"))
         let catalog = try await service(session).catalog()
         XCTAssertEqual(Set(catalog.map(\.agentID)), Set(KhabarwaaniAgent.agents.keys))
+        for (id, descriptor) in KhabarwaaniAgent.agents {
+            let versions = catalog.filter { $0.agentID == id }
+            XCTAssertEqual(Set(versions.map(\.version)), Set(descriptor.allVersions))
+            XCTAssertEqual(versions.filter(\.isExecutable).map(\.version), [descriptor.latestVersion])
+        }
         let historical = catalog.filter { !$0.isExecutable }
         for entry in historical {
             let input = LocalAgentRequest(agentID: entry.agentID, version: entry.version, inputJSON: "{}", provider: .codex, executable: "fake")

@@ -20,6 +20,10 @@ Keep the local KhabarwaaniAgent checkout beside this repository. AgentAtom and
 TerminalAgentSession resolve from GitHub release ranges; KhabarwaaniAgent stays
 a local path dependency.
 
+Validated with KhabarwaaniAgent 1.1.0, including ThreeSceneStoryCreator 2.1.0
+and its progressive Inquire → Clarify → Payoff instructions. Agent versions come
+from discovery metadata; the app does not pin or relabel them.
+
 The Agent dropdown and its Version dropdown share one row. Both come from the
 package's `KhabarwaaniAgent.agents` discovery descriptors and executable hooks.
 The app has no agent enum or per-agent form switch. Register a new
@@ -28,8 +32,9 @@ The app has no agent enum or per-agent form switch. Register a new
 Input controls come from JSON Schema: strings, numbers, integers, booleans,
 enums, optional and nullable values, nested objects, and arrays. Defaults are
 preserved. Invalid edits remain visible and prevent Run. **Input JSON** shows
-the same payload validated and sent to the package executor. Drafts and version
-choices are retained separately per agent/version while the app is open.
+the same payload validated and sent to the package executor. Drafts are retained
+separately per agent/version while the app is open. Changing agents selects the
+latest executable stable version.
 
 Historical versions listed only as discovery metadata remain unavailable until
 the package supplies their executor. Selecting an older version never executes
