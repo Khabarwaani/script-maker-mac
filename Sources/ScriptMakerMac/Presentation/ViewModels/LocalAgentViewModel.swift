@@ -4,7 +4,12 @@ import Observation
 @Observable @MainActor
 final class LocalAgentViewModel {
     private(set) var definitions: [LocalAgentDefinition] = []
-    var agentID = "" { didSet { restoreVersion() } }
+    var agentID = "" {
+        didSet {
+            if agentID != oldValue { selectLatestVersion() }
+            else { restoreVersion() }
+        }
+    }
     var version = "" {
         didSet {
             if !version.isEmpty { selectedVersions[agentID] = version }
@@ -38,6 +43,11 @@ final class LocalAgentViewModel {
     var draft: AgentInputDraft? {
         get { definition.flatMap { drafts[$0.id] } }
         set { if let key = definition?.id, let newValue { drafts[key] = newValue } }
+    }
+    func draft(for definitionID: String) -> AgentInputDraft? { drafts[definitionID] }
+    func setDraft(_ draft: AgentInputDraft, for definitionID: String) {
+        guard !isRunning, drafts[definitionID] != nil else { return }
+        drafts[definitionID] = draft
     }
     var sessionSettings: LocalAgentSessionSettings {
         get { providerSettings[provider] ?? .init() }
@@ -91,8 +101,11 @@ final class LocalAgentViewModel {
             version = versions.contains(selected) ? selected : ""
             if version.isEmpty { errorMessage = "Selected version \(selected) is unavailable. Choose a version." }
         } else {
-            version = versions.first(where: { !$0.contains("-") && isVersionExecutable($0) }) ?? versions.first(where: { isVersionExecutable($0) }) ?? ""
+            selectLatestVersion()
         }
+    }
+    private func selectLatestVersion() {
+        version = versions.first(where: { !$0.contains("-") && isVersionExecutable($0) }) ?? versions.first(where: { isVersionExecutable($0) }) ?? ""
     }
     private func prepareDraft() {
         if let definition, drafts[definition.id] == nil { drafts[definition.id] = .init(schema: definition.schema, required: true) }

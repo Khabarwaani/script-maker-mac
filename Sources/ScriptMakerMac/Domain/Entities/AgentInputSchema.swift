@@ -53,7 +53,7 @@ struct AgentInputSchema: Equatable, Sendable {
     }
     var nullable: Bool {
         property("type")?.array.contains(.string("null")) == true ||
-        (raw.object["anyOf"]?.array.contains { $0.object["type"] == .string("null") } == true) || choices.contains(.null)
+        (raw.object["anyOf"]?.array.contains { $0.object["type"] == .string("null") } == true)
     }
     var properties: [String: AgentInputSchema] { (property("properties")?.object ?? [:]).mapValues { .init(raw: $0) } }
     var required: Set<String> { Set(property("required")?.array.compactMap(\.string) ?? []) }
@@ -84,7 +84,7 @@ struct AgentInputSchema: Equatable, Sendable {
     func validate(_ value: AgentJSON, path: String = "input") throws {
         func fail(_ reason: String) throws -> Never { throw LocalAgentError.invalidInput("\(path): \(reason)") }
         if value == .null {
-            guard nullable || kind == "null" else { try fail("null is not allowed.") }
+            guard (nullable || kind == "null") && (choices.isEmpty || choices.contains(.null)) else { try fail("null is not allowed.") }
             return
         }
         if !choices.isEmpty, !choices.contains(value) { try fail("choose one of the listed values.") }
@@ -139,6 +139,7 @@ struct AgentInputDraft: Identifiable, Sendable {
         isNull = value == .null
         if let value {
             text = value.string ?? value.number.map { String($0) } ?? ""
+            if schema.kind == "integer", let number = value.number, number.isFinite { text = String(format: "%.0f", number) }
             boolean = value.bool ?? false
             choice = schema.choices.firstIndex(of: value) ?? 0
         }

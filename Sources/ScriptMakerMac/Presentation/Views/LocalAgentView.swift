@@ -36,9 +36,12 @@ private struct LocalAgentInputForm: View {
                     TextField("Model (provider default)", text: $viewModel.model).accessibilityLabel("Model override")
                 }
                 LocalAgentSessionSettingsView(viewModel: viewModel)
-                if let definition = viewModel.definition, definition.isExecutable, let draft = Binding($viewModel.draft) {
-                    DynamicAgentInputForm(draft: draft, schema: definition.schema, label: "Inputs", required: true,
+                if let definition = viewModel.definition, definition.isExecutable, let snapshot = viewModel.draft(for: definition.id) {
+                    DynamicAgentInputForm(draft: Binding(
+                        get: { viewModel.draft(for: definition.id) ?? snapshot },
+                        set: { viewModel.setDraft($0, for: definition.id) }), schema: definition.schema, label: "Inputs", required: true,
                         addItem: { viewModel.addArrayItem(id: $0, schema: $1) }, removeItem: { viewModel.removeArrayItem(parentID: $0, itemID: $1) })
+                        .id(definition.id)
                 }
                 if let error = viewModel.inputError { Text(error).font(.caption).foregroundStyle(AppTheme.warning) }
                 DisclosureGroup("Input JSON") {

@@ -63,6 +63,8 @@ final class AgentInputSchemaTests: XCTestCase {
         XCTAssertEqual(draft.fields["count"]?.text, "-")
         draft.fields["count"]!.text = "1.5"
         XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+        draft.fields["count"]!.text = "9007199254740993"
+        XCTAssertThrowsError(try draft.value(schema: schema, required: true))
         draft.fields["count"]!.text = "6"
         XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
     }
@@ -85,11 +87,35 @@ final class AgentInputSchemaTests: XCTestCase {
         XCTAssertEqual(try draft.value(schema: schema, required: true)?.object["extra"], .string(""))
         draft.fields["extra"]!.isNull = true
         XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+        let nullableEnum = try AgentInputSchema(json: #"{"type":"object","properties":{"value":{"type":["string","null"],"enum":["allowed"]}}}"#)
+        XCTAssertThrowsError(try nullableEnum.validate(.object(["value": .null])))
     }
 }
 
 @MainActor
 final class LocalAgentViewModelTests: XCTestCase {
+    func testAgentChangesSelectLatestAndOldFormDraftRemainsStable() async throws {
+        let old = try syntheticDefinition()
+        let latest = try syntheticDefinition(version: "2.0.0")
+        let other = LocalAgentDefinition(agentID: "Other", name: "Other", version: "1.0.0", schema: old.schema)
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner(definitions: [old, latest, other]))
+        await vm.refreshProviders()
+        vm.selectAgent(old.agentID)
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.version = "1.0.0"
+        vm.draft = filledDraft(old.schema)
+        let oldDraft = try XCTUnwrap(vm.draft(for: old.id))
+        vm.selectAgent(other.agentID)
+        XCTAssertEqual(vm.draft(for: old.id)?.id, oldDraft.id)
+        var edit = oldDraft
+        edit.fields["title"]!.text = "Old form completion"
+        vm.setDraft(edit, for: old.id)
+        XCTAssertNotEqual(vm.draft?.fields["title"]?.text, "Old form completion")
+        vm.selectAgent(old.agentID)
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.version = "1.0.0"
+        XCTAssertEqual(vm.draft?.fields["title"]?.text, "Old form completion")
+    }
     func testSyntheticCatalogEntryGeneratesDraftAndExactExecutionJSONWithoutAppRegistration() async throws {
         let definition = try syntheticDefinition()
         let runner = StubLocalAgentRunner(definitions: [definition])

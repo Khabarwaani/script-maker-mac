@@ -31,8 +31,10 @@ struct DynamicAgentInputForm: View {
             case "object":
                 Text(label).font(.headline)
                 ForEach(schema.properties.keys.sorted(), id: \.self) { key in
-                    if let child = Binding($draft.fields[key]), let childSchema = schema.properties[key] {
-                        AnyView(DynamicAgentInputForm(draft: child, schema: childSchema,
+                    if let snapshot = draft.fields[key], let childSchema = schema.properties[key] {
+                        AnyView(DynamicAgentInputForm(draft: Binding(
+                            get: { draft.fields[key] ?? snapshot },
+                            set: { if draft.fields[key] != nil { draft.fields[key] = $0 } }), schema: childSchema,
                             label: childSchema.title ?? key.replacingOccurrences(of: "_", with: " ").capitalized,
                             required: schema.required.contains(key), addItem: addItem, removeItem: removeItem))
                     }
@@ -40,11 +42,13 @@ struct DynamicAgentInputForm: View {
             case "array":
                 Text(label).font(.headline)
                 if let itemSchema = schema.items {
-                    ForEach($draft.items) { $item in
+                    ForEach(draft.items) { snapshot in
                         VStack(alignment: .leading, spacing: 8) {
-                            AnyView(DynamicAgentInputForm(draft: $item, schema: itemSchema, label: "Item", required: true,
+                            AnyView(DynamicAgentInputForm(draft: Binding(
+                                get: { draft.items.first { $0.id == snapshot.id } ?? snapshot },
+                                set: { value in if let index = draft.items.firstIndex(where: { $0.id == snapshot.id }) { draft.items[index] = value } }), schema: itemSchema, label: "Item", required: true,
                                 addItem: addItem, removeItem: removeItem))
-                            Button("Remove item") { removeItem(draft.id, item.id) }
+                            Button("Remove item") { removeItem(draft.id, snapshot.id) }
                         }
                         .padding(10).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                     }
