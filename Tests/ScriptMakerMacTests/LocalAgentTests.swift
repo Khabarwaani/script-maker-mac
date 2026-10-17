@@ -5,6 +5,71 @@ import TerminalAgentSession
 
 @MainActor
 final class LocalAgentViewModelTests: XCTestCase {
+    func testAllRegisteredAgentsHaveVersionsAndKeepTheirInputs() async {
+        let runner = StubLocalAgentRunner()
+        let vm = LocalAgentViewModel(service: runner)
+        await vm.refreshProviders()
+        XCTAssertEqual(Set(vm.tools), Set(LocalAgentTool.allCases))
+        vm.news = "Story facts"
+        vm.outputCount = 4
+        vm.selectTool(.newsResearcher)
+        XCTAssertEqual(vm.version, "1.1.0")
+        vm.researchTopic = "  Research topic  "
+        vm.researchLanguage = " Hindi "
+        vm.researchSourceURL = " https://example.com/source "
+        XCTAssertTrue(vm.canRun)
+        vm.run()
+        await waitForIdle(vm)
+        let executed = await runner.requests.first
+        XCTAssertEqual(executed?.tool, .newsResearcher)
+        XCTAssertEqual(executed?.version, "1.1.0")
+        XCTAssertEqual(executed?.topic, "Research topic")
+        XCTAssertEqual(executed?.language, "Hindi")
+        XCTAssertEqual(executed?.sourceURL, "https://example.com/source")
+        vm.selectTool(.shekharJoke)
+        vm.outputCount = 12
+        vm.selectTool(.threeSceneStory)
+        XCTAssertEqual(vm.news, "Story facts")
+        XCTAssertEqual(vm.outputCount, 4)
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.selectTool(.newsResearcher)
+        XCTAssertEqual(vm.researchTopic, "  Research topic  ")
+        XCTAssertEqual(vm.version, "1.1.0")
+    }
+
+    func testResearchInputsAndProviderCapability() async {
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner())
+        await vm.refreshProviders()
+        vm.selectProvider(.appleLocal)
+        vm.selectTool(.newsResearcher)
+        XCTAssertEqual(vm.tool, .newsResearcher)
+        XCTAssertEqual(vm.provider, .codex)
+        XCTAssertFalse(vm.isAvailable(.appleLocal))
+        vm.selectProvider(.appleLocal)
+        XCTAssertEqual(vm.provider, .codex)
+        XCTAssertFalse(vm.canRun)
+        vm.researchTopic = "A topic"
+        XCTAssertTrue(vm.canRun)
+        vm.researchSourceURL = "file:///tmp/article"
+        XCTAssertFalse(vm.canRun)
+        vm.researchSourceURL = "https://example.com/article"
+        vm.researchLanguage = " "
+        XCTAssertFalse(vm.canRun)
+        vm.researchLanguage = "English"
+        XCTAssertTrue(vm.canRun)
+    }
+
+    func testResearchCannotRunWhenOnlyOnDeviceProviderIsAvailable() async {
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner(unavailable: [.codex, .claude, .antigravity, .grok]))
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.provider, .appleLocal)
+        vm.selectTool(.newsResearcher)
+        vm.researchTopic = "A topic"
+        XCTAssertEqual(vm.tool, .newsResearcher)
+        XCTAssertFalse(vm.canRun)
+        vm.run()
+        XCTAssertTrue(vm.errorMessage?.contains("web research") == true)
+    }
     func testVersionSelectionFollowsToolAndRefresh() async {
         let runner = StubLocalAgentRunner(storyVersions: ["1.0.0", "2.0.0", "2.1.0-beta"])
         let vm = LocalAgentViewModel(service: runner)
@@ -227,7 +292,7 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
     }
 
     func versions() async throws -> [LocalAgentTool: [String]] {
-        [.threeSceneStory: storyVersions, .shekharJoke: ["1.0.0"]]
+        [.threeSceneStory: storyVersions, .shekharJoke: ["1.0.0"], .newsResearcher: ["1.1.0"]]
     }
     func setStoryVersions(_ versions: [String]) { storyVersions = versions }
 
@@ -235,6 +300,41 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
 }
 
 final class TerminalLocalAgentServiceTests: XCTestCase {
+    func testLocalCatalogIncludesEveryDeclaredAgent() async throws {
+        let versions = try await makeService(StubTerminalSession(response: .success(""))).versions()
+        XCTAssertEqual(Set(versions.keys), Set(LocalAgentTool.allCases))
+        XCTAssertEqual(versions[.newsResearcher], ["1.1.0"])
+    }
+
+    func testNewsResearchSpecRoutingAndOutputPreservesReportedFindings() async throws {
+        let raw = ##"{"verified":false,"confidence":12,"date":"17-10-26","location":{"city":"City","country":"India"},"people":["A"],"notes":["Not verified"],"hashtags":["#News"]}"##
+        let session = StubTerminalSession(response: .success(raw))
+        var input = request(.newsResearcher)
+        input.version = "1.1.0"
+        input.topic = "Research topic"
+        input.language = "Hindi"
+        input.sourceURL = "https://example.com/source"
+        let output = try await makeService(session).run(input)
+        XCTAssertEqual(output.rawOutput, raw)
+        XCTAssertTrue(output.text.contains("verified: false"))
+        XCTAssertTrue(output.text.contains("City, India"))
+        XCTAssertTrue(output.text.contains("Not verified"))
+        XCTAssertTrue(output.metadata?.contains("1.1.0") == true)
+        let sent = await session.recorder.input
+        XCTAssertTrue(sent.contains("Research topic"))
+        XCTAssertTrue(sent.contains("Hindi"))
+        XCTAssertTrue(sent.contains("source_url"))
+        XCTAssertFalse(sent.contains("output_count"))
+        let instructions = await session.recorder.instructions
+        XCTAssertTrue(instructions.contains("news researcher"))
+    }
+
+    func testResearchSupportsRawLocationAndOmittedOptionals() throws {
+        let raw = #"{"verified":true,"confidence":90,"date":"17-10-26","location":"India"}"#
+        let output = try TerminalLocalAgentService.decode(raw, request: request(.newsResearcher))
+        XCTAssertTrue(output.text.contains("Location: India"))
+        XCTAssertEqual(output.rawOutput, raw)
+    }
     func testStrictSchemaClosesNestedObjectsAndKeepsNullableFields() throws {
         let input = try XCTUnwrap(JSONString("""
         {"type":"object","properties":{"nested":{"type":"object","properties":{"count":{"type":"integer"}}},"optional":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["nested"]}

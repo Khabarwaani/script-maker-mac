@@ -29,20 +29,7 @@ private struct LocalAgentInputForm: View {
             Text("Run KhabarwaaniAgent on this Mac or through an installed CLI.")
                 .foregroundStyle(.secondary)
             Group {
-                Text("Agent").font(.headline)
-                ForEach(LocalAgentTool.allCases) { tool in
-                    Button { viewModel.selectTool(tool) } label: {
-                        Label(tool.title, systemImage: viewModel.tool == tool ? "largecircle.fill.circle" : "circle")
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.provider == .appleLocal && tool == .shekharJoke)
-                    .accessibilityValue(viewModel.tool == tool ? "Selected" : "")
-                }
-                Picker("Agent version", selection: $viewModel.version) {
-                    if viewModel.versions.isEmpty { Text("No versions available").tag("") }
-                    ForEach(viewModel.versions, id: \.self) { version in Text(version).tag(version) }
-                }
-                .disabled(viewModel.versions.isEmpty || viewModel.isRefreshing)
+                LocalAgentSelectionRow(viewModel: viewModel)
                 Text("Versions available in the local package. Package and agent versions are separate.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Provider").font(.headline)
@@ -70,7 +57,9 @@ private struct LocalAgentInputForm: View {
                         .accessibilityLabel("Model override")
                 }
                 LocalAgentSessionSettingsView(viewModel: viewModel)
-                Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...(viewModel.tool == .threeSceneStory ? 5 : 20))
+                if viewModel.tool != .newsResearcher {
+                    Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...(viewModel.tool == .threeSceneStory ? 5 : 20))
+                }
                 if viewModel.tool == .threeSceneStory {
                     Text("News facts").font(.headline)
                     TextEditor(text: $viewModel.news)
@@ -82,9 +71,11 @@ private struct LocalAgentInputForm: View {
                         .frame(minHeight: 80)
                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.line))
                         .accessibilityLabel("Optional joke")
-                } else {
+                } else if viewModel.tool == .shekharJoke {
                     Stepper("News to research: \(viewModel.newsCount)", value: $viewModel.newsCount, in: 1...50)
                     Stepper("Jokes per category: \(viewModel.jokesPerCategory)", value: $viewModel.jokesPerCategory, in: 1...20)
+                } else {
+                    LocalAgentResearchInputs(viewModel: viewModel)
                 }
             }
             .disabled(viewModel.isRunning)
@@ -102,6 +93,53 @@ private struct LocalAgentInputForm: View {
             Text(viewModel.status).font(.callout).foregroundStyle(.secondary)
             Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model. No terminal provider or pipeline server is used." : "Uses your CLI account and provider connection. Studio server settings do not apply here.")
                 .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct LocalAgentSelectionRow: View {
+    @Bindable var viewModel: LocalAgentViewModel
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Agent").font(.headline)
+                Picker("Agent", selection: Binding(get: { viewModel.tool }, set: { viewModel.selectTool($0) })) {
+                    if !viewModel.tools.contains(viewModel.tool) { Text("No agents available").tag(viewModel.tool) }
+                    ForEach(viewModel.tools) { tool in Text(tool.title).tag(tool) }
+                }
+                .labelsHidden().pickerStyle(.menu)
+                .disabled(viewModel.tools.isEmpty || viewModel.isRefreshing)
+                .accessibilityLabel("Agent")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Version").font(.headline)
+                Picker("Agent version", selection: $viewModel.version) {
+                    if viewModel.versions.isEmpty { Text("Unavailable").tag("") }
+                    ForEach(viewModel.versions, id: \.self) { version in Text(version).tag(version) }
+                }
+                .labelsHidden().pickerStyle(.menu)
+                .disabled(viewModel.versions.isEmpty || viewModel.isRefreshing)
+                .accessibilityLabel("Agent version")
+            }
+            .frame(width: 105, alignment: .leading)
+        }
+    }
+}
+
+private struct LocalAgentResearchInputs: View {
+    @Bindable var viewModel: LocalAgentViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Topic").font(.headline)
+            TextEditor(text: $viewModel.researchTopic)
+                .frame(minHeight: 150)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.line))
+                .accessibilityLabel("Research topic")
+            TextField("Language", text: $viewModel.researchLanguage).accessibilityLabel("Research language")
+            TextField("Source URL (optional)", text: $viewModel.researchSourceURL).accessibilityLabel("Research source URL")
         }
     }
 }

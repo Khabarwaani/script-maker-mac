@@ -5,7 +5,12 @@ import Observation
 @MainActor
 final class LocalAgentViewModel {
     var tool: LocalAgentTool = .threeSceneStory {
-        didSet { restoreVersion() }
+        didSet {
+            restoreVersion()
+            if !isAvailable(provider), let available = LocalAgentProvider.allCases.first(where: { isAvailable($0) }) {
+                provider = available
+            }
+        }
     }
     var version = "" {
         didSet {
@@ -16,9 +21,10 @@ final class LocalAgentViewModel {
     private(set) var versionsByTool: [LocalAgentTool: [String]] = [:]
     private(set) var isRefreshing = false
     var versions: [String] { versionsByTool[tool] ?? [] }
+    var tools: [LocalAgentTool] { LocalAgentTool.allCases.filter { !(versionsByTool[$0] ?? []).isEmpty } }
     var provider: LocalAgentProvider = .codex {
         didSet {
-            if provider == .appleLocal, tool == .shekharJoke { tool = .threeSceneStory }
+            if !tool.supports(provider) { tool = .threeSceneStory }
         }
     }
     private var providerSettings: [LocalAgentProvider: LocalAgentSessionSettings] = [:]
@@ -32,9 +38,16 @@ final class LocalAgentViewModel {
     }
     var news = ""
     var userJoke = ""
-    var outputCount = 1
+    private var outputCounts: [LocalAgentTool: Int] = [:]
+    var outputCount: Int {
+        get { outputCounts[tool] ?? 1 }
+        set { outputCounts[tool] = newValue }
+    }
     var newsCount = 3
     var jokesPerCategory = 2
+    var researchTopic = ""
+    var researchLanguage = "English"
+    var researchSourceURL = ""
     private(set) var isRunning = false
     private(set) var isCancelling = false
     private(set) var result: LocalAgentResult?
@@ -52,8 +65,11 @@ final class LocalAgentViewModel {
     var canRun: Bool { !isRunning && !isRefreshing && versions.contains(version) && isAvailable(provider) && (try? request.validate()) != nil }
     var executable: String { provider.executable }
 
-    func isAvailable(_ provider: LocalAgentProvider) -> Bool { providers[provider]?.isAvailable == true }
-    func availabilityReason(_ provider: LocalAgentProvider) -> String { providers[provider]?.reason ?? "Checking availability…" }
+    func isAvailable(_ provider: LocalAgentProvider) -> Bool { providers[provider]?.isAvailable == true && tool.supports(provider) }
+    func availabilityReason(_ provider: LocalAgentProvider) -> String {
+        if !tool.supports(provider) { return "\(tool.title) needs web research. Choose an installed terminal provider." }
+        return providers[provider]?.reason ?? "Checking availability…"
+    }
 
     func refreshProviders() async {
         guard !isRunning, !isRefreshing else { return }
@@ -104,7 +120,7 @@ final class LocalAgentViewModel {
     }
 
     func selectTool(_ selected: LocalAgentTool) {
-        guard !isRunning, provider != .appleLocal || selected != .shekharJoke else { return }
+        guard !isRunning, tools.contains(selected) else { return }
         tool = selected
     }
 
@@ -112,7 +128,10 @@ final class LocalAgentViewModel {
         LocalAgentRequest(tool: tool, provider: provider, executable: executable,
                           model: trimmed(model), news: news, userJoke: trimmed(userJoke),
                           outputCount: outputCount, newsCount: newsCount, jokesPerCategory: jokesPerCategory,
-                          session: sessionSettings, version: version)
+                          session: sessionSettings, version: version,
+                          topic: researchTopic.trimmingCharacters(in: .whitespacesAndNewlines),
+                          language: researchLanguage.trimmingCharacters(in: .whitespacesAndNewlines),
+                          sourceURL: trimmed(researchSourceURL))
     }
 
     func run() {

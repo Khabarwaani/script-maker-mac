@@ -31,12 +31,16 @@ graph. No exact release or local checkout is pinned by the app. Use Xcode's
 **File → Packages → Update to Latest Package Versions** to refresh an existing
 resolution. The local KhabarwaaniAgent package uses your working-tree sources.
 
-In LocalAgent, choose an agent and an available **Agent version**.
+In LocalAgent, choose an **Agent** from the left dropdown and its **Version**
+from the right dropdown on the same row. The local service currently registers
+Three Scene Story Creator, Shekhar Joke Generator, and News Researcher.
 Versions come from the local sibling package's specification. A removed selection requires a
 new choice. The updated package supplies ThreeSceneStoryCreator **2.0.0** with
 three scenes containing speaker/dialogue turns and per-scene verification.
 The story form accepts news, an optional joke, and 1–5 outputs; Shekhar Joke
-Generator accepts output count, news count, and jokes per category.
+Generator accepts output count, news count, and jokes per category. News
+Researcher accepts a topic, language, and optional HTTP/HTTPS source URL.
+Inputs and output counts are retained separately when changing agents.
 Choose Codex, Claude, Antigravity, or Grok and sign in to that CLI beforehand,
 or choose **Apple Intelligence (on-device)** to use AgentAtom's native Mac
 session. Missing CLIs and unavailable Apple Intelligence models are grayed out
@@ -52,7 +56,9 @@ Each Run creates a new session; provider capabilities determine process support.
 Codex and Claude normalize persistent stdin/stdout to one-shot execution.
 Metadata appears only when the provider returns and retains it.
 The on-device session runs the supplied-news 3-scene tool; Shekhar's fresh-news
-research tool requires a terminal provider and is disabled for Apple Intelligence.
+research tool and News Researcher require a terminal provider. Selecting either
+research agent selects an available terminal provider when possible; Apple
+Intelligence is disabled for those agents.
 
 Run displays readable results and preserves the exact final response under
 **Raw output**, including undecodable responses. Output text is selectable for
