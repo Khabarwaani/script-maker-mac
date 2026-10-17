@@ -3,7 +3,6 @@ import Foundation
 enum LocalAgentTool: String, CaseIterable, Identifiable, Sendable {
     case threeSceneStory, shekharJoke
     var id: String { rawValue }
-    var agentID: String { self == .threeSceneStory ? "ThreeSceneStoryCreator" : "ShekharJokeGenerator" }
     var title: String {
         switch self {
         case .threeSceneStory: return "3-Scene Story Creator"
