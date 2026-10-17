@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
     @State private var refineViewModel: RefineViewModel
+    @State private var localAgentViewModel: LocalAgentViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
@@ -28,6 +29,7 @@ struct ContentView: View {
         _refineViewModel = State(
             wrappedValue: viewModel.refineViewModel
         )
+        _localAgentViewModel = State(wrappedValue: viewModel.localAgentViewModel)
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
         )
@@ -68,6 +70,7 @@ struct ContentView: View {
                 case .studio: GenerateView(viewModel: generateViewModel)
                 case .library: LibraryView(viewModel: libraryViewModel)
                 case .refine: RefineView(viewModel: refineViewModel)
+                case .localAgent: LocalAgentView(viewModel: localAgentViewModel)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

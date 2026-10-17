@@ -71,4 +71,48 @@ struct FileStore: Sendable {
     func exists(at url: URL) -> Bool {
         fileManager.fileExists(atPath: url.path)
     }
+
+    func makeTemporaryDirectory() throws -> URL {
+        let url = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func removeDirectory(at url: URL) throws {
+        try fileManager.removeItem(at: url)
+    }
+
+    func executableURL(named name: String, searchPaths: [String]) -> URL? {
+        let paths = searchPaths + (ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin").components(separatedBy: ":")
+        let candidates = name.contains("/") ? [URL(fileURLWithPath: name)] : paths.map { URL(fileURLWithPath: $0).appendingPathComponent(name) }
+        return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
+    }
+
+    /// GUI apps have no terminal stdin; provide EOF and preserve CLI diagnostics.
+    func makeCLILauncher(executable: URL, searchPaths: [String], replacements: [String: String] = [:], dropping: [String] = [], in workspace: URL) throws -> URL {
+        func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        let paths = searchPaths + [executable.deletingLastPathComponent().path]
+            + (ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin").components(separatedBy: ":")
+        let output = workspace.appendingPathComponent("cli-output.jsonl")
+        let launcher = workspace.appendingPathComponent("run-cli")
+        let cases = dropping.map { "\(quote($0))) ;;" }
+            + replacements.sorted(by: { $0.key < $1.key }).map { "\(quote($0.key))) arguments+=(\(quote($0.value)));;" }
+        let script = """
+        #!/bin/bash
+        set -o pipefail
+        export PATH=\(quote(paths.joined(separator: ":")))
+        arguments=()
+        for argument in "$@"; do
+            case "$argument" in
+                \(cases.joined(separator: "\n"))
+                *) arguments+=("$argument") ;;
+            esac
+        done
+        \(quote(executable.path)) "${arguments[@]}" </dev/null | /usr/bin/tee \(quote(output.path))
+
+        """
+        try Data(script.utf8).write(to: launcher)
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: launcher.path)
+        return launcher
+    }
 }

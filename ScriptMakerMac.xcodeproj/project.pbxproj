@@ -5,6 +5,20 @@
 	};
 	objectVersion = 56;
 	objects = {
+		L001 = {isa = PBXBuildFile; fileRef = L101; };
+		L101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentModels.swift; sourceTree = "<group>"; };
+		L002 = {isa = PBXBuildFile; fileRef = L102; };
+		L102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentRunning.swift; sourceTree = "<group>"; };
+		L003 = {isa = PBXBuildFile; fileRef = L103; };
+		L103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLocalAgentService.swift; sourceTree = "<group>"; };
+		L004 = {isa = PBXBuildFile; fileRef = L104; };
+		L104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentViewModel.swift; sourceTree = "<group>"; };
+		L005 = {isa = PBXBuildFile; fileRef = L105; };
+		L105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentView.swift; sourceTree = "<group>"; };
+		L006 = {isa = PBXBuildFile; fileRef = L106; };
+		L106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentTests.swift; sourceTree = "<group>"; };
+		L007 = {isa = PBXBuildFile; fileRef = L107; };
+		L107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrictLocalAgentSession.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -214,6 +228,7 @@
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
+				L101 /* LocalAgentModels.swift */,
 				R002 /* PipelineModels.swift */,
 				R040 /* Story.swift */,
 				R047 /* StudioConfig.swift */,
@@ -226,6 +241,7 @@
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				L102 /* LocalAgentRunning.swift */,
 				R028 /* PipelineService.swift */,
 				R034 /* ImageService.swift */,
 				R029 /* APIError.swift */,
@@ -273,6 +289,8 @@
 		G018 /* WebClients */ = {
 			isa = PBXGroup;
 			children = (
+				L103 /* TerminalLocalAgentService.swift */,
+				L107 /* StrictLocalAgentSession.swift */,
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
 				R052 /* HTTPRefineTransport.swift */,
@@ -309,6 +327,7 @@
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				L105 /* LocalAgentView.swift */,
 				R008 /* ContentView.swift */,
 				R049 /* AppTheme.swift */,
 				R030 /* SceneThumbnail.swift */,
@@ -336,6 +355,7 @@
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
 				R007 /* GenerateViewModel.swift */,
@@ -390,6 +410,7 @@
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				L106 /* LocalAgentTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -401,6 +422,17 @@
 			path = Tests/ScriptMakerMacTests;
 			sourceTree = "<group>";
 		};
+LP001 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/AgentAtom"; requirement = {kind = versionRange; minimumVersion = 0.1.0; maximumVersion = 999999.0.0; }; };
+LP002 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/TerminalAgentSession"; requirement = {kind = versionRange; minimumVersion = 0.1.4; maximumVersion = 999999.0.0; }; };
+LP003 = {isa = XCLocalSwiftPackageReference; relativePath = ../KhabarwaaniAgent; };
+LD001 = {isa = XCSwiftPackageProductDependency; package = LP001; productName = AgentAtom; };
+LD002 = {isa = XCSwiftPackageProductDependency; package = LP002; productName = TerminalAgentSession; };
+LD003 = {isa = XCSwiftPackageProductDependency; productName = KhabarwaaniAgent; };
+LB001 = {isa = PBXBuildFile; productRef = LD001; };
+LB002 = {isa = PBXBuildFile; productRef = LD002; };
+LB003 = {isa = PBXBuildFile; productRef = LD003; };
+LB004 = {isa = PBXBuildFile; productRef = LD001; };
+LB005 = {isa = PBXBuildFile; productRef = LD002; };
 		/* Target */
 		T001 /* ScriptMakerMac */ = {
 			isa = PBXNativeTarget;
@@ -413,6 +445,7 @@
 			);
 			buildRules = ( );
 			dependencies = ( );
+			packageProductDependencies = ( LD001, LD002, LD003, );
 			name = ScriptMakerMac;
 			productName = ScriptMakerMac;
 			productReference = R013 /* ScriptMakerMac.app */;
@@ -429,6 +462,7 @@
 			dependencies = (
 				D001 /* PBXTargetDependency */,
 			);
+			packageProductDependencies = ( LD001, LD002, );
 			name = ScriptMakerMacTests;
 			productName = ScriptMakerMacTests;
 			productReference = R024 /* ScriptMakerMacTests.xctest */;
@@ -456,6 +490,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L005 /* LocalAgentView.swift in Sources */,
+				L004 /* LocalAgentViewModel.swift in Sources */,
+				L003 /* TerminalLocalAgentService.swift in Sources */,
+				L007 /* StrictLocalAgentSession.swift in Sources */,
+				L002 /* LocalAgentRunning.swift in Sources */,
+				L001 /* LocalAgentModels.swift in Sources */,
 				F001 /* ScriptMakerMacApp.swift in Sources */,
 				F035 /* CoreUtilities.swift in Sources */,
 				F036 /* Story.swift in Sources */,
@@ -511,7 +551,7 @@
 		P002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( );
+			files = ( LB001, LB002, LB003, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 P006 /* Build revision */ = {
@@ -529,6 +569,7 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L006 /* LocalAgentTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
@@ -541,7 +582,7 @@ P006 /* Build revision */ = {
 		P005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( );
+			files = ( LB004, LB005, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P003 /* Resources */ = {
@@ -561,10 +602,10 @@ P006 /* Build revision */ = {
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -578,10 +619,10 @@ P006 /* Build revision */ = {
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -595,6 +636,7 @@ P006 /* Build revision */ = {
 				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -608,6 +650,7 @@ P006 /* Build revision */ = {
 				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -664,6 +707,7 @@ P006 /* Build revision */ = {
 			knownRegions = ( en, );
 			mainGroup = G001;
 			productRefGroup = G003 /* Products */;
+			packageReferences = ( LP001, LP002, LP003, );
 			projectDirPath = "";
 			projectRoot = "";
 			targets = ( T001 /* ScriptMakerMac */, T002 /* ScriptMakerMacTests */, );
