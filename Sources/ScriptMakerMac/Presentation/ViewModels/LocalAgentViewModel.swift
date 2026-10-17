@@ -5,9 +5,20 @@ import Observation
 @MainActor
 final class LocalAgentViewModel {
     var tool: LocalAgentTool = .threeSceneStory
-    var provider: LocalAgentProvider = .codex
-    var executableOverride = ""
-    var model = ""
+    var provider: LocalAgentProvider = .codex {
+        didSet {
+            if provider == .appleLocal, tool == .shekharJoke { tool = .threeSceneStory }
+        }
+    }
+    private var providerSettings: [LocalAgentProvider: LocalAgentSessionSettings] = [:]
+    var sessionSettings: LocalAgentSessionSettings {
+        get { providerSettings[provider] ?? LocalAgentSessionSettings() }
+        set { providerSettings[provider] = newValue }
+    }
+    var model: String {
+        get { sessionSettings.model }
+        set { sessionSettings.model = newValue }
+    }
     var news = ""
     var userJoke = ""
     var outputCount = 1
@@ -19,22 +30,49 @@ final class LocalAgentViewModel {
     private(set) var rawOutput = ""
     private(set) var errorMessage: String?
     private(set) var status = "Ready"
+    private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
     @ObservationIgnored private let service: any LocalAgentRunning
     @ObservationIgnored private var task: Task<Void, Never>?
 
     init(service: any LocalAgentRunning) { self.service = service }
 
-    var canRun: Bool { !isRunning && (try? request.validate()) != nil }
-    var executable: String { trimmed(executableOverride) ?? provider.executable }
+    var canRun: Bool { !isRunning && isAvailable(provider) && (try? request.validate()) != nil }
+    var executable: String { provider.executable }
+
+    func isAvailable(_ provider: LocalAgentProvider) -> Bool { providers[provider]?.isAvailable == true }
+    func availabilityReason(_ provider: LocalAgentProvider) -> String { providers[provider]?.reason ?? "Checking availability…" }
+
+    func refreshProviders() async {
+        guard !isRunning else { return }
+        providers = await service.availability()
+        if !isAvailable(provider), let available = LocalAgentProvider.allCases.first(where: { isAvailable($0) }) {
+            provider = available
+        }
+    }
+
+    func selectProvider(_ selected: LocalAgentProvider) {
+        guard !isRunning, isAvailable(selected) else { return }
+        provider = selected
+    }
+
+    func selectTool(_ selected: LocalAgentTool) {
+        guard !isRunning, provider != .appleLocal || selected != .shekharJoke else { return }
+        tool = selected
+    }
 
     private var request: LocalAgentRequest {
         LocalAgentRequest(tool: tool, provider: provider, executable: executable,
                           model: trimmed(model), news: news, userJoke: trimmed(userJoke),
-                          outputCount: outputCount, newsCount: newsCount, jokesPerCategory: jokesPerCategory)
+                          outputCount: outputCount, newsCount: newsCount, jokesPerCategory: jokesPerCategory,
+                          session: sessionSettings)
     }
 
     func run() {
         guard !isRunning else { return }
+        guard isAvailable(provider) else {
+            errorMessage = availabilityReason(provider)
+            return
+        }
         let request = request
         do { try request.validate() } catch {
             errorMessage = error.localizedDescription
@@ -58,6 +96,7 @@ final class LocalAgentViewModel {
                     self?.status = "Cancelled"
                 } else {
                     if case LocalAgentError.invalidOutput(let raw, _) = error { self?.rawOutput = raw }
+                    if case LocalAgentError.executionFailed(let raw, _) = error { self?.rawOutput = raw }
                     self?.errorMessage = error.localizedDescription
                     self?.status = "Failed"
                 }

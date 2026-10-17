@@ -16,6 +16,7 @@ struct LocalAgentView: View {
             }
             .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
+        .task { await viewModel.refreshProviders() }
     }
 }
 
@@ -25,21 +26,42 @@ private struct LocalAgentInputForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("LocalAgent").font(.title2.bold())
-            Text("Run KhabarwaaniAgent using an installed, signed-in CLI.")
+            Text("Run KhabarwaaniAgent on this Mac or through an installed CLI.")
                 .foregroundStyle(.secondary)
             Group {
-                Picker("Agent", selection: $viewModel.tool) {
-                    ForEach(LocalAgentTool.allCases) { Text($0.title).tag($0) }
+                Text("Agent").font(.headline)
+                ForEach(LocalAgentTool.allCases) { tool in
+                    Button { viewModel.selectTool(tool) } label: {
+                        Label(tool.title, systemImage: viewModel.tool == tool ? "largecircle.fill.circle" : "circle")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.provider == .appleLocal && tool == .shekharJoke)
+                    .accessibilityValue(viewModel.tool == tool ? "Selected" : "")
                 }
-                Picker("Provider", selection: $viewModel.provider) {
-                    ForEach(LocalAgentProvider.allCases) { Text($0.title).tag($0) }
+                Text("Provider").font(.headline)
+                ForEach(LocalAgentProvider.allCases) { provider in
+                    Button { viewModel.selectProvider(provider) } label: {
+                        Label(provider.title, systemImage: viewModel.provider == provider ? "largecircle.fill.circle" : "circle")
+                            .foregroundStyle(viewModel.isAvailable(provider) ? AppTheme.ink : AppTheme.secondaryInk)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!viewModel.isAvailable(provider))
+                    .accessibilityValue(viewModel.provider == provider ? "Selected" : "")
                 }
-                LabeledContent("Executable") {
-                    TextField(viewModel.provider.executable, text: $viewModel.executableOverride)
-                        .accessibilityLabel("CLI executable override")
+                Text(viewModel.availabilityReason(viewModel.provider)).font(.caption).foregroundStyle(.secondary)
+                Button("Refresh providers") { Task { await viewModel.refreshProviders() } }
+                DisclosureGroup("Provider availability") {
+                    ForEach(LocalAgentProvider.allCases) { provider in
+                        Label("\(provider.title): \(viewModel.availabilityReason(provider))",
+                              systemImage: viewModel.isAvailable(provider) ? "checkmark.circle" : "minus.circle")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                TextField("Model (provider default)", text: $viewModel.model)
-                    .accessibilityLabel("Model override")
+                if viewModel.provider != .appleLocal {
+                    TextField("Model (provider default)", text: $viewModel.model)
+                        .accessibilityLabel("Model override")
+                }
+                LocalAgentSessionSettingsView(viewModel: viewModel)
                 Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...20)
                 if viewModel.tool == .threeSceneStory {
                     Text("News facts").font(.headline)
@@ -70,8 +92,41 @@ private struct LocalAgentInputForm: View {
                 }
             }
             Text(viewModel.status).font(.callout).foregroundStyle(.secondary)
-            Text("Uses your CLI account and provider connection. Studio server settings do not apply here.")
+            Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model. No terminal provider or pipeline server is used." : "Uses your CLI account and provider connection. Studio server settings do not apply here.")
                 .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct LocalAgentSessionSettingsView: View {
+    @Bindable var viewModel: LocalAgentViewModel
+
+    var body: some View {
+        DisclosureGroup("Session settings") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Settings are kept separately for each provider while the app is open.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if viewModel.provider == .appleLocal {
+                    Stepper("Temperature: \(viewModel.sessionSettings.temperature, specifier: "%.1f")",
+                            value: $viewModel.sessionSettings.temperature, in: 0...1, step: 0.1)
+                } else {
+                Picker("Process mode", selection: $viewModel.sessionSettings.persistence) {
+                    Text("One process per run").tag(LocalAgentSessionSettings.Persistence.ephemeral)
+                    Text("Persistent stdin/stdout").tag(LocalAgentSessionSettings.Persistence.persistentStdio)
+                    Text("Daemon").tag(LocalAgentSessionSettings.Persistence.daemon)
+                }
+                Toggle("Keep session memory during the run", isOn: $viewModel.sessionSettings.keepMemory)
+                    .disabled(viewModel.sessionSettings.persistence == .ephemeral)
+                Text("Uses the package's memory policy. Each Run starts a new session; Codex and Claude use one-shot CLI execution.")
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle("Record model", isOn: $viewModel.sessionSettings.recordModel)
+                Toggle("Record duration", isOn: $viewModel.sessionSettings.recordDuration)
+                Toggle("Record token usage", isOn: $viewModel.sessionSettings.recordTokens)
+                Text("Metadata is shown when the provider returns and retains it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.top, 8)
         }
     }
 }
@@ -100,6 +155,11 @@ private struct LocalAgentOutputView: View {
                         .font(.callout.monospaced())
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            if let metadata = viewModel.result?.metadata {
+                DisclosureGroup("Execution metadata") {
+                    Text(metadata).font(.callout.monospaced()).textSelection(.enabled)
                 }
             }
         }

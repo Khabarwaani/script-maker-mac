@@ -49,7 +49,8 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
    PRs target `develop`. Never push direct to `main`/`develop`.
 2. **Thin client:** pipeline generation goes through `PipelineAPI`. The
    `LocalAgent` workspace may execute KhabarwaaniAgent through installed CLI
-   providers via its injected service. Views never import agent packages.
+   providers or AgentAtom's on-device session via its injected service.
+   Views never import agent packages.
 3. **Fail-loud:** typed errors (`APIError`, `ConfigError`) with `LocalizedError`.
    Surfaces to the user; the UI stays usable offline.
 4. **Concurrency:** async/await only — no completion handlers, no Combine for

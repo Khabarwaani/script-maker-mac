@@ -17,6 +17,8 @@
 		L105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentView.swift; sourceTree = "<group>"; };
 		L006 = {isa = PBXBuildFile; fileRef = L106; };
 		L106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentTests.swift; sourceTree = "<group>"; };
+		L007 = {isa = PBXBuildFile; fileRef = L107; };
+		L107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrictLocalAgentSession.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -288,6 +290,7 @@
 			isa = PBXGroup;
 			children = (
 				L103 /* TerminalLocalAgentService.swift */,
+				L107 /* StrictLocalAgentSession.swift */,
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
 				R052 /* HTTPRefineTransport.swift */,
@@ -490,6 +493,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				L005 /* LocalAgentView.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
+				L007 /* StrictLocalAgentSession.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
 				L001 /* LocalAgentModels.swift in Sources */,
 				F001 /* ScriptMakerMacApp.swift in Sources */,

@@ -33,10 +33,22 @@ resolution. The local KhabarwaaniAgent package uses your working-tree sources.
 
 In LocalAgent, choose **3-Scene Story Creator** (news, optional joke, output count)
 or **Shekhar Joke Generator** (output count, news count, jokes per category).
-Choose Codex, Claude, Antigravity, or Grok and sign in to that CLI beforehand.
-An optional executable path and model override are available. Finder-launched
-apps also search `/opt/homebrew/bin` and `/usr/local/bin`; use an absolute path
-for other installations.
+Choose Codex, Claude, Antigravity, or Grok and sign in to that CLI beforehand,
+or choose **Apple Intelligence (on-device)** to use AgentAtom's native Mac
+session. Missing CLIs and unavailable Apple Intelligence models are grayed out
+and cannot be selected. **Refresh providers** rechecks availability; installed
+CLIs still need valid provider authentication. Executables are found on PATH,
+`/opt/homebrew/bin`, and `/usr/local/bin`.
+
+Expand **Session settings** for the package's runtime process mode, memory
+policy, and execution metadata. The on-device provider offers temperature
+instead of terminal process/memory settings. CLI model overrides are in the
+main form. Settings are kept separately per provider while the app is open.
+Each Run creates a new session; provider capabilities determine process support.
+Codex and Claude normalize persistent stdin/stdout to one-shot execution.
+Metadata appears only when the provider returns and retains it.
+The on-device session runs the supplied-news 3-scene tool; Shekhar's fresh-news
+research tool requires a terminal provider and is disabled for Apple Intelligence.
 
 Run displays readable results and preserves the exact final response under
 **Raw output**, including undecodable responses. Output text is selectable for
@@ -46,9 +58,17 @@ disabled until cleanup finishes. Provider access may require internet and uses
 your existing CLI account. Results remain in memory while switching tabs;
 automatic import into Studio/Library is not included.
 
+The CLI launcher supplies EOF on stdin for GUI launches, adds executable
+search paths to the child environment, and captures stdout for failure details.
+The package adapter closes derived object schemas for strict structured output,
+including nullable optional fields. It translates Grok's schema option to the
+installed CLI's `--json-schema` interface and does not forward permission-bypass
+flags inserted by provider defaults.
+
 CI and release workflows check out `KhabarwaaniAgent`'s `develop` branch beside
-the app. Configure `KHABARWAANI_AGENT_READ_TOKEN` with read access to that private
-repository, and use a macOS 27/Xcode 27 runner. Tests fake CLI sessions and never
+the app. Workflows try their GitHub token; if cross-repository access is denied,
+configure `KHABARWAANI_AGENT_READ_TOKEN` with read access to the private package.
+The `xcode-27` runner provides macOS 27/Xcode 27. Tests fake sessions and never
 invoke a live provider.
 
 ## Architecture
