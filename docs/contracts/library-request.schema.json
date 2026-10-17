@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LibraryRequest",
+  "type": "object",
+  "required": [
+    "story",
+    "engine",
+    "instruction",
+    "model_identifier"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "story": {
+      "$ref": "library-story.schema.json"
+    },
+    "engine": {
+      "type": "string",
+      "description": "Compatibility alias of model_identifier. Exact canonical provider/model/reasoning identifier; legacy None disables AI."
+    },
+    "instruction": {
+      "type": "string",
+      "description": "Required nonblank for refinements; empty string for enrichment updates."
+    },
+    "model_identifier": {
+      "type": "string",
+      "description": "Shared Settings identifier; percent-encode each component before joining with slash. Do not infer provider from model name.",
+      "pattern": "^[^/]+/[^/]+/[^/]+$"
+    }
+  },
+  "examples": [
+    {
+      "story": {
+        "id": "4c349aaa-2d1c-4be6-9ad8-9376d58a3c23",
+        "title": "The Odd Day",
+        "summary": "Delhi considers odd-even traffic restrictions.",
+        "headline": "Delhi announces odd-even restrictions",
+        "createdAt": "2026-10-11T03:00:00Z",
+        "status": "saved",
+        "emotion": "Curiosity",
+        "format": "Normal Talk",
+        "scriptText": "Narrator: Will odd-even restrictions help?"
+      },
+      "engine": "Antigravity/Default/default",
+      "instruction": "Tighten the hook while preserving the facts.",
+      "model_identifier": "Antigravity/Default/default"
+    }
+  ]
+}

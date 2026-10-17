@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import UniformTypeIdentifiers
 
 /// Infra layer: dumb framework wrappers.
 /// No business logic, no app-specific types. Just thin adapters.
@@ -72,6 +74,17 @@ struct FileStore: Sendable {
         fileManager.fileExists(atPath: url.path)
     }
 
+    func importMedia(_ source: URL) throws -> URL {
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("ScriptMakerMac/Media", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        let destination = root.appendingPathComponent(UUID().uuidString).appendingPathExtension(source.pathExtension)
+        try fileManager.copyItem(at: source, to: destination)
+        return destination
+    }
+
     func makeTemporaryDirectory() throws -> URL {
         let url = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
@@ -114,5 +127,39 @@ struct FileStore: Sendable {
         try Data(script.utf8).write(to: launcher)
         try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: launcher.path)
         return launcher
+    }
+}
+
+@MainActor
+struct PasteboardStore {
+    func write(_ text: String) -> Bool {
+        NSPasteboard.general.clearContents()
+        return NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+@MainActor
+struct SharingStore {
+    func open(_ url: URL, nativeURL: URL?) -> Bool {
+        if let nativeURL, NSWorkspace.shared.urlForApplication(toOpen: nativeURL) != nil {
+            return NSWorkspace.shared.open(nativeURL)
+        }
+        return NSWorkspace.shared.open(url)
+    }
+
+    func saveText(_ text: String, filename: String, title: String, message: String) throws -> URL? {
+        let panel = NSSavePanel()
+        panel.title = title
+        panel.message = message
+        panel.nameFieldStringValue = filename
+        panel.allowedContentTypes = [.plainText]
+        panel.canCreateDirectories = true
+        let cloudStorage = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/CloudStorage", isDirectory: true)
+        if FileManager.default.fileExists(atPath: cloudStorage.path) { panel.directoryURL = cloudStorage }
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        return url
     }
 }

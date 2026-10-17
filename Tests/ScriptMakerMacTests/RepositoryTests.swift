@@ -1,10 +1,20 @@
 import XCTest
 @testable import ScriptMakerMac
 
+private final class TestStoryDataSource: StoryDataSourceProtocol, @unchecked Sendable {
+    private var stories: [Story] = []
+    func load() -> [Story] { stories }
+    func save(_ stories: [Story]) { self.stories = stories }
+}
+
+private func isolatedStoryStore() -> KeyValueStore {
+    KeyValueStore(defaults: UserDefaults(suiteName: "ScriptMakerMacTests.\(UUID().uuidString)")!)
+}
+
 /// Unit tests for StoryRepository (business layer).
 final class StoryRepositoryTests: XCTestCase {
     func testSaveAndLoad() async {
-        let repo = LocalStoryRepository()
+        let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
         await repo.save(Story(id: "ut-1", title: "Unit Test"))
         let stories = await repo.all()
         XCTAssertTrue(stories.contains { $0.id == "ut-1" })
@@ -12,7 +22,7 @@ final class StoryRepositoryTests: XCTestCase {
     }
 
     func testRemove() async {
-        let repo = LocalStoryRepository()
+        let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
         await repo.save(Story(id: "ut-remove", title: "Remove Me"))
         await repo.remove(id: "ut-remove")
         let stories = await repo.all()
@@ -20,7 +30,7 @@ final class StoryRepositoryTests: XCTestCase {
     }
 
     func testSaveReplacesExisting() async {
-        let repo = LocalStoryRepository()
+        let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
         await repo.save(Story(id: "ut-replace", title: "Original"))
         await repo.save(Story(id: "ut-replace", title: "Updated"))
         let matches = await repo.all().filter { $0.id == "ut-replace" }
@@ -30,7 +40,7 @@ final class StoryRepositoryTests: XCTestCase {
     }
 
     func testNewestFirst() async {
-        let repo = LocalStoryRepository()
+        let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
         await repo.save(Story(id: "ut-old", title: "Old"))
         await repo.save(Story(id: "ut-new", title: "New"))
         let stories = await repo.all()
@@ -45,7 +55,7 @@ final class StoryRepositoryTests: XCTestCase {
 
     func testCacheInvalidation() async {
         // Platform is stateful: cache must reflect mutations.
-        let repo = LocalStoryRepository()
+        let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
         await repo.save(Story(id: "cache-1", title: "Cached"))
         var stories = await repo.all()
         XCTAssertTrue(stories.contains { $0.id == "cache-1" })
@@ -56,7 +66,7 @@ final class StoryRepositoryTests: XCTestCase {
     }
 
     func testInvalidateCacheReloadsFromDataSource() async {
-        let repo = LocalStoryRepository()
+        let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
         await repo.save(Story(id: "inv-1", title: "Before"))
         _ = await repo.all() // populate cache
         await repo.invalidateCache()
@@ -68,28 +78,26 @@ final class StoryRepositoryTests: XCTestCase {
 
 /// Unit tests for UserDefaultsStoryDataSource (infra layer).
 final class StoryDataSourceTests: XCTestCase {
-    private func makeIsolatedStore() -> KeyValueStore {
-        let suite = UserDefaults(suiteName: "test.store.\(UUID().uuidString)")!
-        return KeyValueStore(defaults: suite)
-    }
-
     func testSaveAndLoad() {
-        let store = makeIsolatedStore()
+        let store = isolatedStoryStore()
         let ds = UserDefaultsStoryDataSource(store: store)
+        let original = ds.load()
         ds.save([Story(id: "ds-ut", title: "DS Test")])
         XCTAssertTrue(ds.load().contains { $0.id == "ds-ut" })
+        ds.save(original) // restore
     }
 
     func testLoadReturnsArray() {
-        let store = makeIsolatedStore()
+        let store = isolatedStoryStore()
         let ds = UserDefaultsStoryDataSource(store: store)
         let result = ds.load()
         XCTAssertTrue(result is [Story])
     }
 
     func testLegacyDictionaryMigration() {
-        let store = makeIsolatedStore()
+        let store = isolatedStoryStore()
         let ds = UserDefaultsStoryDataSource(store: store)
+        let original = ds.load()
         // Simulate legacy storage: raw JSON dictionaries.
         let legacy: [[String: Any]] = [
             ["id": "legacy-1", "title": "Legacy Story", "created_at": "2026-01-01T00:00:00Z"]
@@ -100,6 +108,7 @@ final class StoryDataSourceTests: XCTestCase {
         let loaded = ds.load()
         XCTAssertTrue(loaded.contains { $0.id == "legacy-1" })
         XCTAssertEqual(loaded.first { $0.id == "legacy-1" }?.title, "Legacy Story")
+        ds.save(original) // restore
     }
 }
 
