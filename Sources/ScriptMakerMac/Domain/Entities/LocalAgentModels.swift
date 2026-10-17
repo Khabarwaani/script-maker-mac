@@ -1,14 +1,17 @@
 import Foundation
 
 enum LocalAgentTool: String, CaseIterable, Identifiable, Sendable {
-    case threeSceneStory, shekharJoke
+    case threeSceneStory, shekharJoke, newsResearcher
     var id: String { rawValue }
     var title: String {
         switch self {
         case .threeSceneStory: return "3-Scene Story Creator"
         case .shekharJoke: return "Shekhar Joke Generator"
+        case .newsResearcher: return "News Researcher"
         }
     }
+    var requiresWebResearch: Bool { self != .threeSceneStory }
+    func supports(_ provider: LocalAgentProvider) -> Bool { provider != .appleLocal || !requiresWebResearch }
 }
 
 enum LocalAgentProvider: String, CaseIterable, Identifiable, Sendable {
@@ -50,17 +53,23 @@ struct LocalAgentRequest: Sendable {
     var jokesPerCategory: Int
     var session = LocalAgentSessionSettings()
     var version: String? = nil
+    var topic = ""
+    var language = "English"
+    var sourceURL: String? = nil
 
     func validate() throws {
         guard !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw LocalAgentError.invalidInput("Enter a CLI executable name or absolute path.")
         }
-        guard outputCount > 0 else { throw LocalAgentError.invalidInput("Output count must be positive.") }
+        if tool != .newsResearcher, outputCount <= 0 { throw LocalAgentError.invalidInput("Output count must be positive.") }
         if tool == .threeSceneStory, outputCount > 5 {
             throw LocalAgentError.invalidInput("Story output count must be between 1 and 5.")
         }
         guard session.temperature.isFinite, (0...1).contains(session.temperature) else {
             throw LocalAgentError.invalidInput("Temperature must be between 0 and 1.")
+        }
+        guard tool.supports(provider) else {
+            throw LocalAgentError.invalidInput("\(tool.title) requires live news research. Choose a terminal provider.")
         }
         switch tool {
         case .threeSceneStory:
@@ -68,11 +77,22 @@ struct LocalAgentRequest: Sendable {
                 throw LocalAgentError.invalidInput("Enter the news facts for your story.")
             }
         case .shekharJoke:
-            guard provider != .appleLocal else {
-                throw LocalAgentError.invalidInput("Shekhar Joke Generator requires live news research. Choose a terminal provider.")
-            }
             guard newsCount > 0, jokesPerCategory > 0 else {
                 throw LocalAgentError.invalidInput("News and joke counts must be positive.")
+            }
+        case .newsResearcher:
+            guard !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw LocalAgentError.invalidInput("Enter a news topic to research.")
+            }
+            guard !language.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw LocalAgentError.invalidInput("Enter a language for the findings.")
+            }
+            if let sourceURL {
+                guard let url = URLComponents(string: sourceURL),
+                      ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+                      let host = url.host, !host.isEmpty else {
+                    throw LocalAgentError.invalidInput("Enter an HTTP or HTTPS source URL with a host.")
+                }
             }
         }
     }

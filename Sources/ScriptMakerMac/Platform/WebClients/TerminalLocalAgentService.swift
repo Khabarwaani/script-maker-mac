@@ -28,7 +28,8 @@ struct TerminalLocalAgentService: LocalAgentRunning {
 
     func versions() async throws -> [LocalAgentTool: [String]] {
         [.threeSceneStory: [ThreeSceneStoryCreatorSpec.identity.version],
-         .shekharJoke: [ShekharJokeGeneratorSpec.identity.version]]
+         .shekharJoke: [ShekharJokeGeneratorSpec.identity.version],
+         .newsResearcher: [NewsResearcherSpec.identity.version]]
     }
 
     func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
@@ -86,6 +87,9 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         case .shekharJoke:
             raw = try await session.executeSpec(ShekharJokeGeneratorSpec(input: .init(
                 outputCount: request.outputCount, newsCount: request.newsCount, jokesPerCategory: request.jokesPerCategory)))
+        case .newsResearcher:
+            raw = try await session.executeSpec(NewsResearcherSpec(input: .init(
+                topic: request.topic, language: request.language, sourceURL: request.sourceURL)))
         }
         try Task.checkCancellation()
         return try Self.decode(raw, request: request, records: session.executionMetadata)
@@ -112,6 +116,18 @@ struct TerminalLocalAgentService: LocalAgentRunning {
                 text = output.items.map {
                     "\($0.title)\n\($0.category) · \($0.date)\n\($0.link)\n\nShort joke\n\($0.joke1)\n\nLong joke\n\($0.joke2)\n\nScript\n\($0.script)"
                 }.joined(separator: "\n\n──────────\n\n")
+            case .newsResearcher:
+                let output = try JSONDecoder().decode(NewsResearcherOutput.self, from: Data(raw.utf8))
+                let location: String?
+                switch output.location {
+                case .structured(let value): location = [value.city, value.state, value.country].compactMap { $0 }.joined(separator: ", ")
+                case .raw(let value): location = value
+                case nil: location = nil
+                }
+                text = ["Agent-reported verified: \(output.verified)", "Confidence: \(output.confidence)", "Date: \(output.date)",
+                    location.map { "Location: \($0)" }, output.people.map { "People: \($0.joined(separator: ", "))" },
+                    output.notes.map { "Findings\n\($0.joined(separator: "\n"))" }, output.hashtags?.joined(separator: " ")]
+                    .compactMap { $0 }.joined(separator: "\n\n")
             }
             let metadata = records.map { record in
                 [record.modelIdentifier.map { "Model: \($0)" },
