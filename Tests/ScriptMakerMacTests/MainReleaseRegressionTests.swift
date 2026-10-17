@@ -180,48 +180,7 @@ final class LibraryDetailTests: XCTestCase {
         XCTAssertTrue(failing.actionNotice?.contains("Could not import media") ?? false)
         XCTAssertFalse(failing.isImportingMedia)
     }
-    func testRefinementPreviewRequiresAcceptanceAndSavesSeparateStory() async throws {
-        let config = releaseTestConfig()
-        let originalSource = config.dataSource, originalEngine = config.libraryAIEngine
-        let originalDelay = config.localJSONDelay
-        defer { config.dataSource = originalSource; config.libraryAIEngine = originalEngine; config.localJSONDelay = originalDelay }
-        config.dataSource = .offline; config.localJSONDelay = 0; config.libraryAIEngine = "Antigravity"
-        let original = Story(title: "Original title", createdAt: "2020-01-01T00:00:00Z", scriptText: "Original script")
-        let other = Story(title: "Other story", scriptText: "Other script")
-        let repo = MainReleaseWorkflowStoryRepository()
-        await repo.save(original); await repo.save(other)
-        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
-        await vm.refresh(); vm.selectedStoryID = original.id
-        vm.refinementInstruction = "Tighten hook"
-        await vm.update(.refine)
-        XCTAssertNotNil(vm.refinement)
-        XCTAssertEqual(vm.selectedStory?.scriptText, "Original script")
-        vm.refinementInstruction = "A later draft instruction"
-        await vm.acceptRefinement()
-        let accepted = try XCTUnwrap(vm.selectedStory)
-        XCTAssertNotEqual(accepted.id, original.id)
-        XCTAssertEqual(accepted.title, original.title)
-        XCTAssertNotEqual(accepted.createdAt, original.createdAt)
-        XCTAssertEqual(accepted.sourceStoryID, original.id)
-        XCTAssertEqual(accepted.generationNumber, 2)
-        XCTAssertEqual(accepted.scriptVersions?.count, 2)
-        XCTAssertEqual(accepted.scriptVersions?.last?.instruction, "Tighten hook")
-        XCTAssertNotEqual(accepted.scriptText, original.scriptText)
-        let first = try XCTUnwrap(accepted.scriptVersions?.first)
-        await vm.useVersion(first, storyID: accepted.id)
-        XCTAssertEqual(vm.selectedStory?.scriptText, original.scriptText)
-        await vm.update(.refine)
-        vm.selectedStoryID = other.id
-        XCTAssertNil(vm.refinement)
-        await vm.acceptRefinement()
-        XCTAssertEqual(vm.selectedStory?.scriptText, other.scriptText)
-        let saved = await repo.all()
-        XCTAssertEqual(saved.first { $0.id == original.id }?.scriptText, "Original script")
-        XCTAssertNil(saved.first { $0.id == original.id }?.scriptVersions)
-        let persisted = try XCTUnwrap(saved.first { $0.id == accepted.id })
-        let encoded = try JSONEncoder().encode(persisted)
-        XCTAssertEqual(try JSONDecoder().decode(Story.self, from: encoded).scriptVersions?.count, 2)
-    }
+
 
     func testEditingCreatesNewUUIDAndSubtitleWhileCopyUsesNewContent() async throws {
         let repo = MainReleaseWorkflowStoryRepository()
@@ -343,13 +302,8 @@ final class LibraryNetworkContractTests: XCTestCase {
         XCTAssertEqual((json["story"] as? [String: Any])?["scriptText"] as? String, "Current script")
     }
 
-    func testRefinementRouteAndUnavailableServerErrors() async throws {
-        let api = client(body: "{\"script\":\"Refined preview\"}")
+    func testUnavailableServerErrors() async throws {
         let story = Story(scriptText: "Original script")
-        let output = try await api.update(.refine, story: story, engine: "Codex", instruction: "Tighten hook", localJSON: false,
-                                          delay: 60, serverURL: URL(string: "http://library.test"))
-        XCTAssertEqual(output.script, "Refined preview")
-        XCTAssertEqual(LibraryStubProtocol.captured?.url?.path, "/stories/\(story.id)/refinements")
         let unavailable = client(status: 501, body: "{\"error\":{\"code\":\"not_implemented\",\"message\":\"Pending\"}}")
         do {
             _ = try await unavailable.update(.news, story: story, engine: "None", instruction: "", localJSON: false,

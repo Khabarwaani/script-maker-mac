@@ -80,7 +80,7 @@ paths:
       - $ref: '#/components/parameters/StoryID'
     patch:
       operationId: updateStory
-      description: Save enrichment or active-version selection. Preserve identity and creation time. Manual script editing or accepting a refinement uses POST /stories with a new identity and sourceStoryID; never overwrite the original.
+      description: Save enrichment or active-version selection. Preserve identity and creation time. Manual script editing uses POST /stories with a new identity and sourceStoryID; never overwrite the original.
       requestBody:
         $ref: '#/components/requestBodies/Story'
       responses:
@@ -104,19 +104,6 @@ paths:
     post:
       operationId: enrichStory
       description: Return only the requested result field. Retain all other story fields. None disables AI but permits source/media retrieval.
-      requestBody:
-        $ref: '#/components/requestBodies/LibraryRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/LibraryResult'
-        default:
-          $ref: '#/components/responses/Error'
-  /stories/{id}/refinements:
-    parameters:
-      - $ref: '#/components/parameters/StoryID'
-    post:
-      operationId: refineScript
-      description: Return a script preview without saving it. Reject None or a blank instruction with HTTP 422. Acceptance is a separate story update.
       requestBody:
         $ref: '#/components/requestBodies/LibraryRequest'
       responses:
@@ -183,7 +170,7 @@ components:
           schema:
             $ref: './library-story.schema.json'
     LibraryResult:
-      description: Replacement enrichment data or a refinement preview
+      description: Replacement enrichment data
       content:
         application/json:
           schema:
