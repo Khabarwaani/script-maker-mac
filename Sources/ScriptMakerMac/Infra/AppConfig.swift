@@ -33,21 +33,57 @@ final class AppConfig {
     /// The default endpoint is named "localserver".
     static let localserverName = "localserver"
     static let defaultServerURL = "http://localhost:8000"
+    static let defaultRefineAPIBaseURL = "http://127.0.0.1:8080/"
+    static let defaultRefineProvider = "antigravity"
     private static let serverURLKey = "serverURL"
     private static let dataSourceKey = "dataSource"
+    private static let newsPageSizeKey = "newsPageSize"
+    static let defaultNewsPageSize = 20
+    private static let refineAPIBaseURLKey = "refineAPIBaseURL"
+    private static let refineProviderKey = "refineProvider"
+    private static let refineSelectedVariationKey = "refineSelectedVariation"
+
+    private let defaults: UserDefaults
+
     var appearance: AppAppearance {
-        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+        didSet { defaults.set(appearance.rawValue, forKey: "appearance") }
     }
 
     var localJSONDelay: Double {
-        didSet { UserDefaults.standard.set(localJSONDelay, forKey: "localJSONDelay") }
+        didSet { defaults.set(localJSONDelay, forKey: "localJSONDelay") }
+    }
+
+    var newsPageSize: Int {
+        didSet { defaults.set(newsPageSize, forKey: Self.newsPageSizeKey) }
+    }
+
+    private static let aiSourceKey = "aiSource"
+    private static let aiModelKey = "aiModel"
+    private static let aiPowerKey = "aiPower"
+
+    var aiSource: String {
+        didSet { defaults.set(aiSource, forKey: Self.aiSourceKey) }
+    }
+
+    var aiModel: String {
+        didSet { defaults.set(aiModel, forKey: Self.aiModelKey) }
+    }
+
+    var aiPower: String {
+        didSet { defaults.set(aiPower, forKey: Self.aiPowerKey) }
     }
 
     var selectedAI: AIConfig {
-        didSet { UserDefaults.standard.set(selectedAI.identifier, forKey: "selectedAIIdentifier") }
+        get { AIConfig(source: aiSource, model: aiModel, power: aiPower) }
+        set {
+            aiSource = newValue.source
+            aiModel = newValue.model
+            aiPower = newValue.power
+            defaults.set(newValue.identifier, forKey: "selectedAIIdentifier")
+        }
     }
     var recentAIIdentifiers: [String] {
-        didSet { UserDefaults.standard.set(recentAIIdentifiers, forKey: "recentAIIdentifiers") }
+        didSet { defaults.set(recentAIIdentifiers, forKey: "recentAIIdentifiers") }
     }
     var libraryAIEngine: String {
         get { selectedAI.source == "None" ? "None" : selectedAI.identifier }
@@ -72,29 +108,62 @@ final class AppConfig {
     }
 
     var serverURL: String {
-        didSet { UserDefaults.standard.set(serverURL, forKey: Self.serverURLKey) }
+        didSet { defaults.set(serverURL, forKey: Self.serverURLKey) }
+    }
+
+    /// Script-refine API base URL. The Refine tab POSTs to <url>/execute.
+    var refineAPIBaseURL: String {
+        didSet { defaults.set(refineAPIBaseURL, forKey: Self.refineAPIBaseURLKey) }
+    }
+
+    /// Script-refine provider sent in the agent envelope.
+    var refineProvider: String {
+        didSet { defaults.set(refineProvider, forKey: Self.refineProviderKey) }
+    }
+
+    /// Last-selected refined-variation tab index. Restored on launch
+    /// (clamped to the new result's variation count).
+    var refineSelectedVariation: Int {
+        didSet { defaults.set(refineSelectedVariation, forKey: Self.refineSelectedVariationKey) }
     }
 
     /// Exactly one: Server (live pipeline server) or Offline Data (bundled sample JSON).
     /// Offline is the default — full UX, no network.
     var dataSource: DataSource {
-        didSet { UserDefaults.standard.set(dataSource.rawValue, forKey: Self.dataSourceKey) }
+        didSet {
+            defaults.set(dataSource.rawValue, forKey: Self.dataSourceKey)
+            defaults.removeObject(forKey: "useSampleData")
+        }
     }
 
-    init() {
-        let savedAI = UserDefaults.standard.data(forKey: "studioConfig").flatMap { try? JSONDecoder().decode(StudioConfig.self, from: $0) }?.ai
-        self.selectedAI = UserDefaults.standard.string(forKey: "selectedAIIdentifier").flatMap(AIConfig.init(identifier:)) ?? savedAI ?? AIConfig(source: "Antigravity", model: "Default", power: "Default")
-        self.recentAIIdentifiers = Array((UserDefaults.standard.stringArray(forKey: "recentAIIdentifiers") ?? []).filter { AIConfig(identifier: $0) != nil }.prefix(5))
-        self.localJSONDelay = UserDefaults.standard.object(forKey: "localJSONDelay") as? Double ?? 1
-        self.appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "System") ?? .system
-        self.serverURL = UserDefaults.standard.string(forKey: Self.serverURLKey)
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
+        let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
+        self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
+        let savedAI = defaults.string(forKey: "selectedAIIdentifier").flatMap(AIConfig.init(identifier:))
+            ?? defaults.data(forKey: Self.studioConfigKey).flatMap { try? JSONDecoder().decode(StudioConfig.self, from: $0) }?.ai
+        self.aiSource = defaults.string(forKey: Self.aiSourceKey) ?? savedAI?.source ?? "Antigravity"
+        self.recentAIIdentifiers = Array((defaults.stringArray(forKey: "recentAIIdentifiers") ?? []).filter { AIConfig(identifier: $0) != nil }.prefix(5))
+        self.aiModel = defaults.string(forKey: Self.aiModelKey) ?? savedAI?.model ?? "Default"
+        self.aiPower = defaults.string(forKey: Self.aiPowerKey) ?? savedAI?.power ?? "Default"
+        self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
+        self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
-        // Migrate the old boolean key: true -> offline, false -> server.
-        if let raw = UserDefaults.standard.string(forKey: Self.dataSourceKey),
+        self.refineAPIBaseURL = defaults.string(forKey: Self.refineAPIBaseURLKey)
+            ?? Self.defaultRefineAPIBaseURL
+        self.refineProvider = defaults.string(forKey: Self.refineProviderKey)
+            ?? Self.defaultRefineProvider
+        self.refineSelectedVariation = defaults.integer(forKey: Self.refineSelectedVariationKey)
+        if let raw = defaults.string(forKey: Self.dataSourceKey),
            let ds = DataSource(rawValue: raw) {
             self.dataSource = ds
-        } else if let old = UserDefaults.standard.object(forKey: "useSampleData") as? Bool {
-            self.dataSource = old ? .offline : .server
+            defaults.removeObject(forKey: "useSampleData")
+        } else if let old = defaults.object(forKey: "useSampleData") as? Bool {
+            let migrated: DataSource = old ? .offline : .server
+            self.dataSource = migrated
+            defaults.set(migrated.rawValue, forKey: Self.dataSourceKey)
+            defaults.removeObject(forKey: "useSampleData")
         } else {
             self.dataSource = .offline
         }
@@ -112,21 +181,60 @@ final class AppConfig {
     func resetToDefaults() {
         serverURL = Self.defaultServerURL
         dataSource = .offline
+        newsPageSize = Self.defaultNewsPageSize
+        aiSource = "Antigravity"
+        aiModel = "Default"
+        aiPower = "Default"
     }
 
     // MARK: - Studio config (smart save on Generate, like Streamlit #563)
 
     private static let studioConfigKey = "studioConfig"
+    private static let headlinesCacheKeyPrefix = "headlinesCache_"
+    private static let selectedHeadlineKeyPrefix = "selectedHeadline_"
 
     func saveStudioConfig(_ config: StudioConfig) {
         if let data = try? JSONEncoder().encode(config) {
-            UserDefaults.standard.set(data, forKey: Self.studioConfigKey)
+            defaults.set(data, forKey: Self.studioConfigKey)
         }
     }
 
     func loadStudioConfig() -> StudioConfig? {
-        guard let data = UserDefaults.standard.data(forKey: Self.studioConfigKey) else { return nil }
+        guard let data = defaults.data(forKey: Self.studioConfigKey) else { return nil }
         return try? JSONDecoder().decode(StudioConfig.self, from: data)
+    }
+
+    // MARK: - 24-Hour Headlines Cache & Selection Persistence
+
+    struct CachedHeadlinesPayload: Codable {
+        let headlines: [String]
+        let timestamp: Date
+    }
+
+    func cacheHeadlines(_ headlines: [String], forSource source: String) {
+        let payload = CachedHeadlinesPayload(headlines: headlines, timestamp: Date())
+        if let data = try? JSONEncoder().encode(payload) {
+            defaults.set(data, forKey: Self.headlinesCacheKeyPrefix + source)
+        }
+    }
+
+    func getCachedHeadlines(forSource source: String, maxAge: TimeInterval = 86400) -> [String]? {
+        guard let data = defaults.data(forKey: Self.headlinesCacheKeyPrefix + source),
+              let payload = try? JSONDecoder().decode(CachedHeadlinesPayload.self, from: data) else {
+            return nil
+        }
+        if Date().timeIntervalSince(payload.timestamp) > maxAge {
+            return nil
+        }
+        return payload.headlines
+    }
+
+    func saveLastSelectedHeadline(_ headline: String, forSource source: String) {
+        defaults.set(headline, forKey: Self.selectedHeadlineKeyPrefix + source)
+    }
+
+    func getLastSelectedHeadline(forSource source: String) -> String? {
+        defaults.string(forKey: Self.selectedHeadlineKeyPrefix + source)
     }
 
     // MARK: - Normalization

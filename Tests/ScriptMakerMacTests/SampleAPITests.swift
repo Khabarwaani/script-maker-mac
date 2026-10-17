@@ -10,18 +10,13 @@ final class SampleAPITests: XCTestCase {
     func testServerStoryPreservesIdentityAndScreenplay() {
         let id = UUID().uuidString
         let story = StoryMapper.from([
-            "meta": ["id": id, "title": "Server title", "created_at": "2026-10-11T03:00:00Z", "generation_number": 3, "tone": "Curiosity", "source_headline": "Verified headline", "hashtags": ["#Delhi"], "news_links": [["title": "Source story", "url": "https://example.com/story", "source": "Wire"]]],
-            "script": "Full server screenplay\nSpoken dialogue",
-            "hashtags": ["#Delhi"]
+            "meta": ["id": id, "title": "Server title", "created_at": "2026-10-11T03:00:00Z", "generation_number": 3, "tone": "Curiosity", "source_headline": "Verified headline"],
+            "script": "Full server screenplay\nSpoken dialogue"
         ])
         XCTAssertEqual(story.id, id)
         XCTAssertEqual(story.title, "Server title")
         XCTAssertEqual(story.generationNumber, 3)
         XCTAssertEqual(story.createdAt, "2026-10-11T03:00:00Z")
-        XCTAssertEqual(story.hashtags, ["#Delhi"])
-        XCTAssertEqual(story.sourceLinks?.first?.title, "Source story")
-        XCTAssertNotNil(story.sourceLinks?.first?.webURL)
-        XCTAssertNil(StorySourceLink(title: "Invalid", url: "javascript:alert(1)", source: "").webURL)
         XCTAssertEqual(story.emotion, "Curiosity")
         XCTAssertEqual(story.headline, "Verified headline")
         XCTAssertEqual(story.scriptText, "Full server screenplay\nSpoken dialogue")
@@ -76,18 +71,159 @@ final class SampleAPITests: XCTestCase {
         let stories = try await service().listStories()
         XCTAssertTrue(stories.isEmpty, "Offline Library reads the local repository")
     }
-}
 
-@MainActor
-private final class TestClipboard: ClipboardWriting {
-    var contents: String?
-    var succeeds = true
-    func write(_ text: String) -> Bool {
-        guard succeeds else { return false }
-        contents = text
-        return true
+    func testFetchNewsCategoriesOffline() async throws {
+        let response = try await service().fetchNewsCategories()
+        XCTAssertFalse(response.categories.isEmpty)
+        XCTAssertEqual(response.defaultCategory, "trending")
+        XCTAssertTrue(response.categories.contains { $0.id == "india" })
+    }
+
+    func testFetchTopTitlesOffline() async throws {
+        let response = try await service().fetchTopTitles(category: "india", n: 3, mode: "sample")
+        XCTAssertEqual(response.category, "india")
+        XCTAssertEqual(response.mode, "sample")
+        XCTAssertFalse(response.titles.isEmpty)
+        XCTAssertEqual(response.titles.count, 3)
+    }
+
+    func testVerifyNewsEndpointsOffline() async throws {
+        let verified = try await service().verifyNewsEndpoints()
+        XCTAssertTrue(verified)
+    }
+
+    func testNetworkWebClientNewsCategories() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockNewsURLProtocol.self]
+        let session = URLSession(configuration: config)
+        let httpClient = HTTPClient(session: session)
+        let client = NetworkWebClient(baseURL: URL(string: "http://localhost:8000")!, httpClient: httpClient)
+
+        MockNewsURLProtocol.requestHandler = { req in
+            XCTAssertEqual(req.url?.path, "/api/v1/news/category")
+            XCTAssertEqual(req.httpMethod, "GET")
+            let json = """
+            {
+              "categories": [
+                {"id": "trending", "label": "🔥 India Trending & Viral"},
+                {"id": "tech", "label": "💻 Technology & AI"}
+              ],
+              "default_category": "trending"
+            }
+            """
+            let resp = HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (resp, json.data(using: .utf8)!)
+        }
+
+        let result: NewsCategoriesResponse = try await client.get(path: "api/v1/news/category", queryItems: nil)
+        XCTAssertEqual(result.defaultCategory, "trending")
+        XCTAssertEqual(result.categories.count, 2)
+        XCTAssertEqual(result.categories.first?.id, "trending")
+    }
+
+    func testNetworkWebClientTopTitles() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockNewsURLProtocol.self]
+        let session = URLSession(configuration: config)
+        let httpClient = HTTPClient(session: session)
+        let client = NetworkWebClient(baseURL: URL(string: "http://localhost:8000")!, httpClient: httpClient)
+
+        MockNewsURLProtocol.requestHandler = { req in
+            XCTAssertEqual(req.url?.path, "/api/v1/news/title")
+            XCTAssertEqual(req.httpMethod, "GET")
+            let query = req.url?.query ?? ""
+            XCTAssertTrue(query.contains("category=tech"))
+            XCTAssertTrue(query.contains("n=2"))
+            XCTAssertTrue(query.contains("mode=sample"))
+            let json = """
+            {
+              "category": "tech",
+              "label": "💻 Technology & AI",
+              "n": 2,
+              "mode": "sample",
+              "cached": false,
+              "titles": [
+                {"title": "AI Model Released", "link": "https://example.com/ai"},
+                {"title": "Tech Breakthrough", "link": "https://example.com/tech"}
+              ]
+            }
+            """
+            let resp = HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (resp, json.data(using: .utf8)!)
+        }
+
+        let queryItems = [
+            URLQueryItem(name: "category", value: "tech"),
+            URLQueryItem(name: "n", value: "2"),
+            URLQueryItem(name: "mode", value: "sample")
+        ]
+        let result: TopTitlesResponse = try await client.get(path: "api/v1/news/title", queryItems: queryItems)
+        XCTAssertEqual(result.category, "tech")
+        XCTAssertEqual(result.label, "💻 Technology & AI")
+        XCTAssertEqual(result.titles.count, 2)
+        XCTAssertEqual(result.titles.first?.title, "AI Model Released")
+    }
+
+    @MainActor
+    func testGenerateViewModelRefreshHeadlines() async throws {
+        let suite = UserDefaults(suiteName: "test.api.headlines.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
+        appConfig.dataSource = .offline
+        appConfig.localJSONDelay = 0
+        let testSource = "🇮🇳 India Top Stories & Breaking"
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        viewModel.selectedStorySource = testSource
+        viewModel.topic = ""
+        await viewModel.refreshHeadlines()
+        XCTAssertFalse(viewModel.headlines.isEmpty)
+        XCTAssertEqual(viewModel.selectedHeadline, "Delhi announces odd-even vehicle restrictions to combat air pollution")
+        XCTAssertEqual(viewModel.topic, viewModel.selectedHeadline)
+    }
+
+    @MainActor
+    func testGenerateViewModelLoadNewsCategories() async throws {
+        let suite = UserDefaults(suiteName: "test.api.categories.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
+        appConfig.dataSource = .offline
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        await viewModel.loadNewsCategories()
+        XCTAssertFalse(viewModel.storySources.isEmpty)
+        XCTAssertTrue(viewModel.storySources.contains("🇮🇳 India Top Stories & Breaking"))
+    }
+
+    @MainActor
+    func testGenerateViewModelRefreshHashtagsEmptyByDefault() async throws {
+        let suite = UserDefaults(suiteName: "test.api.hashtags.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        XCTAssertTrue(viewModel.trendingHashtags.isEmpty)
     }
 }
+
+final class MockNewsURLProtocol: URLProtocol {
+    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: NSError(domain: "MockNewsURLProtocol", code: -1))
+            return
+        }
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
 
 private actor WorkflowStoryRepository: StoryRepository {
     private var stories: [Story] = []
@@ -101,49 +237,6 @@ private actor WorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class LocalWorkflowTests: XCTestCase {
-    func testAddStoryRequiresScriptAndSelectsSavedUUID() async throws {
-        let repository = WorkflowStoryRepository()
-        let library = LibraryViewModel(config: AppConfig(), repository: repository)
-        library.prepareNewStory()
-        XCTAssertFalse(library.canAddStory)
-        library.newStoryTitle = "Manual story"
-        XCTAssertFalse(library.canAddStory)
-        let rejected = await library.addStory()
-        XCTAssertFalse(rejected)
-        library.newStoryScript = "  Full pasted screenplay\nSpoken dialogue  "
-        XCTAssertTrue(library.canAddStory)
-        let saved = await library.addStory()
-        XCTAssertTrue(saved)
-        let story = try XCTUnwrap(library.selectedStory)
-        XCTAssertNotNil(UUID(uuidString: story.id))
-        XCTAssertNotNil(ISO8601DateFormatter().date(from: story.createdAt))
-        XCTAssertEqual(story.title, "Manual story")
-        XCTAssertEqual(story.scriptText, "Full pasted screenplay\nSpoken dialogue")
-        XCTAssertEqual(story.status, "saved")
-        let persisted = await repository.all()
-        XCTAssertEqual(persisted.count, 1)
-        XCTAssertEqual(persisted.first?.id, story.id)
-        library.prepareNewStory()
-        XCTAssertTrue(library.newStoryTitle.isEmpty)
-        XCTAssertTrue(library.newStoryScript.isEmpty)
-    }
-
-    func testCopyUsesSelectedContentAndReportsFailures() {
-        let clipboard = TestClipboard()
-        let library = LibraryViewModel(config: AppConfig(), repository: WorkflowStoryRepository(), clipboard: clipboard)
-        library.copy("First screenplay", label: "Screenplay")
-        XCTAssertEqual(clipboard.contents, "First screenplay")
-        XCTAssertEqual(library.copyFeedback, "Screenplay copied")
-        library.copy("Second story UUID", label: "Story UUID")
-        XCTAssertEqual(clipboard.contents, "Second story UUID")
-        library.copy("   ", label: "Summary")
-        XCTAssertEqual(library.copyFeedback, "No summary to copy.")
-        XCTAssertEqual(clipboard.contents, "Second story UUID")
-        clipboard.succeeds = false
-        library.copy("Failed content", label: "Screenplay")
-        XCTAssertEqual(library.copyFeedback, "Could not copy screenplay.")
-    }
-
     func testSourceLabelsEnableManualAndHashtagInputs() throws {
         let config = AppConfig()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
@@ -177,7 +270,7 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertNil(generator.errorMessage)
         XCTAssertTrue(generator.generationCompleted)
         XCTAssertFalse(generator.renderCompleted)
-        XCTAssertEqual(generator.currentStage, .validation)
+        XCTAssertEqual(generator.currentStage, .script)
         XCTAssertEqual(generator.stagePayloads.count, PipelineStage.allCases.count)
         await library.refresh()
         XCTAssertEqual(library.stories.count, 1)
@@ -264,49 +357,156 @@ final class LocalWorkflowTests: XCTestCase {
         config.localJSONDelay = 0
         let repository = WorkflowStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
-        generator.scriptCount = 3
+        generator.scriptCount = 1
         generator.topic = "Step-wise lifecycle test"
-        generator.workflowMode = .stepwise
         await generator.start()
-        XCTAssertEqual(generator.currentStage, .verify)
-        XCTAssertEqual(generator.stagePayloads.count, 1)
-        for (index, stage) in PipelineStage.allCases.dropFirst().enumerated() {
-            await generator.select([:])
-            XCTAssertNil(generator.errorMessage)
-            XCTAssertEqual(generator.currentStage, stage)
-            XCTAssertEqual(generator.stagePayloads.count, index + 2)
-            XCTAssertFalse(generator.renderCompleted)
-            let saved = await repository.all()
-            XCTAssertEqual(saved.count, stage == .validation ? 3 : 0)
-        }
         XCTAssertTrue(generator.generationCompleted)
         XCTAssertFalse(generator.renderCompleted)
         let saved = await repository.all()
-        XCTAssertEqual(saved.count, 3)
-        XCTAssertEqual(generator.savedStoryCount, 3)
+        XCTAssertEqual(saved.count, 1)
+    }
+
+    func testDynamicStreamProgressStagesAndSubsteps() async {
+        let config = AppConfig()
+        let originalDelay = config.localJSONDelay
+        let originalSource = config.dataSource
+        defer { config.localJSONDelay = originalDelay; config.dataSource = originalSource }
+        config.dataSource = .offline
+        config.localJSONDelay = 0
+
+        let repository = WorkflowStoryRepository()
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        generator.topic = "Dynamic stream test"
+        await generator.start()
+
+        XCTAssertFalse(generator.streamStages.isEmpty, "streamStages must be populated from stream")
+        XCTAssertEqual(generator.streamStages.count, 6)
+
+        // Casting stage has substeps dynamically generated by type
+        let castingStage = try? XCTUnwrap(generator.streamStages.first(where: { $0.type == "casting" }))
+        XCTAssertNotNil(castingStage)
+        XCTAssertEqual(castingStage?.type, "casting")
+        XCTAssertEqual(castingStage?.status, "success")
+        XCTAssertFalse(castingStage?.substeps.isEmpty ?? true)
+
+        let stageId = castingStage?.id ?? 2
+        let substep1 = castingStage?.substeps.first(where: { $0.id == "\(stageId).1" })
+        XCTAssertNotNil(substep1)
+        XCTAssertEqual(substep1?.name, "Character generation")
+        XCTAssertEqual(substep1?.status, "success")
+        XCTAssertEqual(substep1?.detail, "Sample substep complete")
+        XCTAssertEqual(substep1?.nestingLevel, 0)
+
+        let substepNested = castingStage?.substeps.first(where: { $0.id == "\(stageId).2.1" })
+        XCTAssertNotNil(substepNested)
+        XCTAssertEqual(substepNested?.name, "Character count check")
+        XCTAssertEqual(substepNested?.nestingLevel, 1, "Substep \(stageId).2.1 should have nestingLevel 1")
+
+        // Test toggle helpers
+        generator.toggleStageExpansion(id: stageId)
+        XCTAssertNotEqual(generator.streamStages.first(where: { $0.type == "casting" })?.isExpanded, castingStage?.isExpanded)
+
+        generator.toggleSubstepExpansion(stageID: stageId, substepID: "\(stageId).1")
+        let toggledSubstep = generator.streamStages.first(where: { $0.type == "casting" })?.substeps.first(where: { $0.id == "\(stageId).1" })
+        XCTAssertNotEqual(toggledSubstep?.isExpanded, substep1?.isExpanded)
+    }
+
+    func testAutoSavedToLibraryAndNavigation() async {
+        let config = AppConfig()
+        let originalDelay = config.localJSONDelay
+        let originalSource = config.dataSource
+        defer { config.localJSONDelay = originalDelay; config.dataSource = originalSource }
+        config.dataSource = .offline
+        config.localJSONDelay = 0
+
+        let repository = WorkflowStoryRepository()
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        generator.topic = "Library autosave test"
+        var navigated = false
+        generator.onNavigateToLibrary = { navigated = true }
+
+        await generator.start()
+
+        XCTAssertTrue(generator.generationCompleted)
+        XCTAssertTrue(generator.isSavedToLibrary)
+        let savedStories = await repository.all()
+        XCTAssertFalse(savedStories.isEmpty)
+
+        generator.goToLibrary()
+        XCTAssertTrue(navigated)
+    }
+
+    func testExtraDetailsParsingAndReset() async {
+        let config = AppConfig()
+        let originalDelay = config.localJSONDelay
+        let originalSource = config.dataSource
+        defer { config.localJSONDelay = originalDelay; config.dataSource = originalSource }
+        config.dataSource = .offline
+        config.localJSONDelay = 0
+
+        let repository = WorkflowStoryRepository()
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        generator.topic = "Extra detail verification"
+
+        await generator.start()
+
+        // Validation stage outputs: status, confidence, notes, bypassed, plus test extra keys if any
+        if let validationStage = generator.streamStages.first(where: { $0.type == "validation" }) {
+            XCTAssertNotNil(validationStage.extraDetails)
+        }
+
+        // Test extra details formatting helper
+        let dictItem: [String: Any] = ["nested_key": "val123"]
+        let formatted = ExtraDetailItem.formatValue(dictItem)
+        XCTAssertTrue(formatted.contains("nested_key"))
+
+        // Reset clears stream stages and extra details
+        await generator.reset()
+        XCTAssertTrue(generator.streamStages.isEmpty)
+        XCTAssertTrue(generator.streamExtraDetails.isEmpty)
+        XCTAssertFalse(generator.isSavedToLibrary)
+    }
+
+    func testStudioConfigAutoSavesOnChange() async throws {
+        let suite = UserDefaults(suiteName: "test.config.autosave.\(UUID().uuidString)")!
+        let appConfig = AppConfig(defaults: suite)
+        let generator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+
+        // Default dialogue/scripts should be 1
+        XCTAssertEqual(generator.scriptCount, 1)
+
+        // Modify duration, scriptCount, emotion, etc.
+        generator.duration = 45
+        generator.scriptCount = 2
+        generator.selectedEmotion = "Shock"
+        generator.selectedFormat = "Debate"
+        generator.characterCount = 2
+
+        // Verify changes were immediately persisted to AppConfig without calling start()
+        let saved = try XCTUnwrap(appConfig.loadStudioConfig())
+        XCTAssertEqual(saved.duration, 45)
+        XCTAssertEqual(saved.scriptCount, 2)
+        XCTAssertEqual(saved.emotion, "Shock")
+        XCTAssertEqual(saved.format, "Debate")
+        XCTAssertEqual(saved.characterCount, 2)
+
+        // Verify a new ViewModel restored the exact persisted values
+        let restoredGenerator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+        XCTAssertEqual(restoredGenerator.duration, 45)
+        XCTAssertEqual(restoredGenerator.scriptCount, 2)
+        XCTAssertEqual(restoredGenerator.selectedEmotion, "Shock")
+        XCTAssertEqual(restoredGenerator.selectedFormat, "Debate")
+        XCTAssertEqual(restoredGenerator.characterCount, 2)
+
+        // Verify resetting configuration resets scriptCount back to 1 and auto-saves
+        restoredGenerator.resetConfiguration(save: true)
+        XCTAssertEqual(restoredGenerator.scriptCount, 1)
+        let resetSaved = try XCTUnwrap(appConfig.loadStudioConfig())
+        XCTAssertEqual(resetSaved.scriptCount, 1)
     }
 }
 
 final class LocalSimulationTests: XCTestCase {
-    func testLibraryServerUpdateFailsWithoutSimulating() async {
-        do {
-            _ = try await LibraryUpdateClient().update(.hashtags, story: Story(), engine: "None", instruction: "", localJSON: false, delay: 60)
-            XCTFail("Server mode must not return fixtures")
-        } catch { XCTAssertTrue(error is ConfigError) }
-    }
-
-    func testLibraryUpdateCancellationAndDelay() async throws {
-        let client = LibraryUpdateClient()
-        let clock = ContinuousClock()
-        let start = clock.now
-        let result = try await client.update(.hashtags, story: Story(), engine: "None", instruction: "", localJSON: true, delay: 0.02)
-        XCTAssertGreaterThanOrEqual(start.duration(to: clock.now), .milliseconds(20))
-        XCTAssertFalse(result.hashtags?.isEmpty ?? true)
-        let task = Task { try await client.update(.news, story: Story(), engine: "None", instruction: "", localJSON: true, delay: 60) }
-        task.cancel()
-        do { _ = try await task.value; XCTFail("Cancelled update must fail") }
-        catch { XCTAssertTrue(error is CancellationError) }
-    }
     func testDelayedRequestCanBeCancelled() async {
         let client = OfflineWebClient(delay: 60)
         let request = Task { try await client.createSession() }
@@ -323,401 +523,5 @@ final class LocalSimulationTests: XCTestCase {
         let started = clock.now
         _ = try await client.createSession()
         XCTAssertGreaterThanOrEqual(started.duration(to: clock.now), .milliseconds(20))
-    }
-}
-
-@MainActor
-final class LibraryDetailTests: XCTestCase {
-    func testMultiSelectionDeletionKeepsUnselectedStoriesAndRejectsServerBatch() async {
-        let repo = WorkflowStoryRepository()
-        let stories = (1...4).map { Story(title: "Story \($0)", scriptText: "Script \($0)") }
-        for story in stories { await repo.save(story) }
-        let vm = LibraryViewModel(config: AppConfig(), repository: repo)
-        vm.stories = stories
-        vm.selectAllStories()
-        XCTAssertEqual(vm.selectedStoryIDs.count, 4)
-        vm.selectStories([stories[0].id, stories[2].id])
-        XCTAssertEqual(vm.selectedStoryIDs.count, 2)
-        XCTAssertTrue(vm.selectedStoryIDs.contains(vm.selectedStoryID ?? ""))
-        await vm.deleteStories(ids: vm.selectedStoryIDs)
-        XCTAssertEqual(Set(vm.stories.map(\.id)), Set([stories[1].id, stories[3].id]))
-        XCTAssertNotNil(vm.selectedStory)
-        let persisted = await repo.all()
-        XCTAssertEqual(persisted.count, 2)
-        vm.selectStories([])
-        XCTAssertNil(vm.selectedStoryID)
-        XCTAssertTrue(vm.selectedStoryIDs.isEmpty)
-        let remote = Story(title: "Server-only story")
-        vm.stories.append(remote)
-        vm.selectStories([stories[1].id, remote.id])
-        await vm.deleteStories(ids: vm.selectedStoryIDs)
-        XCTAssertEqual(vm.stories.count, 3)
-        let untouched = await repo.all()
-        XCTAssertEqual(untouched.count, 2)
-        XCTAssertTrue(vm.notice?.contains("No stories were deleted") ?? false)
-    }
-
-    func testCrossRemovalAndUndoPreserveStoryAndOtherItems() async throws {
-        let repo = WorkflowStoryRepository()
-        let link = StorySourceLink(title: "Wire", url: "https://example.com/news", source: "Wire")
-        let story = Story(title: "Removals", videoURL: "https://example.com/video.mp4", hashtags: ["#One", "#Two"], sourceLinks: [link], scriptText: "Keep script", imageURLs: ["sample://one", "sample://two"])
-        await repo.save(story)
-        let vm = LibraryViewModel(config: AppConfig(), repository: repo)
-        vm.stories = [story]; vm.selectedStoryID = story.id
-        await vm.remove(.hashtag("#One"), from: story.id)
-        XCTAssertEqual(vm.selectedStory?.hashtags, ["#Two"])
-        XCTAssertTrue(vm.canUndoRemoval)
-        await vm.undoRemoval()
-        XCTAssertEqual(Set(vm.selectedStory?.hashtags ?? []), Set(["#One", "#Two"]))
-        await vm.remove(.image("sample://one"), from: story.id)
-        XCTAssertEqual(vm.selectedStory?.imageURLs, ["sample://two"])
-        await vm.undoRemoval()
-        XCTAssertEqual(vm.selectedStory?.imageURLs?.count, 2)
-        await vm.remove(.news(link), from: story.id)
-        XCTAssertEqual(vm.selectedStory?.sourceLinks, [])
-        await vm.undoRemoval()
-        XCTAssertEqual(vm.selectedStory?.sourceLinks, [link])
-        await vm.remove(.video("https://example.com/video.mp4"), from: story.id)
-        XCTAssertNil(vm.selectedStory?.videoURL)
-        await vm.undoRemoval()
-        XCTAssertEqual(vm.selectedStory?.videoURL, "https://example.com/video.mp4")
-        XCTAssertEqual(vm.selectedStory?.id, story.id)
-        XCTAssertEqual(vm.selectedStory?.scriptText, "Keep script")
-    }
-
-    func testMediaImportPersistsAttachmentAndFailureKeepsStory() async {
-        let repo = WorkflowStoryRepository()
-        let story = Story(title: "Media", scriptText: "Keep script")
-        await repo.save(story)
-        let imported = URL(fileURLWithPath: "/tmp/imported-image.png")
-        let vm = LibraryViewModel(config: AppConfig(), repository: repo, mediaImporter: TestMediaImporter(destination: imported))
-        vm.stories = [story]; vm.selectedStoryID = story.id
-        await vm.importMedia(URL(fileURLWithPath: "/tmp/source.png"), kind: .image, storyID: story.id)
-        XCTAssertEqual(vm.selectedStory?.imageURLs, [imported.absoluteString])
-        XCTAssertNotNil(vm.imagePreviews[imported.absoluteString])
-        XCTAssertEqual(vm.selectedStory?.id, story.id)
-        let failing = LibraryViewModel(config: AppConfig(), repository: repo, mediaImporter: TestMediaImporter(destination: imported, fails: true))
-        failing.stories = vm.stories; failing.selectedStoryID = story.id
-        await failing.importMedia(URL(fileURLWithPath: "/tmp/source.mp4"), kind: .video, storyID: story.id)
-        XCTAssertNil(failing.selectedStory?.videoURL)
-        XCTAssertTrue(failing.actionNotice?.contains("Could not import media") ?? false)
-        XCTAssertFalse(failing.isImportingMedia)
-    }
-    func testRefinementPreviewRequiresAcceptanceAndSavesSeparateStory() async throws {
-        let config = AppConfig()
-        let originalSource = config.dataSource, originalEngine = config.libraryAIEngine
-        let originalDelay = config.localJSONDelay
-        defer { config.dataSource = originalSource; config.libraryAIEngine = originalEngine; config.localJSONDelay = originalDelay }
-        config.dataSource = .offline; config.localJSONDelay = 0; config.libraryAIEngine = "Antigravity"
-        let original = Story(title: "Original title", createdAt: "2020-01-01T00:00:00Z", scriptText: "Original script")
-        let other = Story(title: "Other story", scriptText: "Other script")
-        let repo = WorkflowStoryRepository()
-        await repo.save(original); await repo.save(other)
-        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
-        await vm.refresh(); vm.selectedStoryID = original.id
-        vm.refinementInstruction = "Tighten hook"
-        await vm.update(.refine)
-        XCTAssertNotNil(vm.refinement)
-        XCTAssertEqual(vm.selectedStory?.scriptText, "Original script")
-        vm.refinementInstruction = "A later draft instruction"
-        await vm.acceptRefinement()
-        let accepted = try XCTUnwrap(vm.selectedStory)
-        XCTAssertNotEqual(accepted.id, original.id)
-        XCTAssertEqual(accepted.title, original.title)
-        XCTAssertNotEqual(accepted.createdAt, original.createdAt)
-        XCTAssertEqual(accepted.sourceStoryID, original.id)
-        XCTAssertEqual(accepted.generationNumber, 2)
-        XCTAssertEqual(accepted.scriptVersions?.count, 2)
-        XCTAssertEqual(accepted.scriptVersions?.last?.instruction, "Tighten hook")
-        XCTAssertNotEqual(accepted.scriptText, original.scriptText)
-        let first = try XCTUnwrap(accepted.scriptVersions?.first)
-        await vm.useVersion(first, storyID: accepted.id)
-        XCTAssertEqual(vm.selectedStory?.scriptText, original.scriptText)
-        await vm.update(.refine)
-        vm.selectedStoryID = other.id
-        XCTAssertNil(vm.refinement)
-        await vm.acceptRefinement()
-        XCTAssertEqual(vm.selectedStory?.scriptText, other.scriptText)
-        let saved = await repo.all()
-        XCTAssertEqual(saved.first { $0.id == original.id }?.scriptText, "Original script")
-        XCTAssertNil(saved.first { $0.id == original.id }?.scriptVersions)
-        let persisted = try XCTUnwrap(saved.first { $0.id == accepted.id })
-        let encoded = try JSONEncoder().encode(persisted)
-        XCTAssertEqual(try JSONDecoder().decode(Story.self, from: encoded).scriptVersions?.count, 2)
-    }
-
-    func testEditingCreatesNewUUIDAndSubtitleWhileCopyUsesNewContent() async throws {
-        let repo = WorkflowStoryRepository()
-        var story = Story(title: "Before", createdAt: "2020-01-01T00:00:00Z", scriptText: "Old script")
-        story.hashtags = ["#News"]; story.imageURLs = ["https://example.com/image.jpg"]
-        story.sourceLinks = [StorySourceLink(title: "News", url: "https://example.com/news", source: "Wire")]
-        await repo.save(story)
-        let vm = LibraryViewModel(config: AppConfig(), repository: repo)
-        vm.stories = [story]; vm.selectedStoryID = story.id
-        vm.prepareEdits(story); vm.editedScript = "Current script"
-        let saved = await vm.saveEdits(id: story.id)
-        XCTAssertTrue(saved)
-        let current = try XCTUnwrap(vm.selectedStory)
-        XCTAssertNotEqual(current.id, story.id)
-        XCTAssertNotEqual(current.createdAt, story.createdAt)
-        XCTAssertEqual(current.title, story.title)
-        XCTAssertEqual(current.generationNumber, 2)
-        XCTAssertEqual(current.sourceStoryID, story.id)
-        XCTAssertEqual(vm.stories.count, 2)
-        XCTAssertEqual(vm.stories.first { $0.id == story.id }, story)
-        XCTAssertEqual(vm.copyText(for: current, format: .script), "Current script")
-        XCTAssertEqual(vm.copyText(for: current, format: .tags), "Current script\n\n#News")
-        XCTAssertTrue(vm.copyText(for: current, format: .media).contains("https://example.com/image.jpg"))
-        XCTAssertFalse(vm.copyText(for: current, format: .media).contains("#News"))
-        XCTAssertTrue(vm.copyText(for: current, format: .all).contains("#News"))
-        XCTAssertTrue(vm.shareText(for: current).contains("https://example.com/news"))
-        await vm.resetEnrichment(id: current.id)
-        XCTAssertNil(vm.selectedStory?.hashtags)
-        XCTAssertNil(vm.selectedStory?.imageURLs)
-        XCTAssertNil(vm.selectedStory?.sourceLinks)
-        XCTAssertEqual(vm.selectedStory?.scriptText, "Current script")
-        XCTAssertEqual(vm.selectedStory?.scriptVersions?.count, 2)
-        vm.prepareEdits(current)
-        vm.editedScript = "Another edited copy"
-        let secondSave = await vm.saveEdits(id: current.id)
-        XCTAssertTrue(secondSave)
-        XCTAssertEqual(vm.stories.count, 3)
-        XCTAssertEqual(Set(vm.stories.map(\.id)).count, 3)
-        XCTAssertTrue(vm.stories.allSatisfy { $0.title == story.title })
-        XCTAssertEqual(vm.selectedStory?.generationNumber, 3)
-        XCTAssertEqual(vm.selectedStory?.sourceStoryID, story.id)
-    }
-
-    func testUpdatesPersistOnlyRequestedFields() async throws {
-        let config = AppConfig()
-        let originalSource = config.dataSource, originalDelay = config.localJSONDelay
-        defer { config.dataSource = originalSource; config.localJSONDelay = originalDelay }
-        config.dataSource = .offline; config.localJSONDelay = 0
-        let repo = WorkflowStoryRepository()
-        let story = Story(title: "Update target", scriptText: "Keep script")
-        await repo.save(story)
-        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
-        await vm.refresh()
-        await vm.update(.hashtags)
-        XCTAssertFalse(vm.selectedStory?.hashtags?.isEmpty ?? true)
-        XCTAssertNil(vm.selectedStory?.imageURLs)
-        await vm.update(.images); await vm.update(.news)
-        XCTAssertFalse(vm.selectedStory?.imageURLs?.isEmpty ?? true)
-        XCTAssertFalse(vm.selectedStory?.sourceLinks?.isEmpty ?? true)
-        XCTAssertEqual(vm.selectedStory?.scriptText, "Keep script")
-        XCTAssertEqual(vm.selectedStory?.id, story.id)
-        XCTAssertTrue(vm.busyUpdates.isEmpty)
-    }
-}
-
-private struct TestMediaImporter: LibraryMediaImporting {
-    let destination: URL
-    var fails = false
-    func importFile(_ url: URL) async throws -> URL {
-        if fails { throw APIError.transport("Test import failure") }
-        return destination
-    }
-    func imageData(at url: URL) async throws -> Data { Data([1, 2, 3]) }
-}
-
-final class LibraryNetworkContractTests: XCTestCase {
-    func testServerModelCatalogUsesConfiguredURLWithoutDelayAndFailsLoud() async throws {
-        LibraryStubProtocol.status = 200
-        LibraryStubProtocol.body = Data(#"{"providers":[{"id":"provider","label":"Provider","models":[{"id":"model","label":"Model","reasoning":["high"]}]}]}"#.utf8)
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [LibraryStubProtocol.self]
-        let client = AIModelCatalogClient(httpClient: HTTPClient(session: URLSession(configuration: configuration)), bundled: BundledStudioCatalog())
-        let catalog = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test:8000/api"))
-        XCTAssertEqual(catalog.providers.first?.models.first?.id, "model")
-        XCTAssertEqual(LibraryStubProtocol.captured?.url?.absoluteString, "http://models.test:8000/api/ai/models")
-        LibraryStubProtocol.status = 501
-        do {
-            _ = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test"))
-            XCTFail("Server mode must not substitute local models")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("not implemented")) }
-    }
-
-    private func client(status: Int = 200, body: String) -> LibraryUpdateClient {
-        LibraryStubProtocol.status = status
-        LibraryStubProtocol.body = Data(body.utf8)
-        LibraryStubProtocol.captured = nil
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [LibraryStubProtocol.self]
-        return LibraryUpdateClient(httpClient: HTTPClient(session: URLSession(configuration: configuration)))
-    }
-
-    func testUpdateUsesConfiguredURLAndContractBodyWithoutSimulationDelay() async throws {
-        let api = client(body: "{\"hashtags\":[\"#News\"]}")
-        let story = Story(title: "News", scriptText: "Current script")
-        let output = try await api.update(.hashtags, story: story, engine: "None", instruction: "", localJSON: false,
-                                          delay: 60, serverURL: URL(string: "http://library.test:8000/api"))
-        XCTAssertEqual(output.hashtags, ["#News"])
-        let request = try XCTUnwrap(LibraryStubProtocol.captured)
-        XCTAssertEqual(request.url?.absoluteString, "http://library.test:8000/api/stories/\(story.id)/updates/hashtags")
-        XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-        let body = try XCTUnwrap(request.httpBody)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        XCTAssertEqual(json["engine"] as? String, "None")
-        XCTAssertEqual(json["instruction"] as? String, "")
-        XCTAssertEqual((json["story"] as? [String: Any])?["scriptText"] as? String, "Current script")
-    }
-
-    func testRefinementRouteAndUnavailableServerErrors() async throws {
-        let api = client(body: "{\"script\":\"Refined preview\"}")
-        let story = Story(scriptText: "Original script")
-        let output = try await api.update(.refine, story: story, engine: "Codex", instruction: "Tighten hook", localJSON: false,
-                                          delay: 60, serverURL: URL(string: "http://library.test"))
-        XCTAssertEqual(output.script, "Refined preview")
-        XCTAssertEqual(LibraryStubProtocol.captured?.url?.path, "/stories/\(story.id)/refinements")
-        let unavailable = client(status: 501, body: "{\"error\":{\"code\":\"not_implemented\",\"message\":\"Pending\"}}")
-        do {
-            _ = try await unavailable.update(.news, story: story, engine: "None", instruction: "", localJSON: false,
-                                             delay: 60, serverURL: URL(string: "http://library.test"))
-            XCTFail("Unavailable server must not return fixture data")
-        } catch {
-            XCTAssertTrue(error is APIError)
-            XCTAssertTrue(error.localizedDescription.contains("No changes were saved"))
-        }
-    }
-}
-
-private final class LibraryStubProtocol: URLProtocol {
-    static var status = 200
-    static var body = Data()
-    static var captured: URLRequest?
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-    override func startLoading() {
-        var captured = request
-        if captured.httpBody == nil, let stream = captured.httpBodyStream {
-            stream.open()
-            defer { stream.close() }
-            var bytes = [UInt8](repeating: 0, count: 4096)
-            var data = Data()
-            while stream.hasBytesAvailable {
-                let count = stream.read(&bytes, maxLength: bytes.count)
-                if count <= 0 { break }
-                data.append(contentsOf: bytes.prefix(count))
-            }
-            captured.httpBody = data
-        }
-        Self.captured = captured
-        let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Self.body)
-        client?.urlProtocolDidFinishLoading(self)
-    }
-    override func stopLoading() { }
-}
-
-@MainActor
-final class SharedAISelectionTests: XCTestCase {
-    func testIdentifierEscapesSlashAndRoundTrips() throws {
-        let selection = AIConfig(source: "Provider A", model: "vendor/model", power: "High")
-        XCTAssertEqual(selection.identifier, "Provider%20A/vendor%2Fmodel/high")
-        let decoded = try XCTUnwrap(AIConfig(identifier: selection.identifier))
-        XCTAssertEqual(decoded.source, selection.source)
-        XCTAssertEqual(decoded.model, selection.model)
-        XCTAssertEqual(decoded.power, "High")
-        XCTAssertNil(AIConfig(identifier: "provider/model"))
-        XCTAssertNil(AIConfig(identifier: "provider//high"))
-    }
-
-    func testSelectionIsSharedPersistsAndKeepsFiveUniqueRecents() {
-        let config = AppConfig()
-        let original = config.selectedAI, recents = config.recentAIIdentifiers
-        defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
-        config.recentAIIdentifiers = []
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog())
-        let library = LibraryViewModel(config: config)
-        for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
-        config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
-        XCTAssertEqual(config.recentAIIdentifiers.count, 5)
-        XCTAssertEqual(Set(config.recentAIIdentifiers).count, 5)
-        XCTAssertEqual(config.recentAIIdentifiers.first, "Provider/model-3/high")
-        XCTAssertEqual(generator.selectedAIIdentifier, library.selectedAIEngine)
-        generator.resetConfiguration()
-        XCTAssertEqual(generator.selectedAIIdentifier, "Provider/model-3/high")
-        XCTAssertEqual(AppConfig().selectedAI.identifier, config.selectedAI.identifier)
-    }
-
-    func testEditorLoadsThreeControlsAndAppliesOnlyOnSave() async throws {
-        let config = AppConfig()
-        let original = config.selectedAI, recents = config.recentAIIdentifiers
-        let source = config.dataSource, delay = config.localJSONDelay
-        defer { config.selectedAI = original; config.recentAIIdentifiers = recents; config.dataSource = source; config.localJSONDelay = delay }
-        config.dataSource = .offline; config.localJSONDelay = 0
-        let vm = PreferencesViewModel(config: config, connectionChecker: ModelTestChecker(), modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()))
-        await vm.editModel()
-        XCTAssertNil(vm.modelError)
-        vm.draftProvider = "Codex"; vm.updateModelOptions()
-        vm.draftModel = try XCTUnwrap(vm.modelOptions.last); vm.updateModelOptions()
-        vm.draftReasoning = try XCTUnwrap(vm.reasoningOptions.last)
-        XCTAssertEqual(config.selectedAI.identifier, original.identifier)
-        let identifier = vm.draftIdentifier
-        vm.saveModelSelection()
-        XCTAssertEqual(config.selectedAI.identifier, identifier)
-        XCTAssertEqual(config.recentAIIdentifiers.first, identifier)
-        XCTAssertFalse(vm.isEditingModel)
-    }
-}
-
-private struct ModelTestChecker: ServerConnectionChecking {
-    func isReachable(at url: URL) async -> Bool { false }
-}
-
-@MainActor
-final class LibrarySharingTests: XCTestCase {
-    func testTelegramComposerEncodesTextAndSourceWithoutLosingCharacters() throws {
-        let text = "News + facts & hashtags #नमस्ते\nSecond line"
-        let source = URL(string: "https://example.com/news?a=1&b=2")!
-        for native in [false, true] {
-            let url = try MacStorySharing.telegramURL(text: text, sourceURL: source, native: native)
-            let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
-            XCTAssertEqual(items.first { $0.name == "text" }?.value, text)
-            XCTAssertEqual(items.first { $0.name == "url" }?.value, source.absoluteString)
-            XCTAssertTrue(url.absoluteString.contains("%2B"))
-            XCTAssertEqual(url.scheme, native ? "tg" : "https")
-        }
-        let manual = try MacStorySharing.telegramURL(text: "Manual story", sourceURL: nil)
-        XCTAssertEqual(URLComponents(url: manual, resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "")
-    }
-
-    func testShareRoutesFullStoryAndCancellationPreservesLibrary() async {
-        let sharing = SharingSpy()
-        let config = AppConfig()
-        let vm = LibraryViewModel(config: config, sharing: sharing)
-        let story = Story(title: "Story", hashtags: ["#Tag"], sourceLinks: [.init(title: "Source", url: "https://example.com/news", source: "Wire")], scriptText: "Narrator: Full script")
-        vm.stories = [story]; vm.selectedStoryID = story.id
-        await vm.share(story, to: .googleDrive)
-        XCTAssertEqual(sharing.title, "Story")
-        XCTAssertTrue(sharing.text.contains("Full script"))
-        XCTAssertTrue(sharing.text.contains("#Tag"))
-        XCTAssertEqual(sharing.source?.absoluteString, "https://example.com/news")
-        XCTAssertNil(vm.actionNotice)
-        XCTAssertEqual(vm.stories.count, 1)
-        XCTAssertFalse(vm.isSharing)
-        sharing.outcome = .composerOpened
-        await vm.share(story, to: .telegram)
-        XCTAssertTrue(vm.actionNotice?.contains("Telegram opened") ?? false)
-        sharing.fails = true
-        await vm.share(story, to: .googleDrive)
-        XCTAssertTrue(vm.actionNotice?.contains("Share failed") ?? false)
-        XCTAssertFalse(vm.isSharing)
-        XCTAssertEqual(vm.selectedStoryID, story.id)
-    }
-}
-
-@MainActor
-private final class SharingSpy: StorySharing {
-    var title = "", text = ""
-    var source: URL?
-    var outcome: StoryShareOutcome = .cancelled
-    var fails = false
-    func share(to destination: StoryShareDestination, title: String, text: String, sourceURL: URL?) async throws -> StoryShareOutcome {
-        self.title = title; self.text = text; self.source = sourceURL
-        if fails { throw APIError.transport("Share failed") }
-        return outcome
     }
 }

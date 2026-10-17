@@ -18,18 +18,123 @@ final class GenerateViewModel {
     var appConfig: AppConfig { config }
 
     var topic: String = ""
-    var sampleStory: String = ""
+    var sampleStory: String = "" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     var sessionID: String?
     var currentStage: PipelineStage?
     var stagePayloads: [PipelineStage: [String: Any]] = [:]
+    /// Dynamic stages received from stream events with their substeps and dropdown state.
+    var streamStages: [PipelineStageState] = []
+    /// Extra unread stream details captured from output or unknown stream events.
+    var streamExtraDetails: [ExtraDetailItem] = []
     var events: [SubstepEvent] = []
     var isRunning = false
-    var errorMessage: String?
+    var errorTitle: String?
+    var errorDetail: String?
+    var errorMessage: String? {
+        get { errorDetail ?? errorTitle }
+        set {
+            errorTitle = newValue != nil ? "Error" : nil
+            errorDetail = newValue
+        }
+    }
     var jobProgress: Double?
+    /// Stream timing tracking
+    var streamStartTime: Date?
+    var streamTotalElapsedMs: Int?
+    /// True after completed generation is automatically saved to the local library.
+    var isSavedToLibrary: Bool = false
+    /// Callback triggered to navigate to the Library tab.
+    var onNavigateToLibrary: (() -> Void)?
+
+    /// Total elapsed milliseconds across all completed phases or from the stream end event.
+    var totalElapsedMs: Int? {
+        if let total = streamTotalElapsedMs, total > 0 {
+            return total
+        }
+        let stageSums = streamStages.compactMap(\.elapsedMs).reduce(0, +)
+        if stageSums > 0 { return stageSums }
+        if let start = streamStartTime {
+            return Int(Date().timeIntervalSince(start) * 1000)
+        }
+        return nil
+    }
+
+    /// Formatted total elapsed time across the entire pipeline.
+    var formattedTotalElapsed: String? {
+        guard let ms = totalElapsedMs, ms > 0 else { return nil }
+        if ms < 1000 {
+            return "\(ms)ms"
+        } else {
+            return String(format: "%.1fs", Double(ms) / 1000.0)
+        }
+    }
+
+    /// The ongoing stage, if any.
+    var ongoingStage: PipelineStageState? {
+        streamStages.first(where: { $0.status.lowercased() == "running" })
+    }
+
+    /// The ongoing substep, if any.
+    var ongoingSubstep: PipelineSubstepState? {
+        for stage in streamStages {
+            if let sub = stage.substeps.first(where: { $0.status.lowercased() == "running" }) {
+                return sub
+            }
+        }
+        return nil
+    }
+
+    /// Concise description of what is currently executing in the pipeline.
+    var ongoingDescription: String? {
+        guard isRunning else { return nil }
+        if let sub = ongoingSubstep, let stage = ongoingStage {
+            return "Stage \(stage.id) · \(stage.label) (\(sub.name))"
+        }
+        if let stage = ongoingStage {
+            return "Stage \(stage.id) · \(stage.label)"
+        }
+        if let current = currentStage {
+            return current.title
+        }
+        if !streamStages.isEmpty {
+            return "Executing pipeline…"
+        }
+        return "Initializing stream…"
+    }
+
+    func goToLibrary() {
+        onNavigateToLibrary?()
+    }
+
+    func toggleStageExpansion(id: Int) {
+        if let idx = streamStages.firstIndex(where: { $0.id == id }) {
+            streamStages[idx].isExpanded.toggle()
+        }
+    }
+
+    func toggleSubstepExpansion(stageID: Int, substepID: String) {
+        if let sIdx = streamStages.firstIndex(where: { $0.id == stageID }),
+           let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == substepID }) {
+            streamStages[sIdx].substeps[subIdx].isExpanded.toggle()
+        }
+    }
+
+    func setError(_ error: Error) {
+        if let apiError = error as? APIError {
+            errorTitle = apiError.errorDescription ?? "Error"
+            errorDetail = apiError.failureReason ?? apiError.localizedDescription
+        } else {
+            errorTitle = "Error"
+            errorDetail = error.localizedDescription
+        }
+    }
 
     // Headlines from sample data (or server when live).
     var headlines: [String] = []
     var selectedHeadline: String = ""
+    var headlinesErrorMessage: String?
 
     // Story & Topic — verified against Streamlit (ai-script-maker) 2026-10-11.
     // Order: STORY_SECTION_ORDER; labels: SECTION_LABELS.
@@ -37,9 +142,16 @@ final class GenerateViewModel {
     var storySources: [String] = []
     var selectedStorySource: String = "🇮🇳 India Top Stories & Breaking"
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
-    var trendingHashtags: [String] = ["#DelhiTraffic", "#OddEven", "#MakeInIndia"]
+    var trendingHashtags: [String] = []
+    var hashtagItems: [NewsHashtag] = []
     var selectedHashtag: String = ""
-    var customHashtag: String = ""
+    var hashtagsErrorMessage: String?
+    var customHashtag: String = "" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var isRefreshingHashtags = false
+
+    private var isApplyingConfig = false
 
     // Configuration — verified against Streamlit 2026-10-11.
     // AI_SOURCES order; default Antigravity (#464). AI_POWERS; default Default.
@@ -52,20 +164,36 @@ final class GenerateViewModel {
     var selectedAIIdentifier: String { config.selectedAI.identifier }
     /// Duration options mirror the Streamlit step-5 number input (5–60s).
     var durations: [Int] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
-    var duration: Int = 10
+    var duration: Int = 10 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     // ALL_EMOTIONS, frozen order (#354); default Curiosity.
     var emotions: [String] = []
-    var selectedEmotion: String = "Curiosity"
-    var scriptCount: Int = 1
-    var maxRetries: Int = 3
-    var characterCount: Int = 3
+    var selectedEmotion: String = "Curiosity" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var scriptCount: Int = 1 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var maxRetries: Int = 3 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var characterCount: Int = 3 {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     // CHARACTER_KINDS; default Human.
     var characterKinds: [String] = []
-    var selectedCharacterKind: String = "Human"
-    var characterKindDetail: String = ""
+    var selectedCharacterKind: String = "Human" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
+    var characterKindDetail: String = "" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
     // Format catalog names; default Normal Talk.
     var formats: [String] = []
-    var selectedFormat: String = "Normal Talk"
+    var selectedFormat: String = "Normal Talk" {
+        didSet { if !isApplyingConfig { saveStudioConfig() } }
+    }
 
     // Generation mode: Continuous (run all stages) or Step-Wise (manual advance).
     enum WorkflowMode: String, CaseIterable, Identifiable {
@@ -83,13 +211,21 @@ final class GenerateViewModel {
         self.config = config
         self.repository = repository
         self.catalogProvider = catalogProvider
+        self.isApplyingConfig = true
+        defer { self.isApplyingConfig = false }
         loadCatalog()
         resetConfiguration()
-        loadSampleLists()
+        syncAIConfigurationFromConfig()
+        if config.dataSource == .offline {
+            loadSampleLists()
+        }
         if let saved = config.loadStudioConfig() {
             applyStudioConfig(saved)
         }
     }
+
+    /// Sync AI engine options from AppConfig (Preferences).
+    func syncAIConfigurationFromConfig() { updateAIOptions() }
 
     var isLocalJSON: Bool { config.dataSource != .server }
     var isCatalogReady: Bool { catalog != nil }
@@ -109,10 +245,9 @@ final class GenerateViewModel {
 
     func updateAIOptions(resetModel: Bool = false) {
         aiModels = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.map(\.id) ?? [])
-        if resetModel { selectedAIModel = "Default" }
+        if resetModel { selectedAIModel = "Default" }; if !aiModels.contains(selectedAIModel) { aiModels.append(selectedAIModel) }
         aiPowers = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.first { $0.id == selectedAIModel }?.efforts.map { $0.capitalized } ?? [])
-        if resetModel { selectedAIPower = "Default" }
-        updateInstruction()
+        if !aiPowers.contains(selectedAIPower) { aiPowers.append(selectedAIPower) }
     }
 
     func checkSetup() {
@@ -135,8 +270,14 @@ final class GenerateViewModel {
         }
     }
 
-    func resetConfiguration() {
+    func resetConfiguration(save: Bool = false) {
         guard let defaults = catalog?.defaults else { return }
+        let wasApplying = isApplyingConfig
+        isApplyingConfig = true
+        defer {
+            isApplyingConfig = wasApplying
+            if save { saveStudioConfig() }
+        }
         duration = defaults.duration
         selectedEmotion = defaults.emotion
         scriptCount = defaults.scriptCount
@@ -161,7 +302,7 @@ final class GenerateViewModel {
             formats = loaded.formats.map(\.name)
             updateAIOptions()
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -188,6 +329,13 @@ final class GenerateViewModel {
     /// Restore a saved Studio configuration. Stored values outside the current
     /// option lists (e.g. from an older build) are ignored, keeping defaults.
     private func applyStudioConfig(_ c: StudioConfig) {
+        isApplyingConfig = true
+        defer { isApplyingConfig = false }
+        if aiSources.contains(c.ai.source) { selectedAISource = c.ai.source }
+        updateAIOptions()
+        if aiModels.contains(c.ai.model) { selectedAIModel = c.ai.model }
+        updateAIOptions()
+        if aiPowers.contains(c.ai.power) { selectedAIPower = c.ai.power }
         if c.duration > 0 { duration = c.duration }
         if emotions.contains(c.emotion) { selectedEmotion = c.emotion }
         scriptCount = max(1, c.scriptCount)
@@ -205,7 +353,6 @@ final class GenerateViewModel {
         if storySources.contains(source) { selectedStorySource = source }
         topic = c.topic
         sampleStory = c.sampleStory
-        updateInstruction()
     }
     /// Load headline dropdowns from sample data.
     func loadSampleLists() {
@@ -216,16 +363,199 @@ final class GenerateViewModel {
             // so Generate is enabled on launch (Streamlit parity).
             if StringFormatting.isBlank(topic) { topic = selectedHeadline }
         }
-        updateInstruction()
     }
 
     /// Refresh headlines (re-load from sample data / server).
-    func refreshHeadlines() async {
+    /// If forceFresh is false, uses 24-hour cache when available.
+    func refreshHeadlines(forceFresh: Bool = false) async {
         isRefreshingHeadlines = true
+        headlinesErrorMessage = nil
         defer { isRefreshingHeadlines = false }
-        // Simulate refresh delay; in server mode this would fetch fresh headlines.
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        loadSampleLists()
+
+        let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
+        let cacheKey = categoryParam ?? "default"
+
+        if !forceFresh, let cached = config.getCachedHeadlines(forSource: cacheKey), !cached.isEmpty {
+            applyHeadlines(cached, forSource: cacheKey)
+            return
+        }
+
+        do {
+            let service = try api()
+            let pageSize = config.newsPageSize
+            let response = try await service.fetchTopTitles(category: categoryParam, n: pageSize, mode: nil)
+            let loadedHeadlines = response.titles.map(\.title)
+            if !loadedHeadlines.isEmpty {
+                config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
+                applyHeadlines(loadedHeadlines, forSource: cacheKey)
+            } else {
+                headlines = []
+                selectedHeadline = ""
+            }
+        } catch {
+            headlines = []
+            selectedHeadline = ""
+            if isLocalJSON {
+                loadSampleLists()
+            } else {
+                headlinesErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func applyHeadlines(_ loadedHeadlines: [String], forSource cacheKey: String) {
+        headlines = loadedHeadlines
+        let lastSelected = config.getLastSelectedHeadline(forSource: cacheKey)
+        if let lastSelected, loadedHeadlines.contains(lastSelected) {
+            selectedHeadline = lastSelected
+        } else if let first = loadedHeadlines.first {
+            selectedHeadline = first
+            config.saveLastSelectedHeadline(first, forSource: cacheKey)
+        }
+        topic = selectedHeadline
+    }
+
+    /// Persist headline selection for the current source when chosen by user.
+    func onHeadlineChanged(_ headline: String) {
+        topic = headline
+        let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
+        let cacheKey = categoryParam ?? "default"
+        config.saveLastSelectedHeadline(headline, forSource: cacheKey)
+    }
+
+    /// User selected a trending hashtag.
+    func onHashtagChanged(_ tag: String) {
+        selectedHashtag = tag
+        if let match = hashtagItems.first(where: { $0.tag == tag }), let headline = match.headline, !headline.isEmpty {
+            selectedHeadline = headline
+            topic = headline
+        } else if !tag.isEmpty {
+            let derived = tag.replacingOccurrences(of: "#", with: "")
+            selectedHeadline = derived
+            topic = derived
+        }
+    }
+
+    /// Handles story source selection change to load headlines or hashtags.
+    func onStorySourceChanged() async {
+        headlines = []
+        selectedHeadline = ""
+        topic = ""
+        headlinesErrorMessage = nil
+        hashtagsErrorMessage = nil
+        saveStudioConfig()
+        if isHashtagSource {
+            await refreshHashtags()
+        } else if !isManualSource {
+            await refreshHeadlines(forceFresh: false)
+        }
+    }
+
+    /// Refresh trending hashtags directly from /api/v1/news/hashtags (with title extraction fallback).
+    func refreshHashtags() async {
+        isRefreshingHashtags = true
+        hashtagsErrorMessage = nil
+        defer { isRefreshingHashtags = false }
+        do {
+            let service = try api()
+            // 1. Direct dedicated hashtags endpoint
+            if let hashtagResponse = try? await service.fetchTrendingHashtags(n: 15), !hashtagResponse.hashtags.isEmpty {
+                hashtagItems = hashtagResponse.hashtags
+                trendingHashtags = hashtagResponse.hashtags.map(\.tag)
+                if let first = hashtagResponse.hashtags.first {
+                    onHashtagChanged(first.tag)
+                }
+                return
+            }
+
+            // 2. Fallback: extract hashtags from top titles
+            let response = try await service.fetchTopTitles(category: "trending", n: 10, mode: nil)
+            var extracted: [NewsHashtag] = []
+            for item in response.titles {
+                let words = item.title.components(separatedBy: .whitespacesAndNewlines)
+                for w in words where w.hasPrefix("#") && w.count > 1 {
+                    if !extracted.contains(where: { $0.tag == w }) {
+                        extracted.append(NewsHashtag(tag: w, headline: item.title, link: item.link, source: "Trending"))
+                    }
+                }
+            }
+            hashtagItems = extracted
+            trendingHashtags = extracted.map(\.tag)
+            if let first = extracted.first {
+                onHashtagChanged(first.tag)
+            }
+        } catch {
+            hashtagItems = []
+            trendingHashtags = []
+            if !isLocalJSON {
+                hashtagsErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    var isRefreshingCategories = false
+
+    /// Fetch news categories from server when available.
+    func loadNewsCategories() async {
+        isRefreshingCategories = true
+        defer { isRefreshingCategories = false }
+        guard !isLocalJSON else {
+            loadCatalog()
+            return
+        }
+        do {
+            let service = try api()
+            let response = try await service.fetchNewsCategories()
+            let serverLabels = response.categories.map(\.label)
+            if !serverLabels.isEmpty {
+                var combined = [Self.manualSourceLabel]
+                for label in serverLabels where !combined.contains(label) {
+                    combined.append(label)
+                }
+                if !combined.contains("#️⃣ Trending Hashtags (Google)") {
+                    combined.insert("#️⃣ Trending Hashtags (Google)", at: min(3, combined.count))
+                }
+                storySources = combined
+                if selectedStorySource.isEmpty || !storySources.contains(selectedStorySource) {
+                    if let defaultCat = response.categories.first(where: { $0.id == response.defaultCategory }) {
+                        selectedStorySource = defaultCat.label
+                    } else if let first = serverLabels.first {
+                        selectedStorySource = first
+                    }
+                }
+                if !isManualSource && !isHashtagSource {
+                    await refreshHeadlines(forceFresh: false)
+                }
+            }
+        } catch {
+            setError(error)
+        }
+    }
+
+    /// Populates data on startup or view appearance.
+    func initialLoad() async {
+        syncAIConfigurationFromConfig()
+        if config.dataSource == .server {
+            await loadNewsCategories()
+            if isHashtagSource {
+                await refreshHashtags()
+            } else if !isManualSource {
+                await refreshHeadlines(forceFresh: false)
+            }
+        } else {
+            loadCatalog()
+            loadSampleLists()
+        }
+    }
+
+    /// Verify news endpoints are available.
+    func verifyNewsEndpoints() async -> Bool {
+        do {
+            let service = try api()
+            return try await service.verifyNewsEndpoints()
+        } catch {
+            return false
+        }
     }
 
     /// Update the master instruction from current config.
@@ -233,7 +563,7 @@ final class GenerateViewModel {
         instructionText = """
         Generate a \(selectedFormat) video with \(characterCount) character(s) \
         (\(selectedCharacterKind)), emotion: \(selectedEmotion). \
-        Duration: \(duration)s. AI: \(selectedAIIdentifier). \
+        Duration: \(duration)s. AI: \(selectedAISource) \(selectedAIModel) (\(selectedAIPower)). \
         Sample story guides dialogue and scenes.
         """
     }
@@ -244,22 +574,253 @@ final class GenerateViewModel {
 
     // MARK: - Flow
 
-    /// Start a new session and run the first stage.
+    /// Start story generation stream according to Contract v1.
     func start() async {
         guard !isRunning else { return }
         saveStudioConfig()
         await reset()
         isRunning = true
+        streamStartTime = Date()
         defer { isRunning = false }
         do {
             let api = try api()
-            let sid = try await api.createSession()
-            sessionID = sid
-            listenForEvents(api: api, sessionID: sid)
-            try await runStage(.verify, api: api, inputs: stageInputs())
-            if workflowMode == .continuous { try await continueAutomatically(api: api) }
+            let streamParams: [String: Any] = [
+                "news_input": topic,
+                "ai_source": selectedAISource,
+                "ai_model": selectedAIModel,
+                "ai_power": selectedAIPower,
+                "batch_size": scriptCount,
+                "target_seconds": duration,
+                "max_retries": maxRetries,
+                "character_count": characterCount,
+                "character_kind": selectedCharacterKind,
+                "character_detail": characterKindDetail,
+                "scene_style": selectedFormat,
+                "preferred_emotion": selectedEmotion,
+                "sample_story": sampleStory,
+                "instruction": instructionText,
+                "mode": config.dataSource == .server ? "live" : "sample"
+            ]
+
+            sessionID = UUID().uuidString
+            for try await event in api.createAndStreamStory(params: streamParams) {
+                switch event {
+                case .planStream(let plan):
+                    self.streamStages = plan.stages.enumerated().map { (index, stagePlan) in
+                        PipelineStageState(
+                            id: stagePlan.id,
+                            type: stagePlan.type,
+                            label: stagePlan.label,
+                            status: "pending",
+                            substeps: [],
+                            isExpanded: index == 0
+                        )
+                    }
+
+                case .planStage(let plan):
+                    if let stageEnum = PipelineStageType(rawValue: plan.stageType) {
+                        currentStage = stageEnum
+                    }
+                    if let idx = streamStages.firstIndex(where: { $0.type == plan.stageType }) {
+                        let existingSubsteps = streamStages[idx].substeps
+                        streamStages[idx].substeps = plan.substeps.map { sub in
+                            if let found = existingSubsteps.first(where: { $0.id == sub.id }) {
+                                return found
+                            }
+                            return PipelineSubstepState(
+                                id: sub.id,
+                                substepType: sub.substepType,
+                                name: sub.name,
+                                status: "pending"
+                            )
+                        }
+                        streamStages[idx].isExpanded = true
+                    } else {
+                        let newStage = PipelineStageState(
+                            id: plan.position,
+                            type: plan.stageType,
+                            label: plan.stageType.capitalized,
+                            status: "pending",
+                            substeps: plan.substeps.map { sub in
+                                PipelineSubstepState(id: sub.id, substepType: sub.substepType, name: sub.name, status: "pending")
+                            },
+                            isExpanded: true
+                        )
+                        streamStages.append(newStage)
+                    }
+
+                case .progressStage(let progress):
+                    if let stageEnum = PipelineStageType(rawValue: progress.stageType) {
+                        currentStage = stageEnum
+                    }
+                    if let cur = currentStage {
+                        let sub = SubstepEvent(
+                            name: cur.rawValue,
+                            stage: cur.rawValue,
+                            label: cur.title,
+                            status: progress.status,
+                            detail: "Status: \(progress.status)"
+                        )
+                        events.append(sub)
+                    }
+                    if let idx = streamStages.firstIndex(where: { $0.type == progress.stageType }) {
+                        streamStages[idx].status = progress.status
+                        if let ms = progress.elapsedMs {
+                            streamStages[idx].elapsedMs = ms
+                        }
+                        if progress.status.lowercased() == "running" {
+                            streamStages[idx].isExpanded = true
+                        }
+                    }
+
+                case .progressSubstep(let progress):
+                    let sub = SubstepEvent(
+                        name: progress.substep,
+                        stage: progress.substepType,
+                        label: "\(progress.substepType.capitalized) substep \(progress.substep)",
+                        status: progress.status,
+                        detail: "Working..."
+                    )
+                    events.append(sub)
+                    if let sIdx = streamStages.firstIndex(where: { $0.type == progress.substepType }) {
+                        if let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == progress.substep }) {
+                            streamStages[sIdx].substeps[subIdx].status = progress.status
+                            if let ms = progress.elapsedMs {
+                                streamStages[sIdx].substeps[subIdx].elapsedMs = ms
+                            }
+                        } else {
+                            streamStages[sIdx].substeps.append(PipelineSubstepState(
+                                id: progress.substep,
+                                substepType: progress.substepType,
+                                name: "\(progress.substepType.capitalized) \(progress.substep)",
+                                status: progress.status,
+                                elapsedMs: progress.elapsedMs
+                            ))
+                        }
+                        streamStages[sIdx].isExpanded = true
+                    }
+
+                case .outputSubstep(let step, let substep, let substepType, let name, let status, let elapsedMs, let output):
+                    _ = step
+                    let sub = SubstepEvent(
+                        name: substep,
+                        stage: substepType,
+                        label: name.isEmpty ? substep : name,
+                        status: status,
+                        detail: status
+                    )
+                    events.append(sub)
+                    let detailText = output["detail"] as? String ?? (output.isEmpty ? nil : "\(output)")
+
+                    let knownSubstepKeys: Set<String> = ["detail"]
+                    var subExtra: [ExtraDetailItem] = []
+                    for (k, v) in output where !knownSubstepKeys.contains(k) {
+                        subExtra.append(ExtraDetailItem(key: k, value: ExtraDetailItem.formatValue(v)))
+                    }
+                    subExtra.sort { $0.key < $1.key }
+
+                    if let sIdx = streamStages.firstIndex(where: { $0.type == substepType }) {
+                        if let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == substep }) {
+                            streamStages[sIdx].substeps[subIdx].status = status
+                            if let ms = elapsedMs { streamStages[sIdx].substeps[subIdx].elapsedMs = ms }
+                            if !name.isEmpty { streamStages[sIdx].substeps[subIdx].name = name }
+                            streamStages[sIdx].substeps[subIdx].detail = detailText
+                            streamStages[sIdx].substeps[subIdx].extraDetails = subExtra
+                        } else {
+                            streamStages[sIdx].substeps.append(PipelineSubstepState(
+                                id: substep,
+                                substepType: substepType,
+                                name: name.isEmpty ? substep : name,
+                                status: status,
+                                detail: detailText,
+                                elapsedMs: elapsedMs,
+                                extraDetails: subExtra
+                            ))
+                        }
+                    }
+
+                case .outputStage(let step, let status, let outputType, let elapsedMs, let output, _):
+                    _ = step
+                    if let stageEnum = PipelineStageType(rawValue: outputType) {
+                        stagePayloads[stageEnum] = output
+                        currentStage = stageEnum
+                    }
+
+                    let recognizedStageKeys: Set<String> = {
+                        switch outputType {
+                        case "validation": return ["status", "confidence", "notes", "bypassed"]
+                        case "casting": return ["finalized_characters", "selected_angles"]
+                        case "dialogue": return ["scenes", "background_music"]
+                        case "scenes": return ["scenes"]
+                        case "storyboard": return ["scripts", "storyboards"]
+                        case "script": return ["scripts"]
+                        default: return []
+                        }
+                    }()
+
+                    var stageExtra: [ExtraDetailItem] = []
+                    for (k, v) in output where !recognizedStageKeys.contains(k) {
+                        stageExtra.append(ExtraDetailItem(key: k, value: ExtraDetailItem.formatValue(v)))
+                    }
+                    stageExtra.sort { $0.key < $1.key }
+
+                    if let sIdx = streamStages.firstIndex(where: { $0.type == outputType }) {
+                        streamStages[sIdx].status = status
+                        if let ms = elapsedMs { streamStages[sIdx].elapsedMs = ms }
+                        streamStages[sIdx].outputPayload = output
+                        streamStages[sIdx].extraDetails = stageExtra
+                        if let notes = output["notes"] as? String {
+                            streamStages[sIdx].outputSummary = notes
+                        } else if let chars = output["finalized_characters"] as? [[String: Any]] {
+                            streamStages[sIdx].outputSummary = "\(chars.count) character(s) defined"
+                        } else if let scripts = output["scripts"] as? [[String: Any]] {
+                            streamStages[sIdx].outputSummary = "\(scripts.count) script(s) generated"
+                        } else if let scenes = output["scenes"] as? [[String: Any]] {
+                            streamStages[sIdx].outputSummary = "\(scenes.count) scene(s) derived"
+                        }
+                    }
+
+                case .unknown(let type, let data):
+                    var unhandled: [ExtraDetailItem] = []
+                    for (k, v) in data {
+                        unhandled.append(ExtraDetailItem(key: "\(type): \(k)", value: ExtraDetailItem.formatValue(v)))
+                    }
+                    unhandled.sort { $0.key < $1.key }
+                    streamExtraDetails.append(contentsOf: unhandled)
+
+                case .error(let errorPayload):
+                    errorMessage = errorPayload.error
+                    if let st = errorPayload.stage, let sIdx = streamStages.firstIndex(where: { $0.id == st }) {
+                        streamStages[sIdx].status = "failed"
+                        streamStages[sIdx].isExpanded = true
+                        if let fs = errorPayload.failedSubstep, let subIdx = streamStages[sIdx].substeps.firstIndex(where: { $0.id == fs }) {
+                            streamStages[sIdx].substeps[subIdx].status = "failed"
+                            streamStages[sIdx].substeps[subIdx].detail = errorPayload.error
+                        }
+                    }
+
+                case .end(let endPayload):
+                    if let endMs = endPayload?.elapsedMs {
+                        streamTotalElapsedMs = endMs
+                    }
+                    if let endPayload, endPayload.result == "failure" {
+                        errorMessage = endPayload.error ?? "Generation failed on server."
+                        if let lastRunning = streamStages.lastIndex(where: { $0.status == "running" }) {
+                            streamStages[lastRunning].status = "failed"
+                        }
+                    } else {
+                        for idx in streamStages.indices {
+                            if streamStages[idx].status == "running" {
+                                streamStages[idx].status = "success"
+                            }
+                        }
+                        generationCompleted = true
+                        await saveToLibrary()
+                    }
+                }
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -271,10 +832,9 @@ final class GenerateViewModel {
             "story_source": selectedStorySource,
             "trending_hashtag": customHashtag.isEmpty ? selectedHashtag : customHashtag,
             "ai_source": selectedAISource,
-            "ai_model": selectedAIIdentifier,
-            "model_identifier": selectedAIIdentifier,
+            "ai_model": selectedAIModel,
             "ai_power": selectedAIPower,
-            "ai": ["source": selectedAISource, "model": selectedAIModel, "power": selectedAIPower, "identifier": selectedAIIdentifier],
+            "ai": ["source": selectedAISource, "model": selectedAIModel, "power": selectedAIPower],
             "duration": duration,
             "emotion": selectedEmotion,
             "script_count": scriptCount,
@@ -296,7 +856,7 @@ final class GenerateViewModel {
             let api = try api()
             try await runStage(stage, api: api, inputs: inputs.isEmpty ? stageInputs() : inputs)
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -335,7 +895,7 @@ final class GenerateViewModel {
                 try await runStage(next, api: api, inputs: stageInputs())
             }
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -358,7 +918,6 @@ final class GenerateViewModel {
 
     private var generatedStoryIDs: [Int: String] = [:]
     private var generationCreatedAt = DateFormatting.iso8601Now()
-    var savedStoryCount = 0
     var generationCompleted = false
     var renderJobID: String?
     var renderCompleted = false
@@ -374,7 +933,7 @@ final class GenerateViewModel {
         do {
             try await completeRender(api: api(), inputs: inputs.isEmpty ? stageInputs() : inputs)
         } catch {
-            errorMessage = error.localizedDescription
+            setError(error)
         }
     }
 
@@ -424,13 +983,17 @@ final class GenerateViewModel {
         sessionID = nil
         currentStage = nil
         stagePayloads = [:]
+        streamStages = []
+        streamExtraDetails = []
         events = []
         errorMessage = nil
         jobProgress = nil
         renderJobID = nil
         renderCompleted = false
         generationCompleted = false
-        savedStoryCount = 0
+        isSavedToLibrary = false
+        streamStartTime = nil
+        streamTotalElapsedMs = nil
         generatedStoryIDs = [:]
         generationCreatedAt = DateFormatting.iso8601Now()
     }
@@ -439,7 +1002,8 @@ final class GenerateViewModel {
 
     /// Save the completed generation to the Library via the repository.
     private func saveToLibrary() async {
-        let scripts = stagePayloads[.validation]?["scripts"] as? [[String: Any]]
+        let scripts = stagePayloads[.script]?["scripts"] as? [[String: Any]]
+            ?? stagePayloads[.validation]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.storyboard]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.dialogue]?["scripts"] as? [[String: Any]] ?? []
         for (index, script) in scripts.enumerated() {
@@ -458,9 +1022,13 @@ final class GenerateViewModel {
             }
             let id = generatedStoryIDs[index] ?? UUID().uuidString
             generatedStoryIDs[index] = id
-            let title = script["title"] as? String ?? ""
+            let title = script["title"] as? String ?? topic
             let boards = stagePayloads[.storyboard]?["storyboards"] as? [[String: Any]] ?? []
             let board = boards.indices.contains(index) ? boards[index] : [:]
+            let scriptContent = script["script_md"] as? String ?? script["script"] as? String ?? board["script_md"] as? String
+            let initialVersions: [StoryScriptVersion]? = scriptContent.map {
+                [StoryScriptVersion(number: 1, text: $0, createdAt: generationCreatedAt, instruction: instructionText.isEmpty ? nil : instructionText)]
+            }
             let story = Story(
                 id: id,
                 title: StringFormatting.isBlank(title) ? "Untitled story \(index + 1)" : title,
@@ -471,19 +1039,32 @@ final class GenerateViewModel {
                 emotion: selectedEmotion,
                 format: selectedFormat,
                 hashtags: script["hashtags"] as? [String],
-                sourceLinks: (stagePayloads[.verify]?["sources"] as? [[String: Any]])?.map { link in
-                    StorySourceLink(title: link["title"] as? String ?? "Source", url: link["url"] as? String ?? "", source: link["source"] as? String ?? "")
+                sourceLinks: (stagePayloads[.validation]?["sources"] as? [[String: Any]])?.map {
+                    StorySourceLink(title: $0["title"] as? String ?? "Source", url: $0["url"] as? String ?? "", source: $0["source"] as? String ?? "")
                 },
-                scriptText: script["script_md"] as? String ?? script["script"] as? String ?? board["script_md"] as? String,
+                scriptText: scriptContent,
+                instruction: instructionText.isEmpty ? nil : instructionText,
+
                 generationNumber: index + 1,
-                stageOutputs: outputs
+                stageOutputs: outputs,
+                scriptVersions: initialVersions
             )
             await repository.save(story)
-            savedStoryCount = index + 1
         }
+        isSavedToLibrary = true
     }
 
     private func nextStage(after stage: PipelineStage?) -> PipelineStage? {
+        if !streamStages.isEmpty {
+            guard let stage else {
+                return streamStages.first?.stageTypeEnum
+            }
+            if let idx = streamStages.firstIndex(where: { $0.type == stage.rawValue }),
+               idx + 1 < streamStages.count {
+                return streamStages[idx + 1].stageTypeEnum
+            }
+            return nil
+        }
         let all = PipelineStage.allCases
         guard let stage, let idx = all.firstIndex(of: stage), idx + 1 < all.count else {
             return stage == nil ? all.first : nil
@@ -492,6 +1073,14 @@ final class GenerateViewModel {
     }
 
     private func previousStage(before stage: PipelineStage?) -> PipelineStage? {
+        if !streamStages.isEmpty {
+            guard let stage,
+                  let idx = streamStages.firstIndex(where: { $0.type == stage.rawValue }),
+                  idx > 0 else {
+                return nil
+            }
+            return streamStages[idx - 1].stageTypeEnum
+        }
         let all = PipelineStage.allCases
         guard let stage, let idx = all.firstIndex(of: stage), idx > 0 else {
             return nil

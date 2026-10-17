@@ -21,10 +21,10 @@ xcodebuild -project ../../ScriptMakerMac.xcodeproj \
   -scheme ScriptMakerMac \
   -configuration Release \
   -derivedDataPath build \
-  clean build
+  CODE_SIGNING_ALLOWED=NO clean build
 
-BUILT_APP="$(find build -name "$APP" -maxdepth 4 | head -1)"
-if [ -z "$BUILT_APP" ]; then
+BUILT_APP="build/Build/Products/Release/$APP"
+if [ ! -d "$BUILT_APP" ]; then
     echo "ERROR: $APP not found under build/ after xcodebuild." >&2
     exit 1
 fi

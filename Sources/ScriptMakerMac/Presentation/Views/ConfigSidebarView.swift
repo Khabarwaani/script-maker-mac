@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct ConfigSidebarView: View {
     @Bindable var viewModel: GenerateViewModel
@@ -17,27 +16,120 @@ struct ConfigSidebarView: View {
         .scrollIndicators(.visible)
         .background(ScrollBarConfiguration())
         .disabled(viewModel.isRunning)
-        .onChange(of: viewModel.selectedAIIdentifier) { _, _ in viewModel.updateInstruction() }
+        .task {
+            await viewModel.initialLoad()
+        }
+        .onChange(of: viewModel.appConfig.dataSource) { _, _ in
+            Task { await viewModel.initialLoad() }
+        }
     }
 
     private var storySection: some View {
         StudioSection("Story") {
-            Button { Task { await viewModel.refreshHeadlines() } } label: { Image(systemName: "arrow.clockwise") }
-                .help("Refresh headlines").disabled(viewModel.isRefreshingHeadlines)
+            EmptyView()
         } content: {
             StudioRow("Source", inset: 0) {
-                StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                HStack(spacing: 8) {
+                    StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                        .disabled(viewModel.isRefreshingCategories)
+                        .onChange(of: viewModel.selectedStorySource) { _, _ in
+                            Task { await viewModel.onStorySourceChanged() }
+                        }
+                    StudioRefreshButton(
+                        isRefreshing: viewModel.isRefreshingCategories,
+                        helpText: "Refresh news categories"
+                    ) {
+                        Task { await viewModel.loadNewsCategories() }
+                    }
+                    .padding(.trailing, 10)
+                }
             }
             if viewModel.isHashtagSource {
                 StudioRow("Trending hashtag", inset: 0) {
-                    StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
+                    HStack(spacing: 8) {
+                        if viewModel.trendingHashtags.isEmpty {
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingHashtags {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading hashtags…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.hashtagsErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No hashtags found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        } else {
+                            StudioOptionPicker("Trending hashtag", selection: $viewModel.selectedHashtag, options: [""] + viewModel.trendingHashtags, label: { $0.isEmpty ? "None" : $0 })
+                                .disabled(viewModel.isRefreshingHashtags)
+                                .onChange(of: viewModel.selectedHashtag) { _, new in
+                                    viewModel.onHashtagChanged(new)
+                                }
+                        }
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingHashtags,
+                            helpText: "Refresh trending hashtags"
+                        ) {
+                            Task { await viewModel.refreshHashtags() }
+                        }
+                        .padding(.trailing, 10)
+                    }
                 }
                 StudioRow("Custom hashtag") { TextField("e.g. #MakeInIndia", text: $viewModel.customHashtag) }
             }
-            if !viewModel.isManualSource && !viewModel.headlines.isEmpty {
+            if !viewModel.isManualSource {
                 StudioRow("Headline", inset: 0) {
-                    StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
-                        .onChange(of: viewModel.selectedHeadline) { _, new in viewModel.topic = new }
+                    HStack(spacing: 8) {
+                        if viewModel.headlines.isEmpty {
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingHeadlines {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading headlines…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.headlinesErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No headlines found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        } else {
+                            StudioOptionPicker("Headline", selection: $viewModel.selectedHeadline, options: viewModel.headlines)
+                                .disabled(viewModel.isRefreshingHeadlines)
+                                .onChange(of: viewModel.selectedHeadline) { _, new in
+                                    viewModel.selectedHeadline = new
+                                    viewModel.onHeadlineChanged(new)
+                                }
+                        }
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingHeadlines,
+                            helpText: "Refresh headlines"
+                        ) {
+                            Task { await viewModel.refreshHeadlines(forceFresh: true) }
+                        }
+                        .padding(.trailing, 10)
+                    }
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -56,7 +148,7 @@ struct ConfigSidebarView: View {
 
     private var configurationSection: some View {
         StudioSection("Configuration") {
-            Button("Reset") { viewModel.resetConfiguration() }.help("Restore defaults")
+            Button("Reset") { viewModel.resetConfiguration(save: true) }.help(Text(verbatim: "Restore defaults"))
         } content: {
             StudioRow("AI Model", inset: 12) {
                 Text(viewModel.selectedAIIdentifier).lineLimit(1).truncationMode(.middle)
@@ -66,35 +158,48 @@ struct ConfigSidebarView: View {
                 .buttonStyle(StudioButtonStyle())
             StudioRow("Duration (s)") {
                 StudioNumberInput("Duration", value: $viewModel.duration, range: 1...Int.max, step: 5)
-                    .onChange(of: viewModel.duration) { _, _ in viewModel.updateInstruction() }
             }
             StudioRow("Emotion", inset: 0) {
-                StudioOptionPicker("Emotion", selection: $viewModel.selectedEmotion, options: viewModel.emotions).onChange(of: viewModel.selectedEmotion) { _, _ in viewModel.updateInstruction() }
+                StudioOptionPicker("Emotion", selection: $viewModel.selectedEmotion, options: viewModel.emotions)
             }
             StudioRow("Scripts") { StudioNumberInput("Scripts", value: $viewModel.scriptCount, range: 1...Int.max) }
             StudioRow("Retries") { StudioNumberInput("Retries", value: $viewModel.maxRetries, range: viewModel.retryRange) }
             StudioRow("Characters") {
                 StudioNumberInput("Characters", value: $viewModel.characterCount, range: 1...Int.max)
-                    .onChange(of: viewModel.characterCount) { _, _ in viewModel.updateInstruction() }
             }
             StudioRow("Character Kind", inset: 0) {
-                StudioOptionPicker("Character Kind", selection: $viewModel.selectedCharacterKind, options: viewModel.characterKinds).onChange(of: viewModel.selectedCharacterKind) { _, _ in viewModel.updateInstruction() }
+                StudioOptionPicker("Character Kind", selection: $viewModel.selectedCharacterKind, options: viewModel.characterKinds)
             }
             StudioRow("Kind Detail") { TextField("e.g. lion, Shiva, talking SIM card", text: $viewModel.characterKindDetail) }
             StudioRow("Format", inset: 0) {
-                StudioOptionPicker("Format", selection: $viewModel.selectedFormat, options: viewModel.formats).onChange(of: viewModel.selectedFormat) { _, _ in viewModel.updateInstruction() }
+                StudioOptionPicker("Format", selection: $viewModel.selectedFormat, options: viewModel.formats)
             }
         }
     }
 
     private var instructionSection: some View {
         StudioSection("Instruction") {
-            Button { viewModel.updateInstruction() } label: { Image(systemName: "arrow.clockwise") }
-                .help("Refresh instruction from current configuration")
+            HStack(spacing: 8) {
+                if !viewModel.instructionText.isEmpty {
+                    Button { viewModel.instructionText = "" } label: { Image(systemName: "xmark") }
+                        .help("Clear instruction")
+                }
+                Button { viewModel.updateInstruction() } label: { Image(systemName: "sparkles") }
+                    .help("Generate instruction from current configuration")
+            }
         } content: {
-            TextEditor(text: $viewModel.instructionText).font(.body).scrollContentBackground(.hidden)
-                .frame(height: 120).padding(8)
-                .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
+            ZStack(alignment: .topLeading) {
+                if viewModel.instructionText.isEmpty {
+                    Text("Add custom instructions or tap ✨ to generate from configuration…")
+                        .font(.body)
+                        .foregroundStyle(AppTheme.secondaryInk.opacity(0.8))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                }
+                TextEditor(text: $viewModel.instructionText).font(.body).scrollContentBackground(.hidden)
+                    .frame(height: 120).padding(4)
+            }
+            .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -107,7 +212,7 @@ struct ConfigSidebarView: View {
             if let notice = viewModel.setupNotice { Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
             Button { Task { await viewModel.start() } } label: {
                 HStack {
-                    if viewModel.isRunning { StudioActivityIndicator() }
+                    if viewModel.isRunning { ProgressView().controlSize(.small) }
                     Text(viewModel.isRunning ? "Generating…" : "Generate")
                 }.frame(maxWidth: .infinity)
             }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)
@@ -176,13 +281,12 @@ struct StudioSection<Action: View, Content: View>: View {
     }
 }
 
-struct StudioOptionPicker: NSViewRepresentable {
+struct StudioOptionPicker: View {
     let title: String
     @Binding var selection: String
     let options: [String]
     var label: (String) -> String = { $0 }
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.colorScheme) private var colorScheme
+    @State private var showingOptions = false
 
     init(_ title: String, selection: Binding<String>, options: [String], label: @escaping (String) -> String = { $0 }) {
         self.title = title
@@ -191,73 +295,87 @@ struct StudioOptionPicker: NSViewRepresentable {
         self.label = label
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(selection: $selection) }
-
-    func makeNSView(context: Context) -> StudioPopUpButton {
-        let button = StudioPopUpButton(frame: .zero, pullsDown: false)
-        button.target = context.coordinator
-        button.action = #selector(Coordinator.selectOption(_:))
-        button.isBordered = false
-        button.focusRingType = .default
-        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        return button
-    }
-
-    func updateNSView(_ button: StudioPopUpButton, context: Context) {
-        context.coordinator.selection = $selection
-        let labels = options.map(label)
-        if button.itemTitles != labels {
-            button.removeAllItems()
-            for (index, option) in options.enumerated() {
-                button.addItem(withTitle: label(option))
-                button.item(at: index)?.representedObject = option
+    var body: some View {
+        Button {
+            guard !options.isEmpty else { return }
+            showingOptions.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Text(label(selection)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.down").font(.caption).foregroundStyle(AppTheme.secondaryInk)
             }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
         }
-        if let index = options.firstIndex(of: selection) { button.selectItem(at: index) }
-        button.isEnabled = isEnabled
-        button.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
-        button.setAccessibilityLabel(title)
-        button.setAccessibilityValue(label(selection))
-        button.needsDisplay = true
-    }
-
-    final class Coordinator: NSObject {
-        var selection: Binding<String>
-        init(selection: Binding<String>) { self.selection = selection }
-        @objc func selectOption(_ button: NSPopUpButton) {
-            if let value = button.selectedItem?.representedObject as? String { selection.wrappedValue = value }
+        .buttonStyle(.plain)
+        .disabled(options.isEmpty)
+        .accessibilityLabel(title)
+        .accessibilityValue(label(selection))
+        .popover(
+            isPresented: Binding(
+                get: { showingOptions && !options.isEmpty },
+                set: { showingOptions = $0 }
+            ),
+            arrowEdge: .bottom
+        ) {
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(options, id: \.self) { option in
+                        Button {
+                            selection = option
+                            showingOptions = false
+                        } label: {
+                            HStack {
+                                Text(label(option)).frame(maxWidth: .infinity, alignment: .leading)
+                                Image(systemName: "checkmark").opacity(selection == option ? 1 : 0)
+                            }
+                            .padding(10).contentShape(Rectangle())
+                            .background(selection == option ? AppTheme.sunken : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                        }.buttonStyle(.plain)
+                    }
+                }.padding(8)
+            }
+            .frame(width: 340, height: min(CGFloat(options.count) * 42 + 16, 400))
+            .foregroundStyle(AppTheme.ink).background(AppTheme.card)
+            .scrollIndicators(.visible)
         }
     }
 }
 
-/// Native menu tracking with the Studio field's typography and spacing.
-final class StudioPopUpButton: NSPopUpButton {
-    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 44) }
+struct StudioRefreshButton: View {
+    let isRefreshing: Bool
+    let helpText: String
+    let action: () -> Void
 
-    override func draw(_ dirtyRect: NSRect) {
-        let background = NSColor(named: "Sunken") ?? .controlBackgroundColor
-        let foreground = NSColor(named: "Ink") ?? .labelColor
-        let secondary = NSColor(named: "SecondaryInk") ?? .secondaryLabelColor
-        background.setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 10, yRadius: 10).fill()
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byTruncatingTail
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: foreground.withAlphaComponent(isEnabled ? 1 : 0.45), .paragraphStyle: paragraph
-        ]
-        let textHeight = font.ascender - font.descender + font.leading
-        let rect = NSRect(x: 10, y: (bounds.height - textHeight) / 2, width: max(bounds.width - 42, 0), height: textHeight)
-        (title as NSString).draw(in: rect, withAttributes: attributes)
-        if let arrow = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil) {
-            let image = arrow.withSymbolConfiguration(.init(pointSize: 11, weight: .regular)) ?? arrow
-            let tinted = NSImage(size: image.size, flipped: false) { target in
-                secondary.withAlphaComponent(self.isEnabled ? 1 : 0.45).setFill()
-                target.fill()
-                image.draw(in: target, from: .zero, operation: .destinationIn, fraction: 1)
-                return true
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.callout)
+                        .foregroundStyle(AppTheme.ink)
+                }
             }
-            tinted.draw(in: NSRect(x: bounds.width - 25, y: (bounds.height - 12) / 2, width: 12, height: 12))
+            .frame(width: 20, height: 20)
         }
+        .buttonStyle(RefreshButtonStyle())
+        .help(helpText)
+        .disabled(isRefreshing)
     }
 }
+
+private struct RefreshButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.82 : 1.0)
+            .rotationEffect(.degrees(configuration.isPressed ? 45 : 0))
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+

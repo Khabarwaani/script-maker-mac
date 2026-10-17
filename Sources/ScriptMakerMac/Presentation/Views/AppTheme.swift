@@ -51,6 +51,9 @@ struct StudioButtonStyle: ButtonStyle {
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(configuration.isPressed ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.line, lineWidth: 1))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -100,7 +103,9 @@ struct StudioPrimaryButtonStyle: ButtonStyle {
             .frame(minHeight: 36)
             .background(isHovered || configuration.isPressed ? AppTheme.accentHover : AppTheme.accent, in: RoundedRectangle(cornerRadius: 10))
             .contentShape(RoundedRectangle(cornerRadius: 10))
-            .opacity(isEnabled ? 1 : 0.5)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1.0) : 0.5)
+            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
             .onHover { isHovered = $0 }
     }
 }

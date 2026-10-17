@@ -32,7 +32,7 @@ struct IntegrationStageView: View {
                 }
 
                 if viewModel.generationCompleted {
-                    Label("\(viewModel.savedStoryCount) \(viewModel.savedStoryCount == 1 ? "story" : "stories") saved to Library", systemImage: "checkmark.circle.fill")
+                    Label("Story saved to Library", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(AppTheme.success)
                 }
             }

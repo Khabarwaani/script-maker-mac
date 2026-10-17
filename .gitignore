@@ -7,11 +7,11 @@ xcuserdata/
 DerivedData/
 build/
 *.xcresult
+packaging/mac/ScriptMakerMac-*.dmg
 
 # Swift Package Manager
 .build/
 .swiftpm/
 
-# Packaging output
 *.dmg
 *.app/

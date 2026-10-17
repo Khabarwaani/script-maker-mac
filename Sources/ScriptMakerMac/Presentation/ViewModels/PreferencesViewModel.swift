@@ -84,6 +84,11 @@ final class PreferencesViewModel {
         set { config.localJSONDelay = min(max(newValue, 0), 60) }
     }
 
+    var newsPageSize: Int {
+        get { config.newsPageSize }
+        set { config.newsPageSize = min(max(newValue, 1), 50) }
+    }
+
     var currentURL: String { config.serverURL }
     var appearance: AppAppearance {
         get { config.appearance }
@@ -95,6 +100,7 @@ final class PreferencesViewModel {
         guard !isTesting else { return }
         errorMessage = nil
         noticeMessage = nil
+
         if dataSource != .server {
             if let normalized = try? AppConfig.normalize(raw: draftURL), URL(string: normalized) != nil {
                 config.serverURL = normalized
@@ -112,9 +118,9 @@ final class PreferencesViewModel {
             let reachable = await connectionChecker.isReachable(at: url)
             config.serverURL = normalized
             draftURL = normalized
-            dataSource = reachable ? .server : .offline
-            config.dataSource = dataSource
-            noticeMessage = reachable ? "Using server." : "Server unavailable. Using Local JSON so you can continue."
+            config.dataSource = .server
+            dataSource = .server
+            noticeMessage = reachable ? "Using server." : "Saved server configuration. Warning: server is currently unreachable at this URL."
         } catch {
             errorMessage = error.localizedDescription
         }

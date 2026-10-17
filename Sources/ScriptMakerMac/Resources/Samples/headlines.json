@@ -1,4 +1,23 @@
 {
+  "category": "india",
+  "label": "🇮🇳 India Top Stories & Breaking",
+  "n": 3,
+  "mode": "sample",
+  "cached": false,
+  "titles": [
+    {
+      "title": "Delhi announces odd-even vehicle restrictions to combat air pollution",
+      "link": "https://sample.example/articles/1"
+    },
+    {
+      "title": "Mumbai local trains get 12 new air-conditioned rakes",
+      "link": "https://sample.example/articles/2"
+    },
+    {
+      "title": "ISRO successfully launches communication satellite GSAT-24",
+      "link": "https://sample.example/articles/3"
+    }
+  ],
   "headlines": [
     "Delhi announces odd-even vehicle restrictions to combat air pollution",
     "Mumbai local trains get 12 new air-conditioned rakes",

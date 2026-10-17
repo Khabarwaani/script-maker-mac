@@ -47,8 +47,10 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
 
 1. **Branches & PR flow:** `main` and `develop`. Feature branches off `develop`,
    PRs target `develop`. Never push direct to `main`/`develop`.
-2. **Thin client:** the UI never computes pipeline work. All generation goes
-   through `PipelineAPI`. No local AI/ML imports.
+2. **Thin client:** pipeline generation goes through `PipelineAPI`. The
+   `LocalAgent` workspace may execute KhabarwaaniAgent through installed CLI
+   providers or AgentAtom's on-device session via its injected service.
+   Views never import agent packages.
 3. **Fail-loud:** typed errors (`APIError`, `ConfigError`) with `LocalizedError`.
    Surfaces to the user; the UI stays usable offline.
 4. **Concurrency:** async/await only — no completion handlers, no Combine for
@@ -57,8 +59,9 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
    defaults to `http://localhost:8000`. IPv6-aware normalization in `AppConfig`.
    Never hardcode another default.
 6. **UX:** same use cases as the classic app. Apple HIG throughout.
-7. **Testing:** CI-first (`xcodebuild` on macos). Unit tests target ViewModels
-   and Services, never Views.
+7. **Testing:** Remote CI-first (`xcodebuild` on GitHub Actions). Rely on CI
+   for test verification; run local tests only upon CI failure. Unit tests target
+   ViewModels and Services, never Views.
 8. **Guidelines:** `docs/guidelines/` — architecture, layer-dependencies,
    workflows (feature, bugfix, git, failure, release, testing).
 9. **Tokens:** fewest words in comments and terminal text.

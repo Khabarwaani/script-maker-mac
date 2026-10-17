@@ -27,7 +27,12 @@ final class LibraryViewModel {
             case .composerOpened: actionNotice = "Telegram opened. Choose a conversation to share this story."
             case .exported(let url): actionNotice = "Story exported to \(url.lastPathComponent). Google Drive syncs files saved in its folder."
             }
-        } catch { actionNotice = error.localizedDescription }
+        } catch {
+            actionNotice = error.localizedDescription
+            if let reason = (error as? LocalizedError)?.failureReason, !reason.isEmpty {
+                actionNotice = "\(error.localizedDescription): \(reason)"
+            }
+        }
     }
 
     var stories: [Story] = []

@@ -25,9 +25,6 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("SOURCE").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
                 StudioChoiceGroup(title: "Source", selection: $viewModel.dataSource, options: [.offline, .server], label: { $0.label })
-                    .onChange(of: viewModel.dataSource) { _, source in
-                        if source != .server { Task { await viewModel.save() } }
-                    }
                 if viewModel.dataSource == .offline {
                     HStack {
                         Text("Network delay (s)")
@@ -42,19 +39,32 @@ struct PreferencesView: View {
                     .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 if viewModel.dataSource == .server {
                     TextField("Server URL", text: $viewModel.draftURL).textFieldStyle(.roundedBorder)
-                    HStack {
+                }
+                HStack {
+                    if viewModel.dataSource == .server {
                         Button("Test connection") { Task { await viewModel.testConnection() } }
-                        Button("Use Local JSON") {
-                            viewModel.dataSource = .offline
-                            Task { await viewModel.save() }
-                        }
-                        Button("Save") { Task { await viewModel.save() } }
-                    }.disabled(viewModel.isTesting)
+                    }
+                    Button("Apply") { Task { await viewModel.save() } }
+                }.disabled(viewModel.isTesting)
+            }
+            .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("CONTENT & FETCH").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
+                HStack {
+                    Text("Default news fetch size")
+                    TextField("Count", value: $viewModel.newsPageSize, format: .number)
+                        .frame(width: 50).textFieldStyle(.roundedBorder)
+                    Stepper("", value: $viewModel.newsPageSize, in: 1...50).labelsHidden()
+                    Text("(1–50, default 20)").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                 }
             }
             .padding(18).frame(maxWidth: .infinity, alignment: .leading)
             .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+
             if let error = viewModel.errorMessage { Text(error).foregroundStyle(AppTheme.danger) }
             if let notice = viewModel.noticeMessage { Text(notice).foregroundStyle(AppTheme.secondaryInk) }
             HStack {

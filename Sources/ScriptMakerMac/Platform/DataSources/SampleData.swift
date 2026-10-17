@@ -24,7 +24,7 @@ struct AIModelCatalogClient: AIModelCatalogProviding {
         let data: Data; let response: URLResponse
         do { (data, response) = try await httpClient.data(for: request) }
         catch is CancellationError { throw CancellationError() }
-        catch { throw APIError.unreachable(serverURL.absoluteString) }
+        catch { throw APIError.unreachable(url: serverURL.absoluteString, detail: error.localizedDescription) }
         guard let http = response as? HTTPURLResponse else { throw APIError.transport("No HTTP response") }
         guard 200..<300 ~= http.statusCode else {
             if [404, 501].contains(http.statusCode) { throw APIError.notImplemented("The server model catalog is not implemented yet. Your selected model is retained.") }
@@ -53,7 +53,7 @@ struct LibraryUpdateClient: LibraryUpdating {
             let response: URLResponse
             do { (data, response) = try await httpClient.data(for: request) }
             catch is CancellationError { throw CancellationError() }
-            catch { throw APIError.unreachable(baseURL.absoluteString) }
+            catch { throw APIError.unreachable(url: baseURL.absoluteString, detail: error.localizedDescription) }
             guard let http = response as? HTTPURLResponse else { throw APIError.transport("No HTTP response") }
             guard 200..<300 ~= http.statusCode else {
                 if http.statusCode == 404 || http.statusCode == 501 {
@@ -87,6 +87,7 @@ private struct LibraryUpdateRequest: Encodable {
     }
 }
 
+
 struct BundledStudioCatalog: StudioCatalogProviding {
     func load() throws -> StudioCatalog {
         guard let data = SampleData.data(for: "studio_catalog") else {
@@ -106,9 +107,15 @@ struct BundledStudioCatalog: StudioCatalogProviding {
 enum SampleData {
     /// Raw JSON data for a sample file (e.g. "verify" -> verify.json).
     static func data(for name: String) -> Data? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "json", subdirectory: "Samples") else {
+        let mappedName: String
+        switch name {
+        case "casting": mappedName = "characters"
+        case "script": mappedName = "validation"
+        default: mappedName = name
+        }
+        guard let url = Bundle.main.url(forResource: mappedName, withExtension: "json", subdirectory: "Samples") else {
             // Fallback for unit tests / SwiftPM layouts.
-            return Bundle.main.url(forResource: name, withExtension: "json")
+            return Bundle.main.url(forResource: mappedName, withExtension: "json")
                 .flatMap { try? Data(contentsOf: $0) }
         }
         return try? Data(contentsOf: url)

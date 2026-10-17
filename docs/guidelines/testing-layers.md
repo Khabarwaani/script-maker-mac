@@ -70,8 +70,9 @@ func testLegacyDictionaryMigration() {
    (stories list contents), not internal cache state.
 4. **Isolate UserDefaults in tests** — save/restore surrounding state, or inject
    a `KeyValueStore` backed by a test suite.
-5. **CI is build-only today** — `xcodebuild build` in `.github/workflows/ci.yml`.
-   Tests run locally via Xcode. (A `xcodebuild test` CI job is future work.)
+5. **CI is the test verification gate** — `.github/workflows/ci.yml` runs
+   `xcodebuild test`. Do not run test suites locally during routine work; run
+   tests locally only when diagnosing and reproducing a failure reported by CI.
 
 ## Current Coverage
 

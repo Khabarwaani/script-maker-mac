@@ -3,15 +3,74 @@
 Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
 MVVM, async/await throughout.
 
-Same use cases as the classic app. Every task goes over HTTP to the pipeline
-server configured in Preferences (Cmd+,); nothing is computed locally.
+Requires **macOS 27+ and Xcode 27+**. Studio, Library, and Script Refine use the
+pipeline server configured in Preferences (Cmd+,). The **LocalAgent** tab runs
+KhabarwaaniAgent through an installed terminal AI provider.
 
-- **Works offline**: server defaults to `http://localhost:8501` — no internet needed.
+- **Server URL** defaults to `http://localhost:8000`.
 - **Server URL** is a top-level setting (IPv6-aware) — point it at a remote server anytime.
 - **Long generations** stream progress via Server-Sent Events; the UI never blocks.
 - **Failures** offer the same four options as the classic app: retry stage, retry fresh, skip, dismiss.
 
 ---
+
+## LocalAgent
+
+Keep the unpublished `KhabarwaaniAgent` checkout beside this repository:
+
+```text
+Khabarwaani/
+  ScriptMakerMac/
+  KhabarwaaniAgent/
+```
+
+Open the Xcode workspace and let Swift Package Manager resolve **AgentAtom** and
+**TerminalAgentSession** from GitHub releases. Release ranges allow new major
+and minor releases; the resolver selects the latest version satisfying the whole
+graph. No exact release or local checkout is pinned by the app. Use Xcode's
+**File → Packages → Update to Latest Package Versions** to refresh an existing
+resolution. The local KhabarwaaniAgent package uses your working-tree sources.
+
+In LocalAgent, choose **3-Scene Story Creator** (news, optional joke, output count)
+or **Shekhar Joke Generator** (output count, news count, jokes per category).
+Choose Codex, Claude, Antigravity, or Grok and sign in to that CLI beforehand,
+or choose **Apple Intelligence (on-device)** to use AgentAtom's native Mac
+session. Missing CLIs and unavailable Apple Intelligence models are grayed out
+and cannot be selected. **Refresh providers** rechecks availability; installed
+CLIs still need valid provider authentication. Executables are found on PATH,
+`/opt/homebrew/bin`, and `/usr/local/bin`.
+
+Expand **Session settings** for the package's runtime process mode, memory
+policy, and execution metadata. The on-device provider offers temperature
+instead of terminal process/memory settings. CLI model overrides are in the
+main form. Settings are kept separately per provider while the app is open.
+Each Run creates a new session; provider capabilities determine process support.
+Codex and Claude normalize persistent stdin/stdout to one-shot execution.
+Metadata appears only when the provider returns and retains it.
+The on-device session runs the supplied-news 3-scene tool; Shekhar's fresh-news
+research tool requires a terminal provider and is disabled for Apple Intelligence.
+
+Run displays readable results and preserves the exact final response under
+**Raw output**, including undecodable responses. Output text is selectable for
+copying. Each run uses a temporary working directory and does not write into
+your repositories. Cancel requests cooperative CLI cancellation and keeps Run
+disabled until cleanup finishes. Provider access may require internet and uses
+your existing CLI account. Results remain in memory while switching tabs;
+automatic import into Studio/Library is not included.
+
+The CLI launcher supplies EOF on stdin for GUI launches, adds executable
+search paths to the child environment, and captures stdout for failure details.
+The package adapter closes derived object schemas for strict structured output,
+including nullable optional fields. It translates Grok's schema option to the
+installed CLI's `--json-schema` interface and does not forward permission-bypass
+flags inserted by provider defaults.
+
+CI and release workflows check out `KhabarwaaniAgent`'s `develop` branch beside
+the app. `KHABARWAANI_AGENT_READ_KEY` supplies a dedicated read-only deploy key
+for the private package. A token with package read access can alternatively be
+provided as `KHABARWAANI_AGENT_READ_TOKEN`; the workflow token is the fallback.
+The `xcode-27` runner provides macOS 27/Xcode 27. Tests fake sessions and never
+invoke a live provider.
 
 ## Architecture
 

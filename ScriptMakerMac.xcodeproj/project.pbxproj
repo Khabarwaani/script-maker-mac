@@ -5,8 +5,25 @@
 	};
 	objectVersion = 56;
 	objects = {
+		L001 = {isa = PBXBuildFile; fileRef = L101; };
+		L101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentModels.swift; sourceTree = "<group>"; };
+		L002 = {isa = PBXBuildFile; fileRef = L102; };
+		L102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentRunning.swift; sourceTree = "<group>"; };
+		L003 = {isa = PBXBuildFile; fileRef = L103; };
+		L103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLocalAgentService.swift; sourceTree = "<group>"; };
+		L004 = {isa = PBXBuildFile; fileRef = L104; };
+		L104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentViewModel.swift; sourceTree = "<group>"; };
+		L005 = {isa = PBXBuildFile; fileRef = L105; };
+		L105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentView.swift; sourceTree = "<group>"; };
+		L006 = {isa = PBXBuildFile; fileRef = L106; };
+		L106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentTests.swift; sourceTree = "<group>"; };
+		L007 = {isa = PBXBuildFile; fileRef = L107; };
+		L107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrictLocalAgentSession.swift; sourceTree = "<group>"; };
+		Blibrary = {isa = PBXBuildFile; fileRef = Jlibrary; };
+		Jlibrary = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
+		M001 = {isa = PBXBuildFile; fileRef = M101; };
+		M101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainReleaseRegressionTests.swift; sourceTree = "<group>"; };
 		/* Build files */
-        Blibrary /* library_updates.json in Resources */ = {isa = PBXBuildFile; fileRef = Jlibrary; };
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
         E013 = {isa = PBXBuildFile; fileRef = E003; };
@@ -43,6 +60,19 @@
 		F019 /* IntegrationStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R021 /* IntegrationStageView.swift */; };
 		F020 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = R022 /* SampleData.swift */; };
 		F021 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R023 /* LibraryViewModel.swift */; };
+		F046 /* RefineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = R050 /* RefineModels.swift */; };
+		F047 /* RefineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R051 /* RefineService.swift */; };
+		F048 /* HTTPRefineTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = R052 /* HTTPRefineTransport.swift */; };
+		F049 /* RefineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R053 /* RefineViewModel.swift */; };
+		F050 /* RefineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R054 /* RefineView.swift */; };
+		F051 /* RefineInputForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = R055 /* RefineInputForm.swift */; };
+		F052 /* RefineOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R056 /* RefineOutputView.swift */; };
+		E011 /* AppConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E001 /* AppConfigTests.swift */; };
+		T007 /* RepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T006 /* RepositoryTests.swift */; };
+		E012 /* SampleDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E002 /* SampleDataTests.swift */; };
+		E013 /* SampleAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E003 /* SampleAPITests.swift */; };
+		E014 /* RefineServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E005 /* RefineServiceTests.swift */; };
+		E015 /* RefineViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E006 /* RefineViewModelTests.swift */; };
 		F022 /* WebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R025 /* WebClient.swift */; };
 		F023 /* NetworkWebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R026 /* NetworkWebClient.swift */; };
 		F024 /* OfflineWebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R027 /* OfflineWebClient.swift */; };
@@ -62,6 +92,7 @@
 		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
 		Brender /* validation.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* validation.json */; };
 		Bheadlines /* headlines.json in Resources */ = {isa = PBXBuildFile; fileRef = Jheadlines /* headlines.json */; };
+		Bcategories /* news_categories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcategories /* news_categories.json */; };
 		Bservers /* servers.json in Resources */ = {isa = PBXBuildFile; fileRef = Jservers /* servers.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
 		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
@@ -106,6 +137,20 @@
 		R043 /* ConfigSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigSidebarView.swift; sourceTree = "<group>"; };
 		R044 /* StoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryListView.swift; sourceTree = "<group>"; };
 		R046 /* StudioDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioDetailView.swift; sourceTree = "<group>"; };
+		R050 /* RefineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineModels.swift; sourceTree = "<group>"; };
+		R051 /* RefineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineService.swift; sourceTree = "<group>"; };
+		R052 /* HTTPRefineTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRefineTransport.swift; sourceTree = "<group>"; };
+		R053 /* RefineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineViewModel.swift; sourceTree = "<group>"; };
+		R054 /* RefineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineView.swift; sourceTree = "<group>"; };
+		R055 /* RefineInputForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineInputForm.swift; sourceTree = "<group>"; };
+		R056 /* RefineOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineOutputView.swift; sourceTree = "<group>"; };
+		E001 /* AppConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigTests.swift; sourceTree = "<group>"; };
+		T006 /* RepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryTests.swift; sourceTree = "<group>"; };
+		E002 /* SampleDataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataTests.swift; sourceTree = "<group>"; };
+		E003 /* SampleAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleAPITests.swift; sourceTree = "<group>"; };
+		E004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E005 /* RefineServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineServiceTests.swift; sourceTree = "<group>"; };
+		E006 /* RefineViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefineViewModelTests.swift; sourceTree = "<group>"; };
 		R045 /* StoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDetailView.swift; sourceTree = "<group>"; };
 		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
 		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
@@ -127,8 +172,8 @@
 		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
 		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
 		Jheadlines /* headlines.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = headlines.json; sourceTree = "<group>"; };
+		Jcategories /* news_categories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = news_categories.json; sourceTree = "<group>"; };
 		Jservers /* servers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = servers.json; sourceTree = "<group>"; };
-		Jlibrary /* library_updates.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
 		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
@@ -187,10 +232,12 @@
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
+				L101 /* LocalAgentModels.swift */,
 				R002 /* PipelineModels.swift */,
 				R040 /* Story.swift */,
 				R047 /* StudioConfig.swift */,
 				R048 /* StudioCatalog.swift */,
+				R050 /* RefineModels.swift */,
 			);
 			path = Entities;
 			sourceTree = "<group>";
@@ -198,11 +245,13 @@
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				L102 /* LocalAgentRunning.swift */,
 				R028 /* PipelineService.swift */,
 				R034 /* ImageService.swift */,
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
 				R025 /* WebClient.swift */,
+				R051 /* RefineService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -244,8 +293,11 @@
 		G018 /* WebClients */ = {
 			isa = PBXGroup;
 			children = (
+				L103 /* TerminalLocalAgentService.swift */,
+				L107 /* StrictLocalAgentSession.swift */,
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
+				R052 /* HTTPRefineTransport.swift */,
 			);
 			path = WebClients;
 			sourceTree = "<group>";
@@ -279,6 +331,7 @@
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				L105 /* LocalAgentView.swift */,
 				R008 /* ContentView.swift */,
 				R049 /* AppTheme.swift */,
 				R030 /* SceneThumbnail.swift */,
@@ -296,6 +349,9 @@
 				R019 /* ServerAddressBar.swift */,
 				R020 /* StoryboardStageView.swift */,
 				R021 /* IntegrationStageView.swift */,
+				R054 /* RefineView.swift */,
+				R055 /* RefineInputForm.swift */,
+				R056 /* RefineOutputView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -303,12 +359,14 @@
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
 				R007 /* GenerateViewModel.swift */,
 				R035 /* ThumbnailViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
+				R053 /* RefineViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -327,16 +385,16 @@
 			isa = PBXGroup;
 			children = (
 				Jverify /* verify.json */,
-				Jcatalog /* studio_catalog.json */,
+				Jcatalog /* studio_catalog.json */, Jlibrary /* library_updates.json */,
 				Jcharacters /* characters.json */,
 				Jdialogue /* dialogue.json */,
 				Jscenes /* scenes.json */,
 				Jstoryboard /* storyboard.json */,
 				Jrender /* validation.json */,
 				Jstories /* stories.json */,
-                Jlibrary /* library_updates.json */,
 				Jservers /* servers.json */,
 				Jheadlines /* headlines.json */,
+				Jcategories /* news_categories.json */,
 			);
 			path = Samples;
 			sourceTree = "<group>";
@@ -356,15 +414,29 @@
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				L106 /* LocalAgentTests.swift */, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
 				E003 /* SampleAPITests.swift */,
 				E004 /* Info.plist */,
+				E005 /* RefineServiceTests.swift */,
+				E006 /* RefineViewModelTests.swift */,
 			);
 			path = Tests/ScriptMakerMacTests;
 			sourceTree = "<group>";
 		};
+LP001 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/AgentAtom"; requirement = {kind = versionRange; minimumVersion = 0.1.0; maximumVersion = 999999.0.0; }; };
+LP002 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/TerminalAgentSession"; requirement = {kind = versionRange; minimumVersion = 0.1.4; maximumVersion = 999999.0.0; }; };
+LP003 = {isa = XCLocalSwiftPackageReference; relativePath = ../KhabarwaaniAgent; };
+LD001 = {isa = XCSwiftPackageProductDependency; package = LP001; productName = AgentAtom; };
+LD002 = {isa = XCSwiftPackageProductDependency; package = LP002; productName = TerminalAgentSession; };
+LD003 = {isa = XCSwiftPackageProductDependency; productName = KhabarwaaniAgent; };
+LB001 = {isa = PBXBuildFile; productRef = LD001; };
+LB002 = {isa = PBXBuildFile; productRef = LD002; };
+LB003 = {isa = PBXBuildFile; productRef = LD003; };
+LB004 = {isa = PBXBuildFile; productRef = LD001; };
+LB005 = {isa = PBXBuildFile; productRef = LD002; };
 		/* Target */
 		T001 /* ScriptMakerMac */ = {
 			isa = PBXNativeTarget;
@@ -377,6 +449,7 @@
 			);
 			buildRules = ( );
 			dependencies = ( );
+			packageProductDependencies = ( LD001, LD002, LD003, );
 			name = ScriptMakerMac;
 			productName = ScriptMakerMac;
 			productReference = R013 /* ScriptMakerMac.app */;
@@ -393,6 +466,7 @@
 			dependencies = (
 				D001 /* PBXTargetDependency */,
 			);
+			packageProductDependencies = ( LD001, LD002, );
 			name = ScriptMakerMacTests;
 			productName = ScriptMakerMacTests;
 			productReference = R024 /* ScriptMakerMacTests.xctest */;
@@ -420,6 +494,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L005 /* LocalAgentView.swift in Sources */,
+				L004 /* LocalAgentViewModel.swift in Sources */,
+				L003 /* TerminalLocalAgentService.swift in Sources */,
+				L007 /* StrictLocalAgentSession.swift in Sources */,
+				L002 /* LocalAgentRunning.swift in Sources */,
+				L001 /* LocalAgentModels.swift in Sources */,
 				F001 /* ScriptMakerMacApp.swift in Sources */,
 				F035 /* CoreUtilities.swift in Sources */,
 				F036 /* Story.swift in Sources */,
@@ -462,13 +542,20 @@
 				F019 /* IntegrationStageView.swift in Sources */,
 				F020 /* SampleData.swift in Sources */,
 				F021 /* LibraryViewModel.swift in Sources */,
+				F046 /* RefineModels.swift in Sources */,
+				F047 /* RefineService.swift in Sources */,
+				F048 /* HTTPRefineTransport.swift in Sources */,
+				F049 /* RefineViewModel.swift in Sources */,
+				F050 /* RefineView.swift in Sources */,
+				F051 /* RefineInputForm.swift in Sources */,
+				F052 /* RefineOutputView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( );
+			files = ( LB001, LB002, LB003, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 P006 /* Build revision */ = {
@@ -486,23 +573,26 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L006 /* LocalAgentTests.swift in Sources */, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
 				E013 /* SampleAPITests.swift in Sources */,
+				E014 /* RefineServiceTests.swift in Sources */,
+				E015 /* RefineViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( );
+			files = ( LB004, LB005, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( Blibrary /* library_updates.json in Resources */, F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Blibrary /* library_updates.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, Bcategories /* news_categories.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {
@@ -516,10 +606,10 @@ P006 /* Build revision */ = {
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -533,10 +623,10 @@ P006 /* Build revision */ = {
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.khabarwaani.scriptmaker.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -550,6 +640,7 @@ P006 /* Build revision */ = {
 				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -563,6 +654,7 @@ P006 /* Build revision */ = {
 				PRODUCT_BUNDLE_IDENTIFIER = com.khabarwaani.scriptmakermac.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -619,6 +711,7 @@ P006 /* Build revision */ = {
 			knownRegions = ( en, );
 			mainGroup = G001;
 			productRefGroup = G003 /* Products */;
+			packageReferences = ( LP001, LP002, LP003, );
 			projectDirPath = "";
 			projectRoot = "";
 			targets = ( T001 /* ScriptMakerMac */, T002 /* ScriptMakerMacTests */, );

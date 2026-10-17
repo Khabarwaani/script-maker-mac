@@ -5,22 +5,31 @@ struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
-    @State private var addressBarViewModel: ServerAddressBarViewModel
+    @State private var refineViewModel: RefineViewModel
+    @State private var localAgentViewModel: LocalAgentViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
+        let genVM = viewModel.generateViewModel
+        genVM.onNavigateToLibrary = { [weak viewModel] in
+            viewModel?.selectedTab = .library
+            Task {
+                await viewModel?.libraryViewModel.refresh()
+            }
+        }
         _generateViewModel = State(
-            wrappedValue: viewModel.generateViewModel
+            wrappedValue: genVM
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
         )
-        _addressBarViewModel = State(
-            wrappedValue: ServerAddressBarViewModel(config: viewModel.config)
+        _refineViewModel = State(
+            wrappedValue: viewModel.refineViewModel
         )
+        _localAgentViewModel = State(wrappedValue: viewModel.localAgentViewModel)
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
         )
@@ -46,12 +55,9 @@ struct ContentView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.line, lineWidth: 1))
                 HStack {
                     Spacer(minLength: 0)
-                    if viewModel.config.dataSource == .server {
-                        ServerAddressBar(viewModel: addressBarViewModel)
-                    }
                     Button { showingPreferences = true } label: { Image(systemName: "gearshape") }
                         .controlSize(.large)
-                        .help("Settings… (⌘,)")
+                        .help(Text(verbatim: "Settings… (⌘,)"))
                         .accessibilityLabel("Settings")
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -63,6 +69,8 @@ struct ContentView: View {
                 switch viewModel.selectedTab {
                 case .studio: GenerateView(viewModel: generateViewModel)
                 case .library: LibraryView(viewModel: libraryViewModel)
+                case .refine: RefineView(viewModel: refineViewModel)
+                case .localAgent: LocalAgentView(viewModel: localAgentViewModel)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,4 +105,3 @@ struct LibraryView: View {
         .task { await viewModel.refresh() }
     }
 }
-

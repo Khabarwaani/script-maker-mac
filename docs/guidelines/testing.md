@@ -2,14 +2,11 @@
 
 Unit tests never make real calls: no network, no live server. Mock, stub, or fake.
 
-## Testing strategy: CI first
+## Testing strategy: Remote CI first
 
-Testing is done in GitHub CI (`xcodebuild` on macos). Push the branch and open
-the draft PR — CI is the verification gate. Do NOT attempt local builds: this
-VM is Linux and cannot run Xcode.
-
-A red CI run cannot be reproduced here. Report the failing step verbatim and
-stop — do not guess at fixes without the Mac build log.
+Testing is performed in GitHub Actions CI (`xcodebuild` on macOS). Push the branch and open
+the draft PR — remote CI is the verification gate. Do not run local test suites during routine
+development; run tests locally only when diagnosing and reproducing a failure reported by CI.
 
 ## What to test
 

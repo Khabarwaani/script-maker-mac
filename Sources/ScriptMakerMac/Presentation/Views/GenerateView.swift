@@ -10,13 +10,6 @@ import SwiftUI
 struct GenerateView: View {
     @Bindable var viewModel: GenerateViewModel
 
-    private var errorBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.errorMessage != nil },
-            set: { if !$0 { viewModel.errorMessage = nil } }
-        )
-    }
-
     var body: some View {
         GeometryReader { geometry in
             HStack(alignment: .top, spacing: 0) {
@@ -25,14 +18,6 @@ struct GenerateView: View {
                 StudioDetailView(viewModel: viewModel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .alert("Something went wrong", isPresented: errorBinding) {
-            Button("Retry stage") { Task { await viewModel.retryStage() } }
-            Button("Retry fresh") { Task { await viewModel.retryFresh() } }
-            Button("Skip stage") { Task { await viewModel.skipStage() } }
-            Button("Dismiss", role: .cancel) { viewModel.errorMessage = nil }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
         }
     }
 }

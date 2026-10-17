@@ -15,6 +15,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var hashtags: [String]?
     var sourceLinks: [StorySourceLink]?
     var scriptText: String?
+    var instruction: String?
     var generationNumber: Int?
     var stageOutputs: [String: String]?
     var imageURLs: [String]?
@@ -35,6 +36,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         hashtags: [String]? = nil,
         sourceLinks: [StorySourceLink]? = nil,
         scriptText: String? = nil,
+        instruction: String? = nil,
         generationNumber: Int? = nil,
         stageOutputs: [String: String]? = nil,
         imageURLs: [String]? = nil,
@@ -54,6 +56,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.hashtags = hashtags
         self.sourceLinks = sourceLinks
         self.scriptText = scriptText
+        self.instruction = instruction
         self.generationNumber = generationNumber
         self.stageOutputs = stageOutputs
         self.imageURLs = imageURLs
