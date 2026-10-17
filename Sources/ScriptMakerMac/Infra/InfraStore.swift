@@ -71,4 +71,14 @@ struct FileStore: Sendable {
     func exists(at url: URL) -> Bool {
         fileManager.fileExists(atPath: url.path)
     }
+
+    func makeTemporaryDirectory() throws -> URL {
+        let url = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func removeDirectory(at url: URL) throws {
+        try fileManager.removeItem(at: url)
+    }
 }

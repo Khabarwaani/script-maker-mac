@@ -47,8 +47,9 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
 
 1. **Branches & PR flow:** `main` and `develop`. Feature branches off `develop`,
    PRs target `develop`. Never push direct to `main`/`develop`.
-2. **Thin client:** the UI never computes pipeline work. All generation goes
-   through `PipelineAPI`. No local AI/ML imports.
+2. **Thin client:** pipeline generation goes through `PipelineAPI`. The
+   `LocalAgent` workspace may execute KhabarwaaniAgent through installed CLI
+   providers via its injected service. Views never import agent packages.
 3. **Fail-loud:** typed errors (`APIError`, `ConfigError`) with `LocalizedError`.
    Surfaces to the user; the UI stays usable offline.
 4. **Concurrency:** async/await only — no completion handlers, no Combine for

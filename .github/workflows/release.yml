@@ -10,10 +10,35 @@ on:
 jobs:
   build-dmg:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ScriptMakerMac
     permissions:
       contents: write # create releases + upload assets
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: ScriptMakerMac
+
+      - name: Check local package access
+        env:
+          PACKAGE_TOKEN: ${{ secrets.KHABARWAANI_AGENT_READ_TOKEN }}
+        run: |
+          if [ -z "$PACKAGE_TOKEN" ]; then
+            echo '::error::Set KHABARWAANI_AGENT_READ_TOKEN with read access to Khabarwaani/KhabarwaaniAgent.'
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Khabarwaani/KhabarwaaniAgent
+          ref: develop
+          path: KhabarwaaniAgent
+          token: ${{ secrets.KHABARWAANI_AGENT_READ_TOKEN }}
+          persist-credentials: false
+
+      - name: Check macOS 27 toolchain
+        run: bash scripts/check-localagent-toolchain.sh
 
       - name: Build DMG
         run: |

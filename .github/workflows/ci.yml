@@ -9,8 +9,31 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ScriptMakerMac
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: ScriptMakerMac
+      - name: Check local package access
+        env:
+          PACKAGE_TOKEN: ${{ secrets.KHABARWAANI_AGENT_READ_TOKEN }}
+        run: |
+          if [ -z "$PACKAGE_TOKEN" ]; then
+            echo '::error::Set KHABARWAANI_AGENT_READ_TOKEN to a token with read access to the private Khabarwaani/KhabarwaaniAgent repository.'
+            exit 1
+          fi
+      - name: Check out unpublished KhabarwaaniAgent
+        uses: actions/checkout@v4
+        with:
+          repository: Khabarwaani/KhabarwaaniAgent
+          ref: develop
+          path: KhabarwaaniAgent
+          token: ${{ secrets.KHABARWAANI_AGENT_READ_TOKEN }}
+          persist-credentials: false
+      - name: Check macOS 27 toolchain
+        run: bash scripts/check-localagent-toolchain.sh
       - name: Build & Test (Debug)
         run: |
           xcodebuild -scheme ScriptMakerMac \
