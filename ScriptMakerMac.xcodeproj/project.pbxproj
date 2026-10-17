@@ -19,6 +19,10 @@
 		L106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentTests.swift; sourceTree = "<group>"; };
 		L007 = {isa = PBXBuildFile; fileRef = L107; };
 		L107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrictLocalAgentSession.swift; sourceTree = "<group>"; };
+		Blibrary = {isa = PBXBuildFile; fileRef = Jlibrary; };
+		Jlibrary = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
+		M001 = {isa = PBXBuildFile; fileRef = M101; };
+		M101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainReleaseRegressionTests.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -381,7 +385,7 @@
 			isa = PBXGroup;
 			children = (
 				Jverify /* verify.json */,
-				Jcatalog /* studio_catalog.json */,
+				Jcatalog /* studio_catalog.json */, Jlibrary /* library_updates.json */,
 				Jcharacters /* characters.json */,
 				Jdialogue /* dialogue.json */,
 				Jscenes /* scenes.json */,
@@ -410,7 +414,7 @@
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				L106 /* LocalAgentTests.swift */,
+				L106 /* LocalAgentTests.swift */, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -569,7 +573,7 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				L006 /* LocalAgentTests.swift in Sources */,
+				L006 /* LocalAgentTests.swift in Sources */, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
@@ -588,7 +592,7 @@ P006 /* Build revision */ = {
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, Bcategories /* news_categories.json in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Blibrary /* library_updates.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, Bcategories /* news_categories.json in Resources */, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {

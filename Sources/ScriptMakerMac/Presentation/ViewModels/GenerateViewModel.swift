@@ -156,17 +156,12 @@ final class GenerateViewModel {
     // Configuration — verified against Streamlit 2026-10-11.
     // AI_SOURCES order; default Antigravity (#464). AI_POWERS; default Default.
     var aiSources: [String] = []
-    var selectedAISource: String = "Antigravity" {
-        didSet { if !isApplyingConfig { saveStudioConfig() } }
-    }
+    var selectedAISource: String { get { config.selectedAI.source } set { config.selectedAI = AIConfig(source: newValue, model: config.selectedAI.model, power: config.selectedAI.power) } }
     var aiModels: [String] = ["Default"]
-    var selectedAIModel: String = "Default" {
-        didSet { if !isApplyingConfig { saveStudioConfig() } }
-    }
+    var selectedAIModel: String { get { config.selectedAI.model } set { config.selectedAI = AIConfig(source: config.selectedAI.source, model: newValue, power: config.selectedAI.power) } }
     var aiPowers: [String] = []
-    var selectedAIPower: String = "Default" {
-        didSet { if !isApplyingConfig { saveStudioConfig() } }
-    }
+    var selectedAIPower: String { get { config.selectedAI.power } set { config.selectedAI = AIConfig(source: config.selectedAI.source, model: config.selectedAI.model, power: newValue) } }
+    var selectedAIIdentifier: String { config.selectedAI.identifier }
     /// Duration options mirror the Streamlit step-5 number input (5–60s).
     var durations: [Int] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
     var duration: Int = 10 {
@@ -230,19 +225,7 @@ final class GenerateViewModel {
     }
 
     /// Sync AI engine options from AppConfig (Preferences).
-    func syncAIConfigurationFromConfig() {
-        if aiSources.contains(config.aiSource) {
-            selectedAISource = config.aiSource
-        }
-        updateAIOptions()
-        if aiModels.contains(config.aiModel) {
-            selectedAIModel = config.aiModel
-        }
-        updateAIOptions()
-        if aiPowers.contains(config.aiPower) {
-            selectedAIPower = config.aiPower
-        }
-    }
+    func syncAIConfigurationFromConfig() { updateAIOptions() }
 
     var isLocalJSON: Bool { config.dataSource != .server }
     var isCatalogReady: Bool { catalog != nil }
@@ -262,9 +245,9 @@ final class GenerateViewModel {
 
     func updateAIOptions(resetModel: Bool = false) {
         aiModels = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.map(\.id) ?? [])
-        if resetModel || !aiModels.contains(selectedAIModel) { selectedAIModel = "Default" }
+        if resetModel { selectedAIModel = "Default" }; if !aiModels.contains(selectedAIModel) { aiModels.append(selectedAIModel) }
         aiPowers = ["Default"] + (catalog?.modelCatalogs[selectedAISource]?.models.first { $0.id == selectedAIModel }?.efforts.map { $0.capitalized } ?? [])
-        if !aiPowers.contains(selectedAIPower) { selectedAIPower = "Default" }
+        if !aiPowers.contains(selectedAIPower) { aiPowers.append(selectedAIPower) }
     }
 
     func checkSetup() {
@@ -295,9 +278,6 @@ final class GenerateViewModel {
             isApplyingConfig = wasApplying
             if save { saveStudioConfig() }
         }
-        selectedAISource = defaults.aiSource
-        selectedAIModel = defaults.aiModel
-        selectedAIPower = defaults.aiPower
         duration = defaults.duration
         selectedEmotion = defaults.emotion
         scriptCount = defaults.scriptCount
@@ -1058,11 +1038,16 @@ final class GenerateViewModel {
                 status: "completed",
                 emotion: selectedEmotion,
                 format: selectedFormat,
+                hashtags: script["hashtags"] as? [String],
+                sourceLinks: (stagePayloads[.validation]?["sources"] as? [[String: Any]])?.map {
+                    StorySourceLink(title: $0["title"] as? String ?? "Source", url: $0["url"] as? String ?? "", source: $0["source"] as? String ?? "")
+                },
                 scriptText: scriptContent,
                 instruction: instructionText.isEmpty ? nil : instructionText,
-                scriptVersions: initialVersions,
+
                 generationNumber: index + 1,
-                stageOutputs: outputs
+                stageOutputs: outputs,
+                scriptVersions: initialVersions
             )
             await repository.save(story)
         }

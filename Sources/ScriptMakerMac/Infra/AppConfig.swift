@@ -73,12 +73,38 @@ final class AppConfig {
         didSet { defaults.set(aiPower, forKey: Self.aiPowerKey) }
     }
 
+    var selectedAI: AIConfig {
+        get { AIConfig(source: aiSource, model: aiModel, power: aiPower) }
+        set {
+            aiSource = newValue.source
+            aiModel = newValue.model
+            aiPower = newValue.power
+            defaults.set(newValue.identifier, forKey: "selectedAIIdentifier")
+        }
+    }
+    var recentAIIdentifiers: [String] {
+        didSet { defaults.set(recentAIIdentifiers, forKey: "recentAIIdentifiers") }
+    }
+    var libraryAIEngine: String {
+        get { selectedAI.source == "None" ? "None" : selectedAI.identifier }
+        set { selectedAI = AIConfig(identifier: newValue) ?? AIConfig(source: newValue, model: "Default", power: "Default") }
+    }
+
+    func selectAI(_ selection: AIConfig) {
+        let previous = selectedAI.identifier
+        selectedAI = selection
+        var recent = [selection.identifier] + recentAIIdentifiers
+        if !recent.contains(previous) { recent.append(previous) }
+        var seen = Set<String>()
+        recentAIIdentifiers = Array(recent.filter { seen.insert($0).inserted }.prefix(5))
+    }
+
     var buildTitle: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
-        return "v\(version) · \(commit)"
+        return "Script Maker (v\(version) - \(commit))"
     }
 
     var serverURL: String {
@@ -115,9 +141,12 @@ final class AppConfig {
         self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
         let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
         self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
-        self.aiSource = defaults.string(forKey: Self.aiSourceKey) ?? "Antigravity"
-        self.aiModel = defaults.string(forKey: Self.aiModelKey) ?? "Default"
-        self.aiPower = defaults.string(forKey: Self.aiPowerKey) ?? "Default"
+        let savedAI = defaults.string(forKey: "selectedAIIdentifier").flatMap(AIConfig.init(identifier:))
+            ?? defaults.data(forKey: Self.studioConfigKey).flatMap { try? JSONDecoder().decode(StudioConfig.self, from: $0) }?.ai
+        self.aiSource = defaults.string(forKey: Self.aiSourceKey) ?? savedAI?.source ?? "Antigravity"
+        self.recentAIIdentifiers = Array((defaults.stringArray(forKey: "recentAIIdentifiers") ?? []).filter { AIConfig(identifier: $0) != nil }.prefix(5))
+        self.aiModel = defaults.string(forKey: Self.aiModelKey) ?? savedAI?.model ?? "Default"
+        self.aiPower = defaults.string(forKey: Self.aiPowerKey) ?? savedAI?.power ?? "Default"
         self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
         self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL

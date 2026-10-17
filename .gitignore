@@ -12,3 +12,6 @@ packaging/mac/ScriptMakerMac-*.dmg
 # Swift Package Manager
 .build/
 .swiftpm/
+
+*.dmg
+*.app/

@@ -150,6 +150,12 @@ struct ConfigSidebarView: View {
         StudioSection("Configuration") {
             Button("Reset") { viewModel.resetConfiguration(save: true) }.help(Text(verbatim: "Restore defaults"))
         } content: {
+            StudioRow("AI Model", inset: 12) {
+                Text(viewModel.selectedAIIdentifier).lineLimit(1).truncationMode(.middle)
+                    .help(viewModel.selectedAIIdentifier)
+            }
+            SettingsLink { Label("Edit model in Settings", systemImage: "slider.horizontal.3") }
+                .buttonStyle(StudioButtonStyle())
             StudioRow("Duration (s)") {
                 StudioNumberInput("Duration", value: $viewModel.duration, range: 1...Int.max, step: 5)
             }
