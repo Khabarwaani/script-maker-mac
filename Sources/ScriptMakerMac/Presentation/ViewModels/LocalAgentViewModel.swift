@@ -4,7 +4,25 @@ import Observation
 @Observable
 @MainActor
 final class LocalAgentViewModel {
-    var tool: LocalAgentTool = .threeSceneStory
+    var tool: LocalAgentTool = .threeSceneStory {
+        didSet { restoreVersion() }
+    }
+    var executionSource: LocalAgentExecutionSource = .local {
+        didSet {
+            providers = [:]
+            versionsByTool = [:]
+            version = ""
+        }
+    }
+    var version = "" {
+        didSet {
+            if !version.isEmpty { selectedVersions[executionSource, default: [:]][tool] = version }
+        }
+    }
+    private var selectedVersions: [LocalAgentExecutionSource: [LocalAgentTool: String]] = [:]
+    private(set) var versionsByTool: [LocalAgentTool: [String]] = [:]
+    private(set) var isRefreshing = false
+    var versions: [String] { versionsByTool[tool] ?? [] }
     var provider: LocalAgentProvider = .codex {
         didSet {
             if provider == .appleLocal, tool == .shekharJoke { tool = .threeSceneStory }
@@ -32,11 +50,17 @@ final class LocalAgentViewModel {
     private(set) var status = "Ready"
     private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
     @ObservationIgnored private let service: any LocalAgentRunning
+    @ObservationIgnored private let serverService: (any LocalAgentRunning)?
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(service: any LocalAgentRunning) { self.service = service }
+    init(service: any LocalAgentRunning, serverService: (any LocalAgentRunning)? = nil) {
+        self.service = service
+        self.serverService = serverService
+    }
 
-    var canRun: Bool { !isRunning && isAvailable(provider) && (try? request.validate()) != nil }
+    private var selectedService: (any LocalAgentRunning)? { executionSource == .local ? service : serverService }
+
+    var canRun: Bool { !isRunning && !isRefreshing && versions.contains(version) && isAvailable(provider) && (try? request.validate()) != nil }
     var executable: String { provider.executable }
 
     func isAvailable(_ provider: LocalAgentProvider) -> Bool { providers[provider]?.isAvailable == true }
@@ -44,9 +68,49 @@ final class LocalAgentViewModel {
 
     func refreshProviders() async {
         guard !isRunning else { return }
-        providers = await service.availability()
+        let source = executionSource
+        guard let service = selectedService else {
+            errorMessage = "Agent server execution is not configured."
+            return
+        }
+        isRefreshing = true
+        defer { if source == executionSource { isRefreshing = false } }
+        do {
+            let versions = try await service.versions()
+            let available = await service.availability()
+            guard source == executionSource, !Task.isCancelled else { return }
+            versionsByTool = versions.mapValues { values in
+                Array(Set(values)).sorted {
+                    if $0.contains("-") != $1.contains("-") { return !$0.contains("-") }
+                    return $0.compare($1, options: .numeric) == .orderedDescending
+                }
+            }
+            providers = available
+            errorMessage = nil
+            restoreVersion()
+        } catch {
+            guard source == executionSource, !Task.isCancelled else { return }
+            providers = [:]
+            versionsByTool = [:]
+            version = ""
+            errorMessage = error.localizedDescription
+            return
+        }
         if !isAvailable(provider), let available = LocalAgentProvider.allCases.first(where: { isAvailable($0) }) {
             provider = available
+        }
+    }
+
+    private func restoreVersion() {
+        if let selected = selectedVersions[executionSource]?[tool] {
+            if versions.contains(selected) {
+                version = selected
+            } else {
+                version = ""
+                errorMessage = "Previously selected version \(selected) is unavailable. Choose an available version."
+            }
+        } else {
+            version = versions.first ?? ""
         }
     }
 
@@ -64,13 +128,17 @@ final class LocalAgentViewModel {
         LocalAgentRequest(tool: tool, provider: provider, executable: executable,
                           model: trimmed(model), news: news, userJoke: trimmed(userJoke),
                           outputCount: outputCount, newsCount: newsCount, jokesPerCategory: jokesPerCategory,
-                          session: sessionSettings)
+                          session: sessionSettings, version: version)
     }
 
     func run() {
         guard !isRunning else { return }
         guard isAvailable(provider) else {
             errorMessage = availabilityReason(provider)
+            return
+        }
+        guard versions.contains(version), let service = selectedService else {
+            errorMessage = "Select an available agent version."
             return
         }
         let request = request
@@ -83,7 +151,7 @@ final class LocalAgentViewModel {
         result = nil
         rawOutput = ""
         errorMessage = nil
-        status = "Running \(request.tool.title) with \(request.provider.title)…"
+        status = "Running \(request.tool.title) \(version) with \(request.provider.title) (\(executionSource.rawValue))…"
         task = Task { [weak self, service] in
             do {
                 let output = try await service.run(request)

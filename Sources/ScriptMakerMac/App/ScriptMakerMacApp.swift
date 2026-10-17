@@ -105,7 +105,7 @@ enum CompositionRoot {
                     }
                     return (provider, LocalAgentAvailability(isAvailable: available, reason: reason))
                 })
-            }))
+            }), serverService: ServerLocalAgentService(httpClient: HTTPClient(), serverURL: { try config.baseURL() }))
         return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, refineViewModel: refiner, localAgentViewModel: localAgent)
     }
 }

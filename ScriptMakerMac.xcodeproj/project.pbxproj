@@ -5,6 +5,8 @@
 	};
 	objectVersion = 56;
 	objects = {
+		V001 = {isa = PBXBuildFile; fileRef = V101; };
+		V101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerLocalAgentService.swift; sourceTree = "<group>"; };
 		L001 = {isa = PBXBuildFile; fileRef = L101; };
 		L101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentModels.swift; sourceTree = "<group>"; };
 		L002 = {isa = PBXBuildFile; fileRef = L102; };
@@ -294,6 +296,7 @@
 			isa = PBXGroup;
 			children = (
 				L103 /* TerminalLocalAgentService.swift */,
+				V101 /* ServerLocalAgentService.swift */,
 				L107 /* StrictLocalAgentSession.swift */,
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
@@ -497,6 +500,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				L005 /* LocalAgentView.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
+				V001 /* ServerLocalAgentService.swift in Sources */,
 				L007 /* StrictLocalAgentSession.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
 				L001 /* LocalAgentModels.swift in Sources */,

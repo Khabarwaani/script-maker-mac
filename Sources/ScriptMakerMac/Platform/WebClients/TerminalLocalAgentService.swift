@@ -26,11 +26,20 @@ struct TerminalLocalAgentService: LocalAgentRunning {
 
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { providerAvailability() }
 
+    func versions() async throws -> [LocalAgentTool: [String]] {
+        [.threeSceneStory: [ThreeSceneStoryCreatorSpec.identity.version],
+         .shekharJoke: [ShekharJokeGeneratorSpec.identity.version]]
+    }
+
     func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
         try request.validate()
+        let supported = try await versions()[request.tool] ?? []
+        if let version = request.version, !supported.contains(version) {
+            throw LocalAgentError.invalidInput("\(request.tool.title) version \(version) is not available locally. Refresh versions.")
+        }
         try Task.checkCancellation()
         let workspace = try makeWorkspace()
-        let result: LocalAgentResult
+        var result: LocalAgentResult
         do {
             let session = try makeSession(request, workspace)
             defer { session.purgeMemory() }
@@ -53,6 +62,8 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             throw error
         }
         try removeWorkspace(workspace)
+        let version = request.version ?? supported.first ?? ""
+        result.metadata = (["Agent version: \(version)\nExecution: this Mac", result.metadata].compactMap { $0 }).joined(separator: "\n")
         return result
     }
 
@@ -77,18 +88,23 @@ struct TerminalLocalAgentService: LocalAgentRunning {
                 outputCount: request.outputCount, newsCount: request.newsCount, jokesPerCategory: request.jokesPerCategory)))
         }
         try Task.checkCancellation()
+        return try Self.decode(raw, request: request, records: session.executionMetadata)
+    }
+
+    static func decode(_ raw: String, request: LocalAgentRequest, records: [AgenticExecutionMetadata] = []) throws -> LocalAgentResult {
         do {
             let text: String
             switch request.tool {
             case .threeSceneStory:
                 let output = try JSONDecoder().decode(ThreeSceneStoryCreatorOutput.self, from: Data(raw.utf8))
                 guard output.items.count == request.outputCount else { throw LocalAgentError.invalidInput("Unexpected story count.") }
-                text = output.items.map { item in
-                    let scenes = [item.scene1, item.scene2, item.scene3].enumerated().map { index, scene in
-                        "Scene \(index + 1) — \(scene.purpose)\n\(scene.characters) · \(scene.setting)\n\n\(scene.speech)\nWords: \(scene.speechWordCount)"
-                        + (scene.jokeApplied.map { "\nJoke: \($0)" } ?? "")
+                text = try output.items.map { item in
+                    guard item.scenes.count == 3 else { throw LocalAgentError.invalidInput("Expected three scenes.") }
+                    let scenes = item.scenes.enumerated().map { index, scene in
+                        let dialogue = scene.dialogues.map { "\($0.speaker): \($0.dialogue)" }.joined(separator: "\n")
+                        return "Scene \(index + 1) — \(scene.title)\n\(scene.goal) · \(scene.location)\n\n\(dialogue)\nWords: \(scene.wordsCount)\n\nAgent-reported verification\nPassed: \(scene.verification.passed)\nDialogue sensible: \(scene.verification.dialogueSensible)\nDifferent concepts: \(scene.verification.differentConcepts)\nFreshness: \(scene.verification.freshnessMaintained)\n\(scene.verification.notes)"
                     }.joined(separator: "\n\n")
-                    return "\(item.title)\n\n\(scenes)\n\nVerification\nDifferent concepts: \(item.verification.differentConcepts)\nFreshness: \(item.verification.freshnessMaintained)\nShareability: \(item.verification.shareabilityVerified)\n\(item.verification.notes)"
+                    return "\(item.title)\n\n\(scenes)"
                 }.joined(separator: "\n\n──────────\n\n")
             case .shekharJoke:
                 let output = try JSONDecoder().decode(ShekharJokeGeneratorOutput.self, from: Data(raw.utf8))
@@ -97,7 +113,7 @@ struct TerminalLocalAgentService: LocalAgentRunning {
                     "\($0.title)\n\($0.category) · \($0.date)\n\($0.link)\n\nShort joke\n\($0.joke1)\n\nLong joke\n\($0.joke2)\n\nScript\n\($0.script)"
                 }.joined(separator: "\n\n──────────\n\n")
             }
-            let metadata = session.executionMetadata.map { record in
+            let metadata = records.map { record in
                 [record.modelIdentifier.map { "Model: \($0)" },
                  record.duration.map { "Duration: \($0)" },
                  record.promptTokens.map { "Input tokens: \($0)" },

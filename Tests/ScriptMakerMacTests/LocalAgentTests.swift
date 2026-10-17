@@ -5,6 +5,48 @@ import TerminalAgentSession
 
 @MainActor
 final class LocalAgentViewModelTests: XCTestCase {
+    func testVersionSelectionFollowsToolAndExecutionSource() async {
+        let local = StubLocalAgentRunner()
+        let server = StubLocalAgentRunner(storyVersions: ["1.0.0", "2.0.0", "2.1.0-beta"])
+        let vm = LocalAgentViewModel(service: local, serverService: server)
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.versions, ["2.0.0"])
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.executionSource = .server
+        XCTAssertFalse(vm.canRun)
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.versions, ["2.0.0", "1.0.0", "2.1.0-beta"])
+        vm.version = "1.0.0"
+        vm.news = "Verified facts"
+        vm.run()
+        await waitForIdle(vm)
+        let executed = await server.requests.first
+        XCTAssertEqual(executed?.version, "1.0.0")
+        let localCount = await local.requests.count
+        XCTAssertEqual(localCount, 0)
+        vm.selectTool(.shekharJoke)
+        XCTAssertEqual(vm.version, "1.0.0")
+        vm.selectTool(.threeSceneStory)
+        XCTAssertEqual(vm.version, "1.0.0")
+        await server.setStoryVersions(["2.0.0"])
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.version, "")
+        XCTAssertFalse(vm.canRun)
+        XCTAssertTrue(vm.errorMessage?.contains("unavailable") == true)
+        vm.executionSource = .local
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.version, "2.0.0")
+    }
+
+    func testStoryCountLimitMatchesNewContract() async {
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner())
+        await vm.refreshProviders()
+        vm.news = "News"
+        vm.outputCount = 6
+        XCTAssertFalse(vm.canRun)
+        vm.run()
+        XCTAssertTrue(vm.errorMessage?.contains("1 and 5") == true)
+    }
     func testUnavailableProviderCannotRunAndRefreshSelectsAnAvailableProvider() async {
         let vm = LocalAgentViewModel(service: StubLocalAgentRunner(unavailable: [.claude, .appleLocal]))
         await vm.refreshProviders()
@@ -156,6 +198,7 @@ final class LocalAgentViewModelTests: XCTestCase {
 }
 
 private actor StubLocalAgentRunner: LocalAgentRunning {
+    var storyVersions: [String]
     var requests: [LocalAgentRequest] = []
     let failure: LocalAgentError?
     let started: XCTestExpectation?
@@ -163,7 +206,8 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
     let unavailable: Set<LocalAgentProvider>
     var continuation: CheckedContinuation<Void, Never>?
 
-    init(failure: LocalAgentError? = nil, started: XCTestExpectation? = nil, suspend: Bool = false, unavailable: Set<LocalAgentProvider> = []) {
+    init(failure: LocalAgentError? = nil, started: XCTestExpectation? = nil, suspend: Bool = false, unavailable: Set<LocalAgentProvider> = [], storyVersions: [String] = ["2.0.0"]) {
+        self.storyVersions = storyVersions
         self.failure = failure
         self.started = started
         self.suspend = suspend
@@ -187,6 +231,11 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
             ($0, LocalAgentAvailability(isAvailable: !unavailable.contains($0), reason: unavailable.contains($0) ? "CLI not installed" : "Test provider"))
         })
     }
+
+    func versions() async throws -> [LocalAgentTool: [String]] {
+        [.threeSceneStory: storyVersions, .shekharJoke: ["1.0.0"]]
+    }
+    func setStoryVersions(_ versions: [String]) { storyVersions = versions }
 
     func release() { continuation?.resume(); continuation = nil }
 }
@@ -231,6 +280,9 @@ final class TerminalLocalAgentServiceTests: XCTestCase {
         XCTAssertEqual(result.rawOutput, storyJSON)
         XCTAssertTrue(result.text.contains("Scene 1"))
         XCTAssertTrue(result.text.contains("A title"))
+        XCTAssertTrue(result.text.contains("A: Speech one"))
+        XCTAssertTrue(result.text.contains("Passed: false"))
+        XCTAssertTrue(result.text.contains("Words: 2"))
         let input = await session.recorder.input
         XCTAssertTrue(input.contains("Verified news"))
         XCTAssertTrue(input.contains("user_joke"))
@@ -249,6 +301,21 @@ final class TerminalLocalAgentServiceTests: XCTestCase {
         let input = await session.recorder.input
         XCTAssertTrue(input.contains("news_count"))
         XCTAssertFalse(input.contains("Verified news"))
+    }
+
+    func testLocalVersionIsDerivedFromPackageAndRejectsUnavailableVersionBeforeSession() async throws {
+        let session = StubTerminalSession(response: .success(storyJSON))
+        let service = makeService(session)
+        let versions = try await service.versions()
+        XCTAssertEqual(versions[.threeSceneStory], ["2.0.0"])
+        var input = request(.threeSceneStory)
+        input.version = "1.0.0"
+        do {
+            _ = try await service.run(input)
+            XCTFail("Expected unavailable version")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("not available locally")) }
+        let sent = await session.recorder.input
+        XCTAssertTrue(sent.isEmpty)
     }
 
     func testMalformedOutputRetained() async {
@@ -311,6 +378,116 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
 }
 
 private let storyJSON = """
-  {"items":[{"title":"A title","scene_1":{"purpose":"Curiosity","characters":"A","setting":"Street","speech":"Speech one","speech_word_count":2},"scene_2":{"purpose":"Discussion","characters":"B","setting":"Office","speech":"Speech two","speech_word_count":2},"scene_3":{"purpose":"Reaction","characters":"C","setting":"Home","speech":"Speech three","speech_word_count":2,"joke_applied":"Joke"},"verification":{"different_concepts":true,"freshness_maintained":true,"shareability_verified":true,"notes":"Checked"}}]}
+  {"items":[{"title":"A title","scenes":[
+    {"title":"Curiosity","goal":"Hook","location":"Street","dialogues":[{"speaker":"A","dialogue":"Speech one"}],"words_count":2,"verification":{"passed":false,"dialogue_sensible":false,"different_concepts":true,"freshness_maintained":true,"notes":"Human review"}},
+    {"title":"Discussion","goal":"News","location":"Office","dialogues":[{"speaker":"B","dialogue":"Speech two"}],"words_count":2,"verification":{"passed":true,"dialogue_sensible":true,"different_concepts":true,"freshness_maintained":true,"notes":"Checked"}},
+    {"title":"Reaction","goal":"Share","location":"Home","dialogues":[{"speaker":"C","dialogue":"Speech three"}],"words_count":2,"verification":{"passed":true,"dialogue_sensible":true,"different_concepts":true,"freshness_maintained":true,"notes":"Checked"}}
+  ]}]}
 
 """
+
+final class ServerLocalAgentServiceTests: XCTestCase {
+    private func service(versions: [String] = ["2.0.0"]) -> ServerLocalAgentService {
+        AgentVersionURLProtocol.versions = versions
+        AgentVersionURLProtocol.requests = []
+        AgentVersionURLProtocol.failure = false
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AgentVersionURLProtocol.self]
+        return ServerLocalAgentService(httpClient: HTTPClient(session: URLSession(configuration: configuration)),
+            serverURL: { URL(string: "http://agent.test/api")! })
+    }
+
+    private var request: LocalAgentRequest {
+        LocalAgentRequest(tool: .threeSceneStory, provider: .codex, executable: "codex", model: nil,
+            news: "Verified news", userJoke: "User joke", outputCount: 1, newsCount: 3, jokesPerCategory: 2,
+            version: "2.0.0")
+    }
+
+    func testServerCatalogAvailabilityAndExplicitVersionPayload() async throws {
+        let server = service(versions: ["1.0.0", "2.0.0"])
+        let versions = try await server.versions()
+        XCTAssertEqual(versions[.threeSceneStory], ["1.0.0", "2.0.0"])
+        XCTAssertEqual(versions[.shekharJoke], [])
+        let availability = await server.availability()
+        XCTAssertEqual(availability[.codex]?.isAvailable, true)
+        XCTAssertEqual(availability[.claude]?.isAvailable, false)
+        XCTAssertEqual(availability[.appleLocal]?.isAvailable, false)
+        let result = try await server.run(request)
+        XCTAssertEqual(result.rawOutput, storyJSON)
+        XCTAssertTrue(result.text.contains("A: Speech one"))
+        let executed = try XCTUnwrap(AgentVersionURLProtocol.requests.first { $0.url?.path == "/api/execute" })
+        XCTAssertEqual(executed.httpMethod, "POST")
+        XCTAssertEqual(executed.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let data = try XCTUnwrap(executed.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["agent_id"] as? String, "ThreeSceneStoryCreator")
+        XCTAssertEqual(json["version"] as? String, "2.0.0")
+        XCTAssertEqual(json["provider"] as? String, "codex")
+        let input = try XCTUnwrap(json["input"] as? [String: Any])
+        XCTAssertEqual(input["news"] as? String, "Verified news")
+        XCTAssertEqual(input["user_joke"] as? String, "User joke")
+        XCTAssertNil(input["news_count"])
+    }
+
+    func testUnavailableVersionNeverExecutesOrFallsBack() async throws {
+        let server = service()
+        var input = request
+        input.version = "1.0.0"
+        do {
+            _ = try await server.run(input)
+            XCTFail("Expected unavailable version")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("available server agent version")) }
+        XCTAssertFalse(AgentVersionURLProtocol.requests.contains { $0.httpMethod == "POST" })
+    }
+
+    func testServerErrorRetainsExactDiagnostics() async throws {
+        let server = service()
+        AgentVersionURLProtocol.failure = true
+        do {
+            _ = try await server.run(request)
+            XCTFail("Expected server error")
+        } catch LocalAgentError.executionFailed(let raw, let reason) {
+            XCTAssertTrue(raw.contains("provider_unavailable"))
+            XCTAssertEqual(reason, "provider_unavailable: Sign in on server")
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+}
+
+private final class AgentVersionURLProtocol: URLProtocol {
+    static var versions = ["2.0.0"]
+    static var requests: [URLRequest] = []
+    static var failure = false
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        var captured = request
+        if let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var body = Data()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                body.append(contentsOf: buffer.prefix(count))
+            }
+            captured.httpBody = body
+        }
+        Self.requests.append(captured)
+        let data: Data
+        var status = 200
+        switch request.url!.lastPathComponent {
+        case "agents":
+            data = try! JSONSerialization.data(withJSONObject: ["agents": [["id": "ThreeSceneStoryCreator", "name": "Story", "versions": Self.versions]]])
+        case "status":
+            data = Data(#"{"providers":[{"id":"codex","available":true,"readiness":"ready"},{"id":"claude","available":false,"readiness":"unavailable"}]}"#.utf8)
+        default:
+            status = Self.failure ? 422 : 200
+            data = Data((Self.failure ? #"{"error":{"code":"provider_unavailable","message":"Sign in on server"}}"# : storyJSON).utf8)
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}

@@ -1,8 +1,14 @@
 import Foundation
 
+enum LocalAgentExecutionSource: String, CaseIterable, Identifiable {
+    case local = "This Mac", server = "Server"
+    var id: String { rawValue }
+}
+
 enum LocalAgentTool: String, CaseIterable, Identifiable, Sendable {
     case threeSceneStory, shekharJoke
     var id: String { rawValue }
+    var agentID: String { self == .threeSceneStory ? "ThreeSceneStoryCreator" : "ShekharJokeGenerator" }
     var title: String {
         switch self {
         case .threeSceneStory: return "3-Scene Story Creator"
@@ -49,12 +55,16 @@ struct LocalAgentRequest: Sendable {
     var newsCount: Int
     var jokesPerCategory: Int
     var session = LocalAgentSessionSettings()
+    var version: String? = nil
 
     func validate() throws {
         guard !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw LocalAgentError.invalidInput("Enter a CLI executable name or absolute path.")
         }
         guard outputCount > 0 else { throw LocalAgentError.invalidInput("Output count must be positive.") }
+        if tool == .threeSceneStory, outputCount > 5 {
+            throw LocalAgentError.invalidInput("Story output count must be between 1 and 5.")
+        }
         guard session.temperature.isFinite, (0...1).contains(session.temperature) else {
             throw LocalAgentError.invalidInput("Temperature must be between 0 and 1.")
         }
