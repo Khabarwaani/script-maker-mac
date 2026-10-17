@@ -31,9 +31,8 @@ graph. No exact release or local checkout is pinned by the app. Use Xcode's
 **File → Packages → Update to Latest Package Versions** to refresh an existing
 resolution. The local KhabarwaaniAgent package uses your working-tree sources.
 
-In LocalAgent, choose **This Mac** or **Server**, then an agent and an available
-**Agent version**. Local versions come from the sibling package's specification;
-server versions come from its `/agents` catalog. A removed selection requires a
+In LocalAgent, choose an agent and an available **Agent version**.
+Versions come from the local sibling package's specification. A removed selection requires a
 new choice. The updated package supplies ThreeSceneStoryCreator **2.0.0** with
 three scenes containing speaker/dialogue turns and per-scene verification.
 The story form accepts news, an optional joke, and 1–5 outputs; Shekhar Joke
@@ -45,12 +44,7 @@ and cannot be selected. **Refresh versions and providers** rechecks availability
 CLIs still need valid provider authentication. Executables are found on PATH,
 `/opt/homebrew/bin`, and `/usr/local/bin`.
 
-Server mode uses the URL in Settings and the server's `/status` provider
-availability. It posts the explicit agent version and input to `/execute`.
-Model and session settings are managed by the server. Cancel stops waiting for
-the response; accepted server work may continue. No local fallback is used.
-
-For This Mac, expand **Session settings** for the package's runtime process mode, memory
+Expand **Session settings** for the package's runtime process mode, memory
 policy, and execution metadata. The on-device provider offers temperature
 instead of terminal process/memory settings. CLI model overrides are in the
 main form. Settings are kept separately per provider while the app is open.

@@ -7,19 +7,12 @@ final class LocalAgentViewModel {
     var tool: LocalAgentTool = .threeSceneStory {
         didSet { restoreVersion() }
     }
-    var executionSource: LocalAgentExecutionSource = .local {
-        didSet {
-            providers = [:]
-            versionsByTool = [:]
-            version = ""
-        }
-    }
     var version = "" {
         didSet {
-            if !version.isEmpty { selectedVersions[executionSource, default: [:]][tool] = version }
+            if !version.isEmpty { selectedVersions[tool] = version }
         }
     }
-    private var selectedVersions: [LocalAgentExecutionSource: [LocalAgentTool: String]] = [:]
+    private var selectedVersions: [LocalAgentTool: String] = [:]
     private(set) var versionsByTool: [LocalAgentTool: [String]] = [:]
     private(set) var isRefreshing = false
     var versions: [String] { versionsByTool[tool] ?? [] }
@@ -50,15 +43,11 @@ final class LocalAgentViewModel {
     private(set) var status = "Ready"
     private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
     @ObservationIgnored private let service: any LocalAgentRunning
-    @ObservationIgnored private let serverService: (any LocalAgentRunning)?
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(service: any LocalAgentRunning, serverService: (any LocalAgentRunning)? = nil) {
+    init(service: any LocalAgentRunning) {
         self.service = service
-        self.serverService = serverService
     }
-
-    private var selectedService: (any LocalAgentRunning)? { executionSource == .local ? service : serverService }
 
     var canRun: Bool { !isRunning && !isRefreshing && versions.contains(version) && isAvailable(provider) && (try? request.validate()) != nil }
     var executable: String { provider.executable }
@@ -67,18 +56,13 @@ final class LocalAgentViewModel {
     func availabilityReason(_ provider: LocalAgentProvider) -> String { providers[provider]?.reason ?? "Checking availability…" }
 
     func refreshProviders() async {
-        guard !isRunning else { return }
-        let source = executionSource
-        guard let service = selectedService else {
-            errorMessage = "Agent server execution is not configured."
-            return
-        }
+        guard !isRunning, !isRefreshing else { return }
         isRefreshing = true
-        defer { if source == executionSource { isRefreshing = false } }
+        defer { isRefreshing = false }
         do {
             let versions = try await service.versions()
             let available = await service.availability()
-            guard source == executionSource, !Task.isCancelled else { return }
+            try Task.checkCancellation()
             versionsByTool = versions.mapValues { values in
                 Array(Set(values)).sorted {
                     if $0.contains("-") != $1.contains("-") { return !$0.contains("-") }
@@ -89,7 +73,7 @@ final class LocalAgentViewModel {
             errorMessage = nil
             restoreVersion()
         } catch {
-            guard source == executionSource, !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return }
             providers = [:]
             versionsByTool = [:]
             version = ""
@@ -102,7 +86,7 @@ final class LocalAgentViewModel {
     }
 
     private func restoreVersion() {
-        if let selected = selectedVersions[executionSource]?[tool] {
+        if let selected = selectedVersions[tool] {
             if versions.contains(selected) {
                 version = selected
             } else {
@@ -137,7 +121,7 @@ final class LocalAgentViewModel {
             errorMessage = availabilityReason(provider)
             return
         }
-        guard versions.contains(version), let service = selectedService else {
+        guard versions.contains(version) else {
             errorMessage = "Select an available agent version."
             return
         }
@@ -151,7 +135,7 @@ final class LocalAgentViewModel {
         result = nil
         rawOutput = ""
         errorMessage = nil
-        status = "Running \(request.tool.title) \(version) with \(request.provider.title) (\(executionSource.rawValue))…"
+        status = "Running \(request.tool.title) \(version) with \(request.provider.title)…"
         task = Task { [weak self, service] in
             do {
                 let output = try await service.run(request)

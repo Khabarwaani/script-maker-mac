@@ -1,10 +1,5 @@
 import Foundation
 
-enum LocalAgentExecutionSource: String, CaseIterable, Identifiable {
-    case local = "This Mac", server = "Server"
-    var id: String { rawValue }
-}
-
 enum LocalAgentTool: String, CaseIterable, Identifiable, Sendable {
     case threeSceneStory, shekharJoke
     var id: String { rawValue }

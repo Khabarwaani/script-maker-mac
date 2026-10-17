@@ -16,7 +16,7 @@ struct LocalAgentView: View {
             }
             .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task(id: viewModel.executionSource) { await viewModel.refreshProviders() }
+        .task { await viewModel.refreshProviders() }
     }
 }
 
@@ -26,12 +26,9 @@ private struct LocalAgentInputForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("LocalAgent").font(.title2.bold())
-            Text("Run KhabarwaaniAgent on this Mac or the configured agent server.")
+            Text("Run KhabarwaaniAgent on this Mac or through an installed CLI.")
                 .foregroundStyle(.secondary)
             Group {
-                Picker("Run on", selection: $viewModel.executionSource) {
-                    ForEach(LocalAgentExecutionSource.allCases) { source in Text(source.rawValue).tag(source) }
-                }
                 Text("Agent").font(.headline)
                 ForEach(LocalAgentTool.allCases) { tool in
                     Button { viewModel.selectTool(tool) } label: {
@@ -46,7 +43,7 @@ private struct LocalAgentInputForm: View {
                     ForEach(viewModel.versions, id: \.self) { version in Text(version).tag(version) }
                 }
                 .disabled(viewModel.versions.isEmpty || viewModel.isRefreshing)
-                Text("Versions available from \(viewModel.executionSource.rawValue). Package and agent versions are separate.")
+                Text("Versions available in the local package. Package and agent versions are separate.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Provider").font(.headline)
                 ForEach(LocalAgentProvider.allCases) { provider in
@@ -68,13 +65,11 @@ private struct LocalAgentInputForm: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if viewModel.executionSource == .local {
                 if viewModel.provider != .appleLocal {
                     TextField("Model (provider default)", text: $viewModel.model)
                         .accessibilityLabel("Model override")
                 }
                 LocalAgentSessionSettingsView(viewModel: viewModel)
-                }
                 Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...(viewModel.tool == .threeSceneStory ? 5 : 20))
                 if viewModel.tool == .threeSceneStory {
                     Text("News facts").font(.headline)
@@ -105,7 +100,7 @@ private struct LocalAgentInputForm: View {
                 }
             }
             Text(viewModel.status).font(.callout).foregroundStyle(.secondary)
-            Text(viewModel.executionSource == .server ? "Uses the server URL in Settings and the server's provider configuration. Cancel stops waiting for the response; accepted server work may continue." : (viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model." : "Uses your CLI account and provider connection."))
+            Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model. No terminal provider or pipeline server is used." : "Uses your CLI account and provider connection. Studio server settings do not apply here.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
