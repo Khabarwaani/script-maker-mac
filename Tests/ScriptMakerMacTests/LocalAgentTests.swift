@@ -5,6 +5,42 @@ import TerminalAgentSession
 
 @MainActor
 final class LocalAgentViewModelTests: XCTestCase {
+    func testVersionSelectionFollowsToolAndRefresh() async {
+        let runner = StubLocalAgentRunner(storyVersions: ["1.0.0", "2.0.0", "2.1.0-beta"])
+        let vm = LocalAgentViewModel(service: runner)
+        XCTAssertFalse(vm.canRun)
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.version, "2.0.0")
+        XCTAssertEqual(vm.versions, ["2.0.0", "1.0.0", "2.1.0-beta"])
+        vm.version = "1.0.0"
+        vm.news = "Verified facts"
+        vm.run()
+        await waitForIdle(vm)
+        let executed = await runner.requests.first
+        XCTAssertEqual(executed?.version, "1.0.0")
+        vm.selectTool(.shekharJoke)
+        XCTAssertEqual(vm.version, "1.0.0")
+        vm.selectTool(.threeSceneStory)
+        XCTAssertEqual(vm.version, "1.0.0")
+        await runner.setStoryVersions(["2.0.0"])
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.version, "")
+        XCTAssertFalse(vm.canRun)
+        XCTAssertTrue(vm.errorMessage?.contains("unavailable") == true)
+        vm.version = "2.0.0"
+        XCTAssertEqual(vm.version, "2.0.0")
+        XCTAssertTrue(vm.canRun)
+    }
+
+    func testStoryCountLimitMatchesNewContract() async {
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner())
+        await vm.refreshProviders()
+        vm.news = "News"
+        vm.outputCount = 6
+        XCTAssertFalse(vm.canRun)
+        vm.run()
+        XCTAssertTrue(vm.errorMessage?.contains("1 and 5") == true)
+    }
     func testUnavailableProviderCannotRunAndRefreshSelectsAnAvailableProvider() async {
         let vm = LocalAgentViewModel(service: StubLocalAgentRunner(unavailable: [.claude, .appleLocal]))
         await vm.refreshProviders()
@@ -156,6 +192,7 @@ final class LocalAgentViewModelTests: XCTestCase {
 }
 
 private actor StubLocalAgentRunner: LocalAgentRunning {
+    var storyVersions: [String]
     var requests: [LocalAgentRequest] = []
     let failure: LocalAgentError?
     let started: XCTestExpectation?
@@ -163,7 +200,8 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
     let unavailable: Set<LocalAgentProvider>
     var continuation: CheckedContinuation<Void, Never>?
 
-    init(failure: LocalAgentError? = nil, started: XCTestExpectation? = nil, suspend: Bool = false, unavailable: Set<LocalAgentProvider> = []) {
+    init(failure: LocalAgentError? = nil, started: XCTestExpectation? = nil, suspend: Bool = false, unavailable: Set<LocalAgentProvider> = [], storyVersions: [String] = ["2.0.0"]) {
+        self.storyVersions = storyVersions
         self.failure = failure
         self.started = started
         self.suspend = suspend
@@ -187,6 +225,11 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
             ($0, LocalAgentAvailability(isAvailable: !unavailable.contains($0), reason: unavailable.contains($0) ? "CLI not installed" : "Test provider"))
         })
     }
+
+    func versions() async throws -> [LocalAgentTool: [String]] {
+        [.threeSceneStory: storyVersions, .shekharJoke: ["1.0.0"]]
+    }
+    func setStoryVersions(_ versions: [String]) { storyVersions = versions }
 
     func release() { continuation?.resume(); continuation = nil }
 }
@@ -231,6 +274,9 @@ final class TerminalLocalAgentServiceTests: XCTestCase {
         XCTAssertEqual(result.rawOutput, storyJSON)
         XCTAssertTrue(result.text.contains("Scene 1"))
         XCTAssertTrue(result.text.contains("A title"))
+        XCTAssertTrue(result.text.contains("A: Speech one"))
+        XCTAssertTrue(result.text.contains("Passed: false"))
+        XCTAssertTrue(result.text.contains("Words: 2"))
         let input = await session.recorder.input
         XCTAssertTrue(input.contains("Verified news"))
         XCTAssertTrue(input.contains("user_joke"))
@@ -249,6 +295,21 @@ final class TerminalLocalAgentServiceTests: XCTestCase {
         let input = await session.recorder.input
         XCTAssertTrue(input.contains("news_count"))
         XCTAssertFalse(input.contains("Verified news"))
+    }
+
+    func testLocalVersionIsDerivedFromPackageAndRejectsUnavailableVersionBeforeSession() async throws {
+        let session = StubTerminalSession(response: .success(storyJSON))
+        let service = makeService(session)
+        let versions = try await service.versions()
+        XCTAssertEqual(versions[.threeSceneStory], ["2.0.0"])
+        var input = request(.threeSceneStory)
+        input.version = "1.0.0"
+        do {
+            _ = try await service.run(input)
+            XCTFail("Expected unavailable version")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("not available locally")) }
+        let sent = await session.recorder.input
+        XCTAssertTrue(sent.isEmpty)
     }
 
     func testMalformedOutputRetained() async {
@@ -311,6 +372,10 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
 }
 
 private let storyJSON = """
-  {"items":[{"title":"A title","scene_1":{"purpose":"Curiosity","characters":"A","setting":"Street","speech":"Speech one","speech_word_count":2},"scene_2":{"purpose":"Discussion","characters":"B","setting":"Office","speech":"Speech two","speech_word_count":2},"scene_3":{"purpose":"Reaction","characters":"C","setting":"Home","speech":"Speech three","speech_word_count":2,"joke_applied":"Joke"},"verification":{"different_concepts":true,"freshness_maintained":true,"shareability_verified":true,"notes":"Checked"}}]}
+  {"items":[{"title":"A title","scenes":[
+    {"title":"Curiosity","goal":"Hook","location":"Street","dialogues":[{"speaker":"A","dialogue":"Speech one"}],"words_count":2,"verification":{"passed":false,"dialogue_sensible":false,"different_concepts":true,"freshness_maintained":true,"notes":"Human review"}},
+    {"title":"Discussion","goal":"News","location":"Office","dialogues":[{"speaker":"B","dialogue":"Speech two"}],"words_count":2,"verification":{"passed":true,"dialogue_sensible":true,"different_concepts":true,"freshness_maintained":true,"notes":"Checked"}},
+    {"title":"Reaction","goal":"Share","location":"Home","dialogues":[{"speaker":"C","dialogue":"Speech three"}],"words_count":2,"verification":{"passed":true,"dialogue_sensible":true,"different_concepts":true,"freshness_maintained":true,"notes":"Checked"}}
+  ]}]}
 
 """

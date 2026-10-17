@@ -38,6 +38,13 @@ private struct LocalAgentInputForm: View {
                     .disabled(viewModel.provider == .appleLocal && tool == .shekharJoke)
                     .accessibilityValue(viewModel.tool == tool ? "Selected" : "")
                 }
+                Picker("Agent version", selection: $viewModel.version) {
+                    if viewModel.versions.isEmpty { Text("No versions available").tag("") }
+                    ForEach(viewModel.versions, id: \.self) { version in Text(version).tag(version) }
+                }
+                .disabled(viewModel.versions.isEmpty || viewModel.isRefreshing)
+                Text("Versions available in the local package. Package and agent versions are separate.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Text("Provider").font(.headline)
                 ForEach(LocalAgentProvider.allCases) { provider in
                     Button { viewModel.selectProvider(provider) } label: {
@@ -49,7 +56,8 @@ private struct LocalAgentInputForm: View {
                     .accessibilityValue(viewModel.provider == provider ? "Selected" : "")
                 }
                 Text(viewModel.availabilityReason(viewModel.provider)).font(.caption).foregroundStyle(.secondary)
-                Button("Refresh providers") { Task { await viewModel.refreshProviders() } }
+                Button("Refresh versions and providers") { Task { await viewModel.refreshProviders() } }
+                    .disabled(viewModel.isRefreshing)
                 DisclosureGroup("Provider availability") {
                     ForEach(LocalAgentProvider.allCases) { provider in
                         Label("\(provider.title): \(viewModel.availabilityReason(provider))",
@@ -62,7 +70,7 @@ private struct LocalAgentInputForm: View {
                         .accessibilityLabel("Model override")
                 }
                 LocalAgentSessionSettingsView(viewModel: viewModel)
-                Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...20)
+                Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...(viewModel.tool == .threeSceneStory ? 5 : 20))
                 if viewModel.tool == .threeSceneStory {
                     Text("News facts").font(.headline)
                     TextEditor(text: $viewModel.news)

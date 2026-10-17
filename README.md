@@ -31,12 +31,16 @@ graph. No exact release or local checkout is pinned by the app. Use Xcode's
 **File → Packages → Update to Latest Package Versions** to refresh an existing
 resolution. The local KhabarwaaniAgent package uses your working-tree sources.
 
-In LocalAgent, choose **3-Scene Story Creator** (news, optional joke, output count)
-or **Shekhar Joke Generator** (output count, news count, jokes per category).
+In LocalAgent, choose an agent and an available **Agent version**.
+Versions come from the local sibling package's specification. A removed selection requires a
+new choice. The updated package supplies ThreeSceneStoryCreator **2.0.0** with
+three scenes containing speaker/dialogue turns and per-scene verification.
+The story form accepts news, an optional joke, and 1–5 outputs; Shekhar Joke
+Generator accepts output count, news count, and jokes per category.
 Choose Codex, Claude, Antigravity, or Grok and sign in to that CLI beforehand,
 or choose **Apple Intelligence (on-device)** to use AgentAtom's native Mac
 session. Missing CLIs and unavailable Apple Intelligence models are grayed out
-and cannot be selected. **Refresh providers** rechecks availability; installed
+and cannot be selected. **Refresh versions and providers** rechecks availability; installed
 CLIs still need valid provider authentication. Executables are found on PATH,
 `/opt/homebrew/bin`, and `/usr/local/bin`.
 
@@ -65,7 +69,7 @@ including nullable optional fields. It translates Grok's schema option to the
 installed CLI's `--json-schema` interface and does not forward permission-bypass
 flags inserted by provider defaults.
 
-CI and release workflows check out `KhabarwaaniAgent`'s `develop` branch beside
+CI and release workflows check out `KhabarwaaniAgent`'s current `main` branch beside
 the app. `KHABARWAANI_AGENT_READ_KEY` supplies a dedicated read-only deploy key
 for the private package. A token with package read access can alternatively be
 provided as `KHABARWAANI_AGENT_READ_TOKEN`; the workflow token is the fallback.
