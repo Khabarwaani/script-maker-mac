@@ -5,7 +5,6 @@ struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
-    @State private var refineViewModel: RefineViewModel
     @State private var localAgentViewModel: LocalAgentViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
@@ -25,9 +24,6 @@ struct ContentView: View {
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
-        )
-        _refineViewModel = State(
-            wrappedValue: viewModel.refineViewModel
         )
         _localAgentViewModel = State(wrappedValue: viewModel.localAgentViewModel)
         _preferencesViewModel = State(
@@ -69,7 +65,6 @@ struct ContentView: View {
                 switch viewModel.selectedTab {
                 case .studio: GenerateView(viewModel: generateViewModel)
                 case .library: LibraryView(viewModel: libraryViewModel)
-                case .refine: RefineView(viewModel: refineViewModel)
                 case .localAgent: LocalAgentView(viewModel: localAgentViewModel)
                 }
             }

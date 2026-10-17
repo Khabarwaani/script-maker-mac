@@ -75,7 +75,7 @@ struct StoryScriptVersion: Codable, Sendable, Hashable, Identifiable {
 }
 
 enum LibraryUpdate: String, CaseIterable, Sendable, Hashable {
-    case hashtags, images, news, refine
+    case hashtags, images, news
 }
 
 enum LibraryRemovedItem {
@@ -86,7 +86,6 @@ struct LibraryUpdateResult: Codable, Sendable {
     var hashtags: [String]?
     var images: [String]?
     var news: [StorySourceLink]?
-    var script: String?
 }
 
 enum StoryCopyFormat: String, CaseIterable, Identifiable {

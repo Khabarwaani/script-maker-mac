@@ -43,7 +43,7 @@ struct LibraryUpdateClient: LibraryUpdating {
                 localJSON: Bool, delay: TimeInterval, serverURL: URL? = nil) async throws -> LibraryUpdateResult {
         if !localJSON {
             guard let baseURL = serverURL else { throw ConfigError.invalidURL("Missing server URL") }
-            let path = kind == .refine ? "refinements" : "updates/\(kind.rawValue)"
+            let path = "updates/\(kind.rawValue)"
             var request = URLRequest(url: baseURL.appendingPathComponent("stories").appendingPathComponent(story.id).appendingPathComponent(path))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

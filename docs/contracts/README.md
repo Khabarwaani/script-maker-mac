@@ -4,9 +4,9 @@ Proposed contract for the server to implement later. It is not a claim that the
 current server supports these endpoints. `library.openapi.yaml` defines routes;
 the JSON Schema files define request and response bodies and examples.
 
-The Mac client currently sends the update and refinement requests below. Story
+The Mac client currently sends the update requests below. Story
 editing, versions, media attachments and deletion are persisted locally until
-the remaining server routes are implemented. No AI runs in the Mac app.
+the remaining server routes are implemented. Library AI uses the server; LocalAgent is independent.
 
 | Operation | Input | Successful output |
 | --- | --- | --- |
@@ -19,20 +19,18 @@ the remaining server routes are implemented. No AI runs in the Mac app.
 | Update hashtags | `POST /stories/{id}/updates/hashtags`, LibraryRequest | `{ "hashtags": [string] }` |
 | Update images | `POST /stories/{id}/updates/images`, LibraryRequest | `{ "images": [URL] }` |
 | Update news | `POST /stories/{id}/updates/news`, LibraryRequest | `{ "news": [{title,url,source}] }` |
-| Fine tune | `POST /stories/{id}/refinements`, LibraryRequest | `{ "script": "refined script" }` |
 | Upload media (future) | `POST /stories/{id}/media`, multipart `kind` and `file` | `{ "url": "https://...", "kind": "image|video", "filename": "...", "byteCount": 123 }` |
 
 All bodies use JSON, UTF-8 and camelCase Story properties. The request's `story`
 is the current saved snapshot, including the active/default `scriptText`. Its
 UUID must equal the route ID. `engine` is one of the labels in the request
 schema; `None` disables AI. Hashtag/image/news retrieval must still work without
-AI. Fine tuning requires an enabled engine and a nonblank `instruction`.
+AI. Script refinement is available through the local agent catalog instead.
 
 Updates return replacement data for exactly the requested kind. Missing a
 required result field is an error; an empty array is a valid result with no
 items. Only the relevant field is persisted; title, UUID, creation time and
-script stay unchanged. Refinements return a preview and must never overwrite
-the script automatically. Explicit acceptance or manual edit/save creates a
+script stay unchanged. Manual edit/save creates a
 new Story with the same title, a new UUID, fresh creation time and next subtitle
 number. `sourceStoryID` points to the original/root story. The original stays
 unchanged. The edited copy retains script history and adds the changed script

@@ -14,6 +14,5 @@
       "url": "https://example.com/",
       "source": "Sample source · simulation only"
     }
-  ],
-  "script": "SCENE 1 · Delhi street\n\nNarrator: Delhi is testing odd-even vehicle restrictions to tackle air pollution.\n\nCommuter: Will changing which cars drive actually help?\n\nNarrator: That is the question. Watch the air-quality data and transport updates before judging the result.\n\nScene direction: Show a traffic junction, followed by an air-quality display."
+  ]
 }
