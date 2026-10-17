@@ -311,7 +311,10 @@ final class LibraryNetworkContractTests: XCTestCase {
         do {
             _ = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test"))
             XCTFail("Server mode must not substitute local models")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("not implemented")) }
+        } catch {
+            guard case APIError.notImplemented(let reason) = error else { return XCTFail("Expected unsupported catalog: \(error)") }
+            XCTAssertTrue(reason.contains("not implemented"))
+        }
     }
 
     private func client(status: Int = 200, body: String) -> LibraryUpdateClient {
@@ -354,7 +357,8 @@ final class LibraryNetworkContractTests: XCTestCase {
             XCTFail("Unavailable server must not return fixture data")
         } catch {
             XCTAssertTrue(error is APIError)
-            XCTAssertTrue(error.localizedDescription.contains("No changes were saved"))
+            guard case APIError.notImplemented(let reason) = error else { return XCTFail("Expected unsupported update: \(error)") }
+            XCTAssertTrue(reason.contains("No changes were saved"))
         }
     }
 }
