@@ -23,6 +23,7 @@ jobs:
           ref: develop
           path: KhabarwaaniAgent
           token: ${{ secrets.KHABARWAANI_AGENT_READ_TOKEN || github.token }}
+          ssh-key: ${{ secrets.KHABARWAANI_AGENT_READ_KEY }}
           persist-credentials: false
       - name: Check macOS 27 toolchain
         run: bash scripts/check-localagent-toolchain.sh

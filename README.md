@@ -66,8 +66,9 @@ installed CLI's `--json-schema` interface and does not forward permission-bypass
 flags inserted by provider defaults.
 
 CI and release workflows check out `KhabarwaaniAgent`'s `develop` branch beside
-the app. Workflows try their GitHub token; if cross-repository access is denied,
-configure `KHABARWAANI_AGENT_READ_TOKEN` with read access to the private package.
+the app. `KHABARWAANI_AGENT_READ_KEY` supplies a dedicated read-only deploy key
+for the private package. A token with package read access can alternatively be
+provided as `KHABARWAANI_AGENT_READ_TOKEN`; the workflow token is the fallback.
 The `xcode-27` runner provides macOS 27/Xcode 27. Tests fake sessions and never
 invoke a live provider.
 
