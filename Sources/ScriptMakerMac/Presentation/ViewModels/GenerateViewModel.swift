@@ -1022,8 +1022,8 @@ final class GenerateViewModel {
                     format: selectedFormat,
                     scriptText: scriptText,
                     instruction: instructionText.isEmpty ? nil : instructionText,
-                    scriptVersions: initialVersions,
-                    generationNumber: script.id ?? (index + 1)
+                    generationNumber: script.id ?? (index + 1),
+                    scriptVersions: initialVersions
                 )
                 await repository.save(story)
             }
