@@ -187,3 +187,11 @@ packaging/mac/build_dmg.sh 1.0
 ## CI
 
 `.github/workflows/ci.yml` — `xcodebuild` Debug build on every push/PR (public repo: free).
+
+Studio news discovery runs locally in Swift using the public personal packages
+[NewsSearch](https://github.com/abhi266raj/NewsSearch) and
+[GoogleTrends](https://github.com/abhi266raj/GoogleTrends). Headline/category refresh
+and Google Trends topics work without ScriptMakerServer; internet is required.
+Bundled sample mode remains available. Script generation still uses the configured
+pipeline server. Both packages offer source and XCFramework products at the same
+version; this app consumes the framework products.

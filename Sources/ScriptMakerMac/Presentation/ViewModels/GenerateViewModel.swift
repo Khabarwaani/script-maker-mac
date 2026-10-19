@@ -10,6 +10,7 @@ import Observation
 final class GenerateViewModel {
     private let config: AppConfig
     private let repository: any StoryRepository
+    private let newsProvider: any StudioNewsProviding
     private let catalogProvider: any StudioCatalogProviding
     private var catalog: StudioCatalog?
     private var eventTask: Task<Void, Never>?
@@ -207,10 +208,11 @@ final class GenerateViewModel {
     var instructionText: String = ""
     var isRefreshingHeadlines = false
 
-    init(config: AppConfig, catalogProvider: any StudioCatalogProviding, repository: any StoryRepository = LocalStoryRepository()) {
+    init(config: AppConfig, catalogProvider: any StudioCatalogProviding, repository: any StoryRepository, newsProvider: any StudioNewsProviding) {
         self.config = config
         self.repository = repository
         self.catalogProvider = catalogProvider
+        self.newsProvider = newsProvider
         self.isApplyingConfig = true
         defer { self.isApplyingConfig = false }
         loadCatalog()
@@ -365,7 +367,7 @@ final class GenerateViewModel {
         }
     }
 
-    /// Refresh headlines (re-load from sample data / server).
+    /// Refresh headlines from local news feeds or bundled samples.
     /// If forceFresh is false, uses 24-hour cache when available.
     func refreshHeadlines(forceFresh: Bool = false) async {
         isRefreshingHeadlines = true
@@ -373,7 +375,7 @@ final class GenerateViewModel {
         defer { isRefreshingHeadlines = false }
 
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
-        let cacheKey = categoryParam ?? "default"
+        let cacheKey = newsCacheKey(categoryParam)
 
         if !forceFresh, let cached = config.getCachedHeadlines(forSource: cacheKey), !cached.isEmpty {
             applyHeadlines(cached, forSource: cacheKey)
@@ -381,9 +383,13 @@ final class GenerateViewModel {
         }
 
         do {
-            let service = try api()
             let pageSize = config.newsPageSize
-            let response = try await service.fetchTopTitles(category: categoryParam, n: pageSize, mode: nil)
+            let response: TopTitlesResponse
+            if isLocalJSON {
+                response = try await api().fetchTopTitles(category: categoryParam, n: pageSize)
+            } else {
+                response = try await newsProvider.headlines(category: categoryParam, limit: pageSize)
+            }
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
                 config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
@@ -403,6 +409,10 @@ final class GenerateViewModel {
         }
     }
 
+    private func newsCacheKey(_ category: String?) -> String {
+        (isLocalJSON ? "sample:" : "local-news:") + (category ?? "default")
+    }
+
     private func applyHeadlines(_ loadedHeadlines: [String], forSource cacheKey: String) {
         headlines = loadedHeadlines
         let lastSelected = config.getLastSelectedHeadline(forSource: cacheKey)
@@ -419,7 +429,7 @@ final class GenerateViewModel {
     func onHeadlineChanged(_ headline: String) {
         topic = headline
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
-        let cacheKey = categoryParam ?? "default"
+        let cacheKey = newsCacheKey(categoryParam)
         config.saveLastSelectedHeadline(headline, forSource: cacheKey)
     }
 
@@ -451,51 +461,32 @@ final class GenerateViewModel {
         }
     }
 
-    /// Refresh trending hashtags directly from /api/v1/news/hashtags (with title extraction fallback).
+    /// Refresh Google Trends topics formatted as tags.
     func refreshHashtags() async {
         isRefreshingHashtags = true
         hashtagsErrorMessage = nil
         defer { isRefreshingHashtags = false }
         do {
-            let service = try api()
-            // 1. Direct dedicated hashtags endpoint
-            if let hashtagResponse = try? await service.fetchTrendingHashtags(n: 15), !hashtagResponse.hashtags.isEmpty {
-                hashtagItems = hashtagResponse.hashtags
-                trendingHashtags = hashtagResponse.hashtags.map(\.tag)
-                if let first = hashtagResponse.hashtags.first {
-                    onHashtagChanged(first.tag)
-                }
-                return
+            let response: NewsHashtagsResponse
+            if isLocalJSON {
+                response = try await api().fetchTrendingHashtags(n: 15)
+            } else {
+                response = try await newsProvider.hashtags(limit: 15)
             }
-
-            // 2. Fallback: extract hashtags from top titles
-            let response = try await service.fetchTopTitles(category: "trending", n: 10, mode: nil)
-            var extracted: [NewsHashtag] = []
-            for item in response.titles {
-                let words = item.title.components(separatedBy: .whitespacesAndNewlines)
-                for w in words where w.hasPrefix("#") && w.count > 1 {
-                    if !extracted.contains(where: { $0.tag == w }) {
-                        extracted.append(NewsHashtag(tag: w, headline: item.title, link: item.link, source: "Trending"))
-                    }
-                }
-            }
-            hashtagItems = extracted
-            trendingHashtags = extracted.map(\.tag)
-            if let first = extracted.first {
-                onHashtagChanged(first.tag)
-            }
+            hashtagItems = response.hashtags
+            trendingHashtags = response.hashtags.map(\.tag)
+            if let first = response.hashtags.first { onHashtagChanged(first.tag) }
         } catch {
             hashtagItems = []
             trendingHashtags = []
-            if !isLocalJSON {
-                hashtagsErrorMessage = error.localizedDescription
-            }
+            selectedHashtag = ""
+            hashtagsErrorMessage = error.localizedDescription
         }
     }
 
     var isRefreshingCategories = false
 
-    /// Fetch news categories from server when available.
+    /// Load categories from the local package, or the bundled sample catalog.
     func loadNewsCategories() async {
         isRefreshingCategories = true
         defer { isRefreshingCategories = false }
@@ -504,12 +495,11 @@ final class GenerateViewModel {
             return
         }
         do {
-            let service = try api()
-            let response = try await service.fetchNewsCategories()
-            let serverLabels = response.categories.map(\.label)
-            if !serverLabels.isEmpty {
+            let response = try await newsProvider.categories()
+            let categoryLabels = response.categories.map(\.label)
+            if !categoryLabels.isEmpty {
                 var combined = [Self.manualSourceLabel]
-                for label in serverLabels where !combined.contains(label) {
+                for label in categoryLabels where !combined.contains(label) {
                     combined.append(label)
                 }
                 if !combined.contains("#️⃣ Trending Hashtags (Google)") {
@@ -519,7 +509,7 @@ final class GenerateViewModel {
                 if selectedStorySource.isEmpty || !storySources.contains(selectedStorySource) {
                     if let defaultCat = response.categories.first(where: { $0.id == response.defaultCategory }) {
                         selectedStorySource = defaultCat.label
-                    } else if let first = serverLabels.first {
+                    } else if let first = categoryLabels.first {
                         selectedStorySource = first
                     }
                 }
@@ -539,8 +529,6 @@ final class GenerateViewModel {
             await loadNewsCategories()
             if isHashtagSource {
                 await refreshHashtags()
-            } else if !isManualSource {
-                await refreshHeadlines(forceFresh: false)
             }
         } else {
             loadCatalog()
@@ -551,8 +539,10 @@ final class GenerateViewModel {
     /// Verify news endpoints are available.
     func verifyNewsEndpoints() async -> Bool {
         do {
-            let service = try api()
-            return try await service.verifyNewsEndpoints()
+            if isLocalJSON { return try await api().verifyNewsEndpoints() }
+            _ = try await newsProvider.categories()
+            _ = try await newsProvider.headlines(category: nil, limit: 1)
+            return true
         } catch {
             return false
         }
