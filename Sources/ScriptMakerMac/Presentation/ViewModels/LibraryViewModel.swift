@@ -5,6 +5,7 @@ import Observation
 @Observable
 @MainActor
 final class LibraryViewModel {
+    let scriptChat: ScriptChatViewModel?
     private let config: AppConfig
     private let clipboard: (any ClipboardWriting)?
     private let repository: any StoryRepository
@@ -77,8 +78,9 @@ final class LibraryViewModel {
     var isLoading = false
     var notice: String?
 
-    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil, uploader: (any StoryUploading)? = nil) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil, uploader: (any StoryUploading)? = nil, scriptChat: ScriptChatViewModel? = nil) {
         self.config = config
+        self.scriptChat = scriptChat
         self.repository = repository
         self.clipboard = clipboard
         self.updater = updater
@@ -172,6 +174,26 @@ final class LibraryViewModel {
         story.uploadReceipt = nil
         await saveEditedCopy(story, originalID: id)
         if titleChanged, let saved = selectedStory { await enrich(storyID: saved.id) }
+        return true
+    }
+
+    func saveRefinedScript() async -> Bool {
+        guard let chat = scriptChat, chat.canSave, let original = chat.source,
+              !isSavingEdits, busyUpdates.isEmpty else { return false }
+        guard stories.contains(where: { $0.id == original.id }) else {
+            chat.showSaveError("The original story was removed. Keep the draft text and open another script.")
+            return false
+        }
+        isSavingEdits = true
+        defer { isSavingEdits = false }
+        var refined = original
+        appendVersion(chat.draft.latestScript, instruction: chat.draft.instruction, to: &refined)
+        refined.instruction = chat.draft.instruction
+        refined.uploadReceipt = nil
+        refined.videoURL = nil
+        await saveEditedCopy(refined, originalID: original.id)
+        chat.markSaved()
+        actionNotice = "Refined script saved as a new story"
         return true
     }
 
