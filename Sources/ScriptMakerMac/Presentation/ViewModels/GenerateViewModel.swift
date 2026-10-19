@@ -437,12 +437,18 @@ final class GenerateViewModel {
     func onHashtagChanged(_ tag: String) {
         selectedHashtag = tag
         if let match = hashtagItems.first(where: { $0.tag == tag }), let headline = match.headline, !headline.isEmpty {
+            headlines = [headline]
             selectedHeadline = headline
             topic = headline
         } else if !tag.isEmpty {
             let derived = tag.replacingOccurrences(of: "#", with: "")
+            headlines = [derived]
             selectedHeadline = derived
             topic = derived
+        } else {
+            headlines = []
+            selectedHeadline = ""
+            topic = ""
         }
     }
 
@@ -480,6 +486,11 @@ final class GenerateViewModel {
             hashtagItems = []
             trendingHashtags = []
             selectedHashtag = ""
+            if isHashtagSource {
+                headlines = []
+                selectedHeadline = ""
+                topic = ""
+            }
             hashtagsErrorMessage = error.localizedDescription
         }
     }
