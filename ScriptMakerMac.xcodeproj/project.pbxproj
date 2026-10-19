@@ -5,6 +5,16 @@
 	};
 	objectVersion = 56;
 	objects = {
+SC105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatTests.swift; sourceTree = "<group>"; };
+SC005 = {isa = PBXBuildFile; fileRef = SC105; };
+SC104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatView.swift; sourceTree = "<group>"; };
+SC004 = {isa = PBXBuildFile; fileRef = SC104; };
+SC103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatViewModel.swift; sourceTree = "<group>"; };
+SC003 = {isa = PBXBuildFile; fileRef = SC103; };
+SC102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalScriptChatService.swift; sourceTree = "<group>"; };
+SC002 = {isa = PBXBuildFile; fileRef = SC102; };
+SC101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatRefining.swift; sourceTree = "<group>"; };
+SC001 = {isa = PBXBuildFile; fileRef = SC101; };
 NS001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsProviding.swift; sourceTree = "<group>"; };
 NS002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStudioNewsProvider.swift; sourceTree = "<group>"; };
 NS003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsTests.swift; sourceTree = "<group>"; };
@@ -259,7 +269,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 				R034 /* ImageService.swift */,
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
-				R025 /* WebClient.swift */, NS001,
+				R025 /* WebClient.swift */, NS001, SC101,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -302,7 +312,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				L103 /* TerminalLocalAgentService.swift */,
-				LL11 /* LocalLibraryUpdateClient.swift */, NS002,
+				LL11 /* LocalLibraryUpdateClient.swift */, NS002, SC102,
 				L107 /* StrictLocalAgentSession.swift */,
 				LL12 /* LocalStoryUploadClient.swift */,
 				R026 /* NetworkWebClient.swift */,
@@ -349,7 +359,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 				R043 /* ConfigSidebarView.swift */,
 				R044 /* StoryListView.swift */,
 				R046 /* StudioDetailView.swift */,
-				R045 /* StoryDetailView.swift */,
+				R045 /* StoryDetailView.swift */, SC104,
 				R031 /* StageTracker.swift */,
 				R009 /* PreferencesView.swift */,
 				R010 /* GenerateView.swift */,
@@ -370,7 +380,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
-				R007 /* GenerateViewModel.swift */,
+				R007 /* GenerateViewModel.swift */, SC103,
 				R035 /* ThumbnailViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
@@ -422,7 +432,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				L106 /* LocalAgentTests.swift */,
-				LL14 /* LocalLibraryTests.swift */, NS003, M101 /* MainReleaseRegressionTests.swift */,
+				LL14 /* LocalLibraryTests.swift */, NS003, SC105, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -505,7 +515,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				DY002 /* DynamicAgentInputForm.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
-				LL01 /* LocalLibraryUpdateClient.swift in Sources */, NS011, NS012,
+				LL01 /* LocalLibraryUpdateClient.swift in Sources */, NS011, NS012, SC001, SC002, SC003, SC004,
 				L007 /* StrictLocalAgentSession.swift in Sources */,
 				LL02 /* LocalStoryUploadClient.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
@@ -578,7 +588,7 @@ P006 /* Build revision */ = {
 			buildActionMask = 2147483647;
 			files = (
 				L006 /* LocalAgentTests.swift in Sources */,
-				LL04 /* LocalLibraryTests.swift in Sources */, NS013, M001 /* MainReleaseRegressionTests.swift in Sources */,
+				LL04 /* LocalLibraryTests.swift in Sources */, NS013, SC005, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,

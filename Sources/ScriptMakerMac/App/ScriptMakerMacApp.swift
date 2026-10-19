@@ -38,8 +38,7 @@ enum CompositionRoot {
         let repository = LocalStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: LocalStudioNewsProvider(news: NewsSearchClient(), trends: GoogleTrendsClient()))
         let files = FileStore()
-        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LocalLibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }))
-        let localAgent = LocalAgentViewModel(service: TerminalLocalAgentService(
+        let agentService = TerminalLocalAgentService(
             makeSession: { request, workspace in
                 let settings = request.session
                 let metadata = (settings.recordModel ? 1 : 0) | (settings.recordDuration ? 2 : 0) | (settings.recordTokens ? 4 : 0)
@@ -106,7 +105,9 @@ enum CompositionRoot {
                     }
                     return (provider, LocalAgentAvailability(isAvailable: available, reason: reason))
                 })
-            }))
+            })
+        let localAgent = LocalAgentViewModel(service: agentService)
+        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LocalLibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }), scriptChat: ScriptChatViewModel(service: LocalScriptChatService(runner: agentService)))
         return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, localAgentViewModel: localAgent)
     }
 }

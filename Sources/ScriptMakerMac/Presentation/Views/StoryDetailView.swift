@@ -8,6 +8,7 @@ struct StoryDetailView: View {
     let onDelete: () -> Void
     let onMerge: (String) -> Void
     @State private var showingEdit = false
+    @State private var showingScriptChat = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,6 +53,15 @@ struct StoryDetailView: View {
                     StorySourcesSection(story: story, viewModel: viewModel)
                     StoryImagesSection(story: story, viewModel: viewModel)
                     if !StringFormatting.isBlank(story.scriptText ?? "") {
+                        HStack {
+                            Text("Script refinement").font(.headline)
+                            Spacer()
+                            Button("Refine with Script Chat", systemImage: "bubble.left.and.text.bubble.right") {
+                                viewModel.scriptChat?.begin(story)
+                                showingScriptChat = true
+                            }
+                            .disabled(viewModel.scriptChat == nil || viewModel.isSavingEdits || !viewModel.busyUpdates.isEmpty)
+                        }
                         StoryDetailSection("Screenplay") {
                             if let script = story.scriptText {
                             Text(script).font(.body).lineSpacing(5)
@@ -88,6 +98,11 @@ struct StoryDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear { viewModel.copyFeedback = nil }
         .onChange(of: story.id) { _, _ in viewModel.copyFeedback = nil }
+        .sheet(isPresented: $showingScriptChat) {
+            if let chat = viewModel.scriptChat {
+                ScriptChatView(viewModel: chat, onSave: { await viewModel.saveRefinedScript() })
+            }
+        }
         .sheet(isPresented: $showingEdit) { EditLibraryStoryView(storyID: story.id, viewModel: viewModel) }
         .task(id: story.imageURLs) { await viewModel.loadImagePreviews(for: story) }
     }
