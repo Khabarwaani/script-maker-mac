@@ -7,7 +7,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
     func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
                 localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
         let title = story.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { throw APIError.malformed("Enter a title before fetching related news.") }
+        guard !title.isEmpty else { throw LibraryOperationError.invalidInput("Enter a title before fetching related news.") }
         try Task.checkCancellation()
         if kind == .hashtags { return LibraryUpdateResult(hashtags: Self.hashtags(for: title)) }
         if kind == .news { return LibraryUpdateResult(news: try await search(title)) }
@@ -18,7 +18,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
             for link in links.prefix(6) {
                 group.addTask {
                     do {
-                        guard let url = link.webURL else { throw APIError.malformed("Invalid article URL") }
+                        guard let url = link.webURL else { throw LibraryOperationError.invalidInput("Invalid article URL") }
                         let (data, response) = try await fetch(url)
                         let html = String(decoding: data, as: UTF8.self)
                         guard let image = Self.imageURL(in: html, baseURL: response.url ?? url) else {
@@ -34,7 +34,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
                         }
                         guard let http = imageResponse as? HTTPURLResponse, (200..<300).contains(http.statusCode),
                               http.mimeType?.hasPrefix("image/") == true else {
-                            throw APIError.transport("Publisher image is unavailable at \(link.source).")
+                            throw LibraryOperationError.requestFailed("Publisher image is unavailable at \(link.source).")
                         }
                         return (image.absoluteString, nil)
                     } catch { return (nil, error is CancellationError ? "Image fetch cancelled." : error.localizedDescription) }
@@ -46,7 +46,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
         }
         try Task.checkCancellation()
         let images = Array(Set(outcomes.compactMap { $0.0 })).sorted()
-        guard !images.isEmpty else { throw APIError.transport("No usable article images found. \(outcomes.compactMap { $0.1 }.joined(separator: " "))") }
+        guard !images.isEmpty else { throw LibraryOperationError.requestFailed("No usable article images found. \(outcomes.compactMap { $0.1 }.joined(separator: " "))") }
         return LibraryUpdateResult(images: images, warnings: outcomes.compactMap { $0.1 })
     }
 
@@ -55,7 +55,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
         request.setValue("Mozilla/5.0 ScriptMakerMac", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await httpClient.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw APIError.transport("News request failed at \(url.host ?? "publisher").")
+            throw LibraryOperationError.requestFailed("News request failed at \(url.host ?? "publisher").")
         }
         return (data, http)
     }
@@ -74,7 +74,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
                 let xml = XMLParser(data: data)
                 xml.shouldResolveExternalEntities = false
                 xml.delegate = parser
-                guard xml.parse() else { throw APIError.malformed("Invalid news feed") }
+                guard xml.parse() else { throw LibraryOperationError.invalidInput("Invalid news feed") }
                 var seen: Set<String> = []
                 let links = parser.items.compactMap { item -> StorySourceLink? in
                     guard let url = Self.articleURL(item.url), seen.insert(url.absoluteString).inserted else { return nil }
@@ -85,7 +85,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
             } catch is CancellationError { throw CancellationError() }
             catch { failures.append(error.localizedDescription) }
         }
-        throw APIError.transport("Could not find related news. \(failures.joined(separator: " "))")
+        throw LibraryOperationError.requestFailed("Could not find related news. \(failures.joined(separator: " "))")
     }
 
     static func articleURL(_ value: String) -> URL? {

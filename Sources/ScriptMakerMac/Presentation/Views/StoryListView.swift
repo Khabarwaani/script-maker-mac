@@ -88,7 +88,7 @@ struct StoryListView: View {
                 ForEach(viewModel.stories) { story in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(story.title).font(.body.weight(.medium)).lineLimit(2)
-                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? "Saved" : "Edited") \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? (story.stageOutputs?.isEmpty == false ? "Generated" : "Saved") : "Edited") \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                             Text(story.id).font(.caption2.monospaced()).foregroundStyle(AppTheme.secondaryInk).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding(12)

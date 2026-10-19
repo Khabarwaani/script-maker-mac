@@ -11,7 +11,7 @@ struct LocalStoryUploadClient: StoryUploading {
     static let googleEndpoint = "https://script.google.com/macros/s/AKfycbw7W1jqPNn5lR-G2BRKajImt4qEbiZxi6JbUETJ68xqSNnFsH28Qll2GdJW9a1hJjLU/exec"
 
     func upload(_ story: Story, to destination: LibraryUploadDestination, options: LibraryUploadOptions) async throws -> LibraryUploadResult {
-        guard !story.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw APIError.malformed("A title is required for upload.") }
+        guard !story.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw LibraryOperationError.invalidInput("A title is required for upload.") }
         switch destination {
         case .telegram: return try await telegram(story, options: options)
         case .googleSheets: return try await google(story, options: options)
@@ -50,12 +50,12 @@ struct LocalStoryUploadClient: StoryUploading {
         let fileToken = lines(try readOptional("Documents/telegrambot/bot_token.txt")).first ?? ""
         let token = fileToken.isEmpty ? options.telegramToken.trimmingCharacters(in: .whitespacesAndNewlines) : fileToken
         guard !token.isEmpty, token.allSatisfy({ $0.isLetter || $0.isNumber || ":_-".contains($0) }) else {
-            throw APIError.malformed("Set up Telegram: put your BotFather token in ~/Documents/telegrambot/bot_token.txt, or enter it in the upload sheet.")
+            throw LibraryOperationError.invalidInput("Set up Telegram: put your BotFather token in ~/Documents/telegrambot/bot_token.txt, or enter it in the upload sheet.")
         }
         var chatID = options.telegramChatID.trimmingCharacters(in: .whitespacesAndNewlines)
         if chatID.isEmpty, let data = try readOptional(".cache/telegram_bot_chat_id.json") {
             guard let cached = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw APIError.malformed("Could not read cached Telegram chat ID. Enter a chat ID in the upload sheet.")
+                throw LibraryOperationError.invalidInput("Could not read cached Telegram chat ID. Enter a chat ID in the upload sheet.")
             }
             if let number = cached["chat_id"] as? NSNumber { chatID = number.stringValue }
             else { chatID = cached["chat_id"] as? String ?? "" }
@@ -70,23 +70,23 @@ struct LocalStoryUploadClient: StoryUploading {
                 ((update["message"] ?? update["channel_post"]) as? [String: Any])?["chat"] as? [String: Any]
             }
             guard let chat = chats.first(where: { $0["type"] as? String == "private" }), let id = chat["id"] as? NSNumber else {
-                throw APIError.malformed("Open your bot in Telegram and tap Start, or enter the destination chat ID.")
+                throw LibraryOperationError.invalidInput("Open your bot in Telegram and tap Start, or enter the destination chat ID.")
             }
             chatID = id.stringValue
             let data = try JSONSerialization.data(withJSONObject: ["chat_id": id])
             try files.writeCreatingDirectory(data, to: home.appendingPathComponent(".cache/telegram_bot_chat_id.json"))
         }
-        guard Int64(chatID) != nil else { throw APIError.malformed("Telegram chat ID must be a number.") }
+        guard Int64(chatID) != nil else { throw LibraryOperationError.invalidInput("Telegram chat ID must be a number.") }
         var targets = [chatID]
         if options.includeTelegramGroups {
             var groups: Set<String> = []
             for line in lines(try readOptional("Documents/telegrambot/group_ids.txt")) {
-                guard Int64(line) != nil else { throw APIError.malformed("Invalid chat ID in ~/Documents/telegrambot/group_ids.txt.") }
+                guard Int64(line) != nil else { throw LibraryOperationError.invalidInput("Invalid chat ID in ~/Documents/telegrambot/group_ids.txt.") }
                 groups.insert(line)
             }
             if let data = try readOptional(".cache/telegram_bot_groups.json") {
                 guard let cached = try? JSONDecoder().decode([Int64].self, from: data) else {
-                    throw APIError.malformed("Could not read ~/.cache/telegram_bot_groups.json.")
+                    throw LibraryOperationError.invalidInput("Could not read ~/.cache/telegram_bot_groups.json.")
                 }
                 groups.formUnion(cached.map(String.init))
             }
@@ -108,7 +108,7 @@ struct LocalStoryUploadClient: StoryUploading {
         if let value = story.videoURL, !value.isEmpty {
             let url = try localVideoURL(value)
             let data = try files.contents(of: url)
-            guard !data.isEmpty, data.count <= 50 * 1024 * 1024 else { throw APIError.malformed("Telegram video must be nonempty and at most 50 MB.") }
+            guard !data.isEmpty, data.count <= 50 * 1024 * 1024 else { throw LibraryOperationError.invalidInput("Telegram video must be nonempty and at most 50 MB.") }
             video = (data, url.lastPathComponent)
         } else { video = nil }
         var completed = 0
@@ -171,24 +171,24 @@ struct LocalStoryUploadClient: StoryUploading {
         let response: URLResponse
         do { (data, response) = try await httpClient.data(for: request) }
         catch is CancellationError { throw CancellationError() }
-        catch { throw APIError.transport("Could not reach Telegram. Check your connection.") }
+        catch { throw LibraryOperationError.requestFailed("Could not reach Telegram. Check your connection.") }
         guard let http = response as? HTTPURLResponse,
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw APIError.malformed("Telegram returned an unreadable response.") }
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw LibraryOperationError.invalidInput("Telegram returned an unreadable response.") }
         guard (200..<300).contains(http.statusCode), object["ok"] as? Bool == true else {
             // The request URL contains the bot token; never expose transport diagnostics.
-            throw APIError.transport("Telegram rejected the request (HTTP \(http.statusCode)). Check the bot token, chat ID and posting permissions.")
+            throw LibraryOperationError.requestFailed("Telegram rejected the request (HTTP \(http.statusCode)). Check the bot token, chat ID and posting permissions.")
         }
         return object["result"] ?? NSNull()
     }
 
     private func google(_ story: Story, options: LibraryUploadOptions) async throws -> LibraryUploadResult {
-        guard let value = story.videoURL, !value.isEmpty else { throw APIError.malformed("Attach a video before uploading to Google Drive / Sheets.") }
+        guard let value = story.videoURL, !value.isEmpty else { throw LibraryOperationError.invalidInput("Attach a video before uploading to Google Drive / Sheets.") }
         let video = try localVideoURL(value)
         let raw = try files.contents(of: video)
-        guard !raw.isEmpty else { throw APIError.malformed("The video file is empty.") }
+        guard !raw.isEmpty else { throw LibraryOperationError.invalidInput("The video file is empty.") }
         let endpoint = options.googleEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: endpoint.isEmpty ? Self.googleEndpoint : endpoint), url.scheme == "https", url.host == "script.google.com" else {
-            throw APIError.malformed("Google upload needs an HTTPS script.google.com deployment URL.")
+            throw LibraryOperationError.invalidInput("Google upload needs an HTTPS script.google.com deployment URL.")
         }
         let token = try await googleToken(manual: options.googleAccessToken)
         var request = URLRequest(url: url, timeoutInterval: 300)
@@ -200,14 +200,14 @@ struct LocalStoryUploadClient: StoryUploading {
         let response: URLResponse
         do { (data, response) = try await googleRequest(request) }
         catch is CancellationError { throw CancellationError() }
-        catch { throw APIError.transport("Google upload could not complete. Check your connection; check the sheet before retrying to avoid a duplicate upload.") }
+        catch { throw LibraryOperationError.requestFailed("Google upload could not complete. Check your connection; check the sheet before retrying to avoid a duplicate upload.") }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200,
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError.transport("Google upload returned no receipt. Sign in with npx clasp login using an allowed account; check the sheet before retrying.")
+            throw LibraryOperationError.requestFailed("Google upload returned no receipt. Sign in with npx clasp login using an allowed account; check the sheet before retrying.")
         }
         guard object["status"] as? String == "success", let id = object["id"] as? Int,
               let preview = object["previewUrl"] as? String, let timestamp = object["timestamp"] as? String else {
-            throw APIError.malformed("Google upload did not return a successful receipt. Check the sheet before retrying.")
+            throw LibraryOperationError.invalidInput("Google upload did not return a successful receipt. Check the sheet before retrying.")
         }
         return LibraryUploadResult(message: "Uploaded to Google Drive / Sheets · row \(id)", receipt: .init(id: id, previewURL: preview, thumbnailURL: object["thumbnailUrl"] as? String ?? "", uploadedAt: timestamp))
     }
@@ -229,7 +229,7 @@ struct LocalStoryUploadClient: StoryUploading {
 
     private func localVideoURL(_ value: String) throws -> URL {
         guard let url = URL(string: value), url.isFileURL, ["mp4", "mov", "webm"].contains(url.pathExtension.lowercased()) else {
-            throw APIError.malformed("Upload needs an imported local MP4, MOV or WebM video. Use Add video first.")
+            throw LibraryOperationError.invalidInput("Upload needs an imported local MP4, MOV or WebM video. Use Add video first.")
         }
         return url
     }
@@ -241,7 +241,7 @@ struct LocalStoryUploadClient: StoryUploading {
                   let tokens = object["tokens"] as? [String: Any], let credentials = tokens["default"] as? [String: Any],
                   let clientID = credentials["client_id"] as? String, let secret = credentials["client_secret"] as? String,
                   let refresh = credentials["refresh_token"] as? String else {
-                throw APIError.malformed("The clasp login cannot be read. Run npx clasp login again.")
+                throw LibraryOperationError.invalidInput("The clasp login cannot be read. Run npx clasp login again.")
             }
             var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!, timeoutInterval: 15)
             request.httpMethod = "POST"
@@ -253,16 +253,16 @@ struct LocalStoryUploadClient: StoryUploading {
             let response: URLResponse
             do { (data, response) = try await httpClient.data(for: request) }
             catch is CancellationError { throw CancellationError() }
-            catch { throw APIError.transport("Could not refresh Google sign-in. Check your connection, then run npx clasp login if needed.") }
+            catch { throw LibraryOperationError.requestFailed("Could not refresh Google sign-in. Check your connection, then run npx clasp login if needed.") }
             guard (response as? HTTPURLResponse)?.statusCode == 200,
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let token = object["access_token"] as? String, !token.isEmpty else {
-                throw APIError.transport("Google sign-in has expired or was rejected. Run npx clasp login again.")
+                throw LibraryOperationError.requestFailed("Google sign-in has expired or was rejected. Run npx clasp login again.")
             }
             return token
         }
         let token = manual.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty else { throw APIError.malformed("Set up Google upload: run npx clasp login once, or enter a Google access token in the upload sheet.") }
+        guard !token.isEmpty else { throw LibraryOperationError.invalidInput("Set up Google upload: run npx clasp login once, or enter a Google access token in the upload sheet.") }
         return token
     }
 
@@ -273,12 +273,12 @@ struct LocalStoryUploadClient: StoryUploading {
             guard let http = response as? HTTPURLResponse, [301, 302, 303, 307, 308].contains(http.statusCode) else { return (data, response) }
             guard let location = http.value(forHTTPHeaderField: "Location"), let url = URL(string: location, relativeTo: response.url)?.absoluteURL,
                   url.scheme == "https", let host = url.host, ["script.google.com", "script.googleusercontent.com"].contains(host) else {
-                throw APIError.transport("Google upload redirected to sign-in or an unexpected host.")
+                throw LibraryOperationError.requestFailed("Google upload redirected to sign-in or an unexpected host.")
             }
             // Apps Script consumes the POST, then redirects to a GET-only receipt.
             request = URLRequest(url: url, timeoutInterval: 300)
             request.httpMethod = "GET"
         }
-        throw APIError.transport("Too many Google upload redirects.")
+        throw LibraryOperationError.requestFailed("Too many Google upload redirects.")
     }
 }

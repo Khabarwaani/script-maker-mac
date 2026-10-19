@@ -30,10 +30,7 @@ final class LibraryViewModel {
             case .exported(let url): actionNotice = "Story exported to \(url.lastPathComponent). Google Drive syncs files saved in its folder."
             }
         } catch {
-            actionNotice = error.localizedDescription
-            if let reason = (error as? LocalizedError)?.failureReason, !reason.isEmpty {
-                actionNotice = "\(error.localizedDescription): \(reason)"
-            }
+            actionNotice = StringFormatting.errorMessage(error)
         }
     }
 
@@ -143,7 +140,7 @@ final class LibraryViewModel {
             }
             await persist(story)
             actionNotice = "Media added to Library"
-        } catch { actionNotice = "Could not import media: \(error.localizedDescription)" }
+        } catch { actionNotice = "Could not import media: \(StringFormatting.errorMessage(error))" }
     }
 
     func loadImagePreviews(for story: Story) async {
@@ -152,7 +149,7 @@ final class LibraryViewModel {
             guard imagePreviews[value] == nil, let url = URL(string: value),
                   url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { continue }
             do { imagePreviews[value] = try await importer.imageData(at: url) }
-            catch { actionNotice = "Could not load image: \(error.localizedDescription)" }
+            catch { actionNotice = "Could not load image: \(StringFormatting.errorMessage(error))" }
         }
     }
 
@@ -185,7 +182,7 @@ final class LibraryViewModel {
         do {
             let warnings = try await applyUpdate(kind, storyID: story.id)
             if selectedStoryID == story.id { actionNotice = "\(kind.rawValue.capitalized) updated" + (warnings.isEmpty ? "" : ". " + warnings.joined(separator: " ")) }
-        } catch { if selectedStoryID == story.id { actionNotice = error.localizedDescription } }
+        } catch { if selectedStoryID == story.id { actionNotice = StringFormatting.errorMessage(error) } }
     }
 
     private func applyUpdate(_ kind: LibraryUpdate, storyID: String) async throws -> [String] {
@@ -218,7 +215,7 @@ final class LibraryViewModel {
         for kind in [LibraryUpdate.hashtags, .news, .images] {
             do { warnings += try await applyUpdate(kind, storyID: storyID) }
             catch is CancellationError { warnings.append("Search cancelled. Saved story retained."); break }
-            catch { warnings.append("\(kind.rawValue.capitalized): \(error.localizedDescription)") }
+            catch { warnings.append("\(kind.rawValue.capitalized): \(StringFormatting.errorMessage(error))") }
         }
         if selectedStoryID == storyID { actionNotice = warnings.isEmpty ? "Related news, images and hashtags updated" : "Story saved. " + warnings.joined(separator: " ") }
     }
@@ -235,7 +232,7 @@ final class LibraryViewModel {
                 await persist(current)
             }
             if selectedStoryID == story.id { actionNotice = result.message }
-        } catch { if selectedStoryID == story.id { actionNotice = error.localizedDescription } }
+        } catch { if selectedStoryID == story.id { actionNotice = StringFormatting.errorMessage(error) } }
     }
 
     func useVersion(_ version: StoryScriptVersion, storyID: String) async {
@@ -387,7 +384,7 @@ final class LibraryViewModel {
             _ = try await api.select(sessionID: storyID, selection: ["action": "merge_clip"])
             await refresh()
         } catch {
-            notice = error.localizedDescription
+            notice = StringFormatting.errorMessage(error)
         }
     }
 }

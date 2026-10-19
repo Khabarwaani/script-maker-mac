@@ -39,6 +39,13 @@ enum StringFormatting {
     static func isBlank(_ value: String) -> Bool {
         value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+
+    static func errorMessage(_ error: Error) -> String {
+        let message = error.localizedDescription
+        guard let reason = (error as? LocalizedError)?.failureReason,
+              !reason.isEmpty, !message.contains(reason) else { return message }
+        return "\(message): \(reason)"
+    }
 }
 
 enum AppLog {

@@ -137,3 +137,12 @@ struct LibraryUploadResult: Sendable {
     var message: String
     var receipt: StoryUploadReceipt? = nil
 }
+
+enum LibraryOperationError: LocalizedError {
+    case invalidInput(String), requestFailed(String)
+    var errorDescription: String? {
+        switch self {
+        case .invalidInput(let message), .requestFailed(let message): return message
+        }
+    }
+}
