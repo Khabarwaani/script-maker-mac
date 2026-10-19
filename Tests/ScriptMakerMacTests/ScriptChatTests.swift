@@ -311,3 +311,95 @@ extension ScriptChatTests {
         XCTAssertFalse(chat.isRefining)
     }
 }
+
+extension ScriptChatTests {
+    func testEditedConsolidatedInstructionsArePassedToNextRefinement() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let original = Story(scriptText: "Original", instruction: "Saved baseline")
+        chat.begin(original)
+        await chat.refreshProviders()
+        chat.userInstruction = "Shorten"
+        await chat.refine()
+        chat.consolidatedInstruction = "Keep all details and use a warmer tone"
+        XCTAssertTrue(chat.hasConsolidatedInstructionEdits)
+        XCTAssertFalse(chat.canSave)
+        chat.userInstruction = "Improve pacing"
+        await chat.refine()
+        let requests = await service.requests
+        XCTAssertEqual(requests[1].draft.latestScript, "Draft 1")
+        XCTAssertEqual(requests[1].draft.instruction, "Keep all details and use a warmer tone")
+        XCTAssertEqual(requests[1].userInstruction, "Improve pacing")
+        XCTAssertEqual(chat.consolidatedInstruction, "Active instructions 2")
+        XCTAssertFalse(chat.hasConsolidatedInstructionEdits)
+        XCTAssertEqual(chat.source, original)
+        XCTAssertTrue(chat.canSave)
+    }
+
+    func testConsolidatedEditsCanRefineWithoutSeparateDirective() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.consolidatedInstruction = "Keep all facts and shorten the dialogue"
+        XCTAssertTrue(chat.canRefine)
+        await chat.refine()
+        let requests = await service.requests
+        XCTAssertEqual(requests.first?.draft.instruction, "Keep all facts and shorten the dialogue")
+        XCTAssertEqual(requests.first?.userInstruction, "Keep all facts and shorten the dialogue")
+        XCTAssertFalse(chat.hasConsolidatedInstructionEdits)
+    }
+
+    func testFailedRefinementKeepsConsolidatedEditsAndBlocksStaleSave() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "Shorten"
+        await chat.refine()
+        let draft = chat.draft
+        chat.consolidatedInstruction = "Expand the dialogue"
+        await service.configure(fail: true)
+        await chat.refine()
+        XCTAssertEqual(chat.draft, draft)
+        XCTAssertEqual(chat.consolidatedInstruction, "Expand the dialogue")
+        XCTAssertTrue(chat.hasConsolidatedInstructionEdits)
+        XCTAssertFalse(chat.canSave)
+        chat.discardConsolidatedInstructionEdits()
+        XCTAssertEqual(chat.consolidatedInstruction, draft.instruction)
+        XCTAssertTrue(chat.canSave)
+    }
+
+    func testHistoryAndConsolidatedEditsCannotOverwriteEachOther() async throws {
+        let chat = ScriptChatViewModel(service: ChatRefinerStub())
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "Shorten"
+        await chat.refine()
+        let turn = try XCTUnwrap(chat.turns.first)
+        chat.consolidatedInstruction = "Warm tone"
+        chat.setHistoryInstruction("Expand", for: turn.id)
+        XCTAssertFalse(chat.hasHistoryEdits)
+        chat.discardConsolidatedInstructionEdits()
+        chat.setHistoryInstruction("Expand", for: turn.id)
+        let current = chat.consolidatedInstruction
+        chat.consolidatedInstruction = "A conflicting edit"
+        XCTAssertEqual(chat.consolidatedInstruction, current)
+        XCTAssertTrue(chat.hasHistoryEdits)
+    }
+
+    func testClearingConsolidatedContextRequiresANewDirective() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original", instruction: "Old guidance"))
+        await chat.refreshProviders()
+        chat.consolidatedInstruction = ""
+        XCTAssertFalse(chat.canRefine)
+        chat.userInstruction = "Use only this new guidance"
+        XCTAssertTrue(chat.canRefine)
+        await chat.refine()
+        let requests = await service.requests
+        XCTAssertEqual(requests.first?.draft.instruction, "")
+        XCTAssertEqual(requests.first?.userInstruction, "Use only this new guidance")
+    }
+}

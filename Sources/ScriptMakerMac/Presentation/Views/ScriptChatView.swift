@@ -30,14 +30,14 @@ struct ScriptChatView: View {
                 Text(reason.reason).font(.callout).foregroundStyle(.secondary)
             }
             HSplitView {
-                ScriptChatScriptPanel(title: "Original script", icon: "lock", script: viewModel.originalScript,
-                    instructionTitle: "Original instructions", instruction: viewModel.originalInstruction,
-                    emptyInstruction: "No original instructions saved.")
-                ScriptChatScriptPanel(title: "Current script", icon: "doc.text", script: viewModel.draft.latestScript,
-                    instructionTitle: "Current consolidated instructions", instruction: viewModel.draft.instruction,
-                    emptyInstruction: "Add a refinement instruction below.")
+                ScriptChatScriptPanel(title: "Original script", icon: "lock", script: viewModel.originalScript)
+                VStack(alignment: .leading, spacing: 8) {
+                    ScriptChatScriptPanel(title: "Current script", icon: "doc.text", script: viewModel.draft.latestScript)
+                    ScriptChatInstructions(viewModel: viewModel).disabled(isSaving)
+                }.frame(minWidth: 320)
             }.frame(minHeight: 230)
-            ScriptChatHistory(viewModel: viewModel).frame(minHeight: 100, maxHeight: 170).disabled(isSaving)
+            ScriptChatHistory(viewModel: viewModel).frame(minHeight: 100, maxHeight: 170)
+                .disabled(isSaving || viewModel.hasConsolidatedInstructionEdits)
             if let error = viewModel.errorMessage {
                 Text(error).font(.callout).foregroundStyle(AppTheme.danger).textSelection(.enabled)
             }
@@ -74,9 +74,6 @@ private struct ScriptChatScriptPanel: View {
     let title: String
     let icon: String
     let script: String
-    let instructionTitle: String
-    let instruction: String
-    let emptyInstruction: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -85,13 +82,6 @@ private struct ScriptChatScriptPanel: View {
                 Text(script).font(.body).lineSpacing(5).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }.frame(minHeight: 100)
-            Divider()
-            Text(instructionTitle).font(.subheadline.bold())
-            ScrollView {
-                Text(instruction.isEmpty ? emptyInstruction : instruction)
-                    .font(.callout).textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(height: 70)
         }.padding(12).frame(minWidth: 320, maxWidth: .infinity)
     }
 }
@@ -132,5 +122,32 @@ private struct ScriptChatHistory: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+}
+
+private struct ScriptChatInstructions: View {
+    @Bindable var viewModel: ScriptChatViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Consolidated instructions").font(.subheadline.bold())
+                Spacer()
+                if viewModel.hasConsolidatedInstructionEdits {
+                    Button("Discard edits") { viewModel.discardConsolidatedInstructionEdits() }
+                        .disabled(viewModel.isRefining)
+                }
+            }
+            TextEditor(text: $viewModel.consolidatedInstruction)
+                .font(.callout).scrollContentBackground(.hidden)
+                .padding(6).frame(height: 85)
+                .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityLabel("Consolidated instructions")
+                .disabled(viewModel.isRefining || viewModel.hasHistoryEdits)
+            if viewModel.hasConsolidatedInstructionEdits {
+                Text("Refine to apply these instruction changes before saving.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }.padding(.horizontal, 12).padding(.bottom, 12)
     }
 }

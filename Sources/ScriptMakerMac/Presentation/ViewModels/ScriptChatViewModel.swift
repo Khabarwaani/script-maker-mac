@@ -7,6 +7,7 @@ final class ScriptChatViewModel {
     private var task: Task<Void, Never>?
     private var operationID = UUID()
     private var historyEdits: [UUID: String] = [:]
+    private var instructionDraft = ""
     private(set) var source: Story?
     private(set) var draft = ScriptChatDraft(latestScript: "", instruction: "")
     private(set) var turns: [ScriptChatTurn] = []
@@ -24,15 +25,28 @@ final class ScriptChatViewModel {
     var originalScript: String { source?.scriptText ?? "" }
     var originalInstruction: String { source?.instruction ?? "" }
     var hasHistoryEdits: Bool { !historyEdits.isEmpty }
+    var consolidatedInstruction: String {
+        get { instructionDraft }
+        set {
+            guard !isRefining, !hasHistoryEdits, source != nil else { return }
+            instructionDraft = newValue
+        }
+    }
+    var hasConsolidatedInstructionEdits: Bool { instructionDraft != draft.instruction }
     private var canUseProvider: Bool {
         source != nil && !isRefining && !isLoadingProviders && providers[provider]?.isAvailable == true
     }
-    var canRefine: Bool { canUseProvider && !hasHistoryEdits && !StringFormatting.isBlank(userInstruction) }
+    var canRefine: Bool {
+        canUseProvider && !hasHistoryEdits && (!StringFormatting.isBlank(userInstruction)
+            || (hasConsolidatedInstructionEdits && !StringFormatting.isBlank(instructionDraft)))
+    }
     var canApplyHistoryEdits: Bool {
-        canUseProvider && hasHistoryEdits && turns.allSatisfy { !StringFormatting.isBlank(historyInstruction(for: $0.id)) }
+        canUseProvider && !hasConsolidatedInstructionEdits && hasHistoryEdits
+            && turns.allSatisfy { !StringFormatting.isBlank(historyInstruction(for: $0.id)) }
     }
     var canSave: Bool {
-        !isRefining && !hasHistoryEdits && !hasSavedDraft && !turns.isEmpty && !StringFormatting.isBlank(draft.latestScript)
+        !isRefining && !hasHistoryEdits && !hasConsolidatedInstructionEdits && !hasSavedDraft
+            && !turns.isEmpty && !StringFormatting.isBlank(draft.latestScript)
             && draft.latestScript != source?.scriptText
     }
 
@@ -41,22 +55,26 @@ final class ScriptChatViewModel {
     }
 
     func setHistoryInstruction(_ value: String, for id: UUID) {
-        guard !isRefining, let turn = turns.first(where: { $0.id == id }) else { return }
+        guard !isRefining, !hasConsolidatedInstructionEdits,
+              let turn = turns.first(where: { $0.id == id }) else { return }
         historyEdits[id] = value == turn.userInstruction ? nil : value
     }
 
     func discardHistoryEdits() { if !isRefining { historyEdits = [:] } }
+    func discardConsolidatedInstructionEdits() { if !isRefining { instructionDraft = draft.instruction } }
 
     func begin(_ story: Story) {
         cancel()
         source = nil; turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
+        instructionDraft = ""
         guard let script = story.scriptText, !StringFormatting.isBlank(script) else {
             errorMessage = "This story has no script to refine."
             return
         }
         source = story
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
+        instructionDraft = draft.instruction
     }
 
     func refreshProviders() async {
@@ -71,8 +89,10 @@ final class ScriptChatViewModel {
 
     func refine() async {
         guard canRefine else { return }
-        await run(instructions: [userInstruction.trimmingCharacters(in: .whitespacesAndNewlines)],
-                  prefix: turns, startingDraft: draft, turnIDs: [UUID()], clearInput: true)
+        let directive = StringFormatting.isBlank(userInstruction) ? instructionDraft : userInstruction
+        let starting = ScriptChatDraft(latestScript: draft.latestScript, instruction: instructionDraft)
+        await run(instructions: [directive.trimmingCharacters(in: .whitespacesAndNewlines)],
+                  prefix: turns, startingDraft: starting, turnIDs: [UUID()], clearInput: true)
     }
 
     func applyHistoryEdits() async {
@@ -111,6 +131,7 @@ final class ScriptChatViewModel {
                 }
                 guard let self, self.operationID == id else { return }
                 self.draft = working
+                self.instructionDraft = working.instruction
                 self.turns = completed
                 self.historyEdits = [:]
                 if clearInput { self.userInstruction = "" }

@@ -205,8 +205,10 @@ cancelling does not save or change the original. This uses KhabarwaaniAgent 1.3.
 installed CLI providers require their existing sign-in, or use available Apple
 Intelligence. Generated video and upload receipts are cleared on the refined copy.
 
-Script Chat shows read-only original script/instructions beside the current
-script and consolidated instructions. Refinement history instructions are
+Script Chat shows the read-only original script beside the current script and
+editable consolidated instructions. Original instructions are kept internally as
+conversation context. Refine applies consolidated-instruction edits; discard them
+to restore the last successful instructions before saving. Refinement history instructions are
 editable: **Apply history edits** regenerates from the first changed turn through
 later turns. A failed or cancelled replay preserves the last successful draft.
 Apply or discard history edits before refining again or saving a new entry.
