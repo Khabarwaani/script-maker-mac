@@ -36,15 +36,15 @@ private actor MainReleaseWorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class MainReleaseLocalWorkflowTests: XCTestCase {
-    func testAddStoryRequiresScriptAndSelectsSavedUUID() async throws {
+    func testAddStoryAcceptsOptionalScriptAndSelectsSavedUUID() async throws {
         let repository = MainReleaseWorkflowStoryRepository()
         let library = LibraryViewModel(config: releaseTestConfig(), repository: repository)
         library.prepareNewStory()
         XCTAssertFalse(library.canAddStory)
-        library.newStoryTitle = "Manual story"
-        XCTAssertFalse(library.canAddStory)
         let rejected = await library.addStory()
         XCTAssertFalse(rejected)
+        library.newStoryTitle = "Manual story"
+        XCTAssertTrue(library.canAddStory)
         library.newStoryScript = "  Full pasted screenplay\nSpoken dialogue  "
         XCTAssertTrue(library.canAddStory)
         let saved = await library.addStory()
@@ -232,7 +232,7 @@ final class LibraryDetailTests: XCTestCase {
         let repo = MainReleaseWorkflowStoryRepository()
         let story = Story(title: "Update target", scriptText: "Keep script")
         await repo.save(story)
-        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
+        let vm = LibraryViewModel(config: config, repository: repo, updater: ReleaseLibraryUpdateStub())
         await vm.refresh()
         await vm.update(.hashtags)
         XCTAssertFalse(vm.selectedStory?.hashtags?.isEmpty ?? true)
@@ -366,13 +366,12 @@ final class SharedAISelectionTests: XCTestCase {
         defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
         config.recentAIIdentifiers = []
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog())
-        let library = LibraryViewModel(config: config)
         for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
         config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
         XCTAssertEqual(config.recentAIIdentifiers.count, 5)
         XCTAssertEqual(Set(config.recentAIIdentifiers).count, 5)
         XCTAssertEqual(config.recentAIIdentifiers.first, "Provider/model-3/high")
-        XCTAssertEqual(generator.selectedAIIdentifier, library.selectedAIEngine)
+        XCTAssertEqual(generator.selectedAIIdentifier, config.selectedAI.identifier)
         generator.resetConfiguration()
         XCTAssertEqual(generator.selectedAIIdentifier, "Provider/model-3/high")
         XCTAssertEqual(AppConfig(defaults: defaults).selectedAI.identifier, config.selectedAI.identifier)
@@ -455,5 +454,13 @@ private final class SharingSpy: StorySharing {
         self.title = title; self.text = text; self.source = sourceURL
         if fails { throw APIError.transport("Share failed") }
         return outcome
+    }
+}
+
+private struct ReleaseLibraryUpdateStub: LibraryUpdating {
+    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
+                localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
+        LibraryUpdateResult(hashtags: ["#News"], images: ["https://example.com/image.jpg"],
+                            news: [.init(title: "News", url: "https://example.com/news", source: "Publisher")])
     }
 }

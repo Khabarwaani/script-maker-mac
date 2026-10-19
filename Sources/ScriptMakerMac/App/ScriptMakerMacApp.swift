@@ -35,8 +35,8 @@ enum CompositionRoot {
         let preferences = PreferencesViewModel(config: config, connectionChecker: checker, modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()))
         let repository = LocalStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
-        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()))
         let files = FileStore()
+        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LocalLibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }))
         let localAgent = LocalAgentViewModel(service: TerminalLocalAgentService(
             makeSession: { request, workspace in
                 let settings = request.session

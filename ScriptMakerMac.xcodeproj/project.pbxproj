@@ -27,6 +27,14 @@
 		Jlibrary = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
 		M001 = {isa = PBXBuildFile; fileRef = M101; };
 		M101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainReleaseRegressionTests.swift; sourceTree = "<group>"; };
+		LL01 = {isa = PBXBuildFile; fileRef = LL11; };
+		LL11 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryUpdateClient.swift; sourceTree = "<group>"; };
+		LL02 = {isa = PBXBuildFile; fileRef = LL12; };
+		LL12 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoryUploadClient.swift; sourceTree = "<group>"; };
+		LL03 = {isa = PBXBuildFile; fileRef = LL13; };
+		LL13 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryUploadView.swift; sourceTree = "<group>"; };
+		LL04 = {isa = PBXBuildFile; fileRef = LL14; };
+		LL14 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -279,7 +287,9 @@
 			isa = PBXGroup;
 			children = (
 				L103 /* TerminalLocalAgentService.swift */,
+				LL11 /* LocalLibraryUpdateClient.swift */,
 				L107 /* StrictLocalAgentSession.swift */,
+				LL12 /* LocalStoryUploadClient.swift */,
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
 			);
@@ -316,6 +326,7 @@
 			isa = PBXGroup;
 			children = (
 				L105 /* LocalAgentView.swift */,
+				LL13 /* LibraryUploadView.swift */,
 				DY102 /* DynamicAgentInputForm.swift */,
 				R008 /* ContentView.swift */,
 				R049 /* AppTheme.swift */,
@@ -395,7 +406,8 @@
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				L106 /* LocalAgentTests.swift */, M101 /* MainReleaseRegressionTests.swift */,
+				L106 /* LocalAgentTests.swift */,
+				LL14 /* LocalLibraryTests.swift */, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -474,10 +486,13 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			buildActionMask = 2147483647;
 			files = (
 				L005 /* LocalAgentView.swift in Sources */,
+				LL03 /* LibraryUploadView.swift in Sources */,
 				DY002 /* DynamicAgentInputForm.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
+				LL01 /* LocalLibraryUpdateClient.swift in Sources */,
 				L007 /* StrictLocalAgentSession.swift in Sources */,
+				LL02 /* LocalStoryUploadClient.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
 				L001 /* LocalAgentModels.swift in Sources */,
 				DY001 /* AgentInputSchema.swift in Sources */,
@@ -547,7 +562,8 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				L006 /* LocalAgentTests.swift in Sources */, M001 /* MainReleaseRegressionTests.swift in Sources */,
+				L006 /* LocalAgentTests.swift in Sources */,
+				LL04 /* LocalLibraryTests.swift in Sources */, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,

@@ -1,8 +1,7 @@
 import Foundation
 import Observation
 
-/// Library: saved scripts and renders. Backed by the server API;
-/// shows an explicit not-implemented state until the server provides it.
+/// Local Library stories, enrichment and explicit uploads.
 @Observable
 @MainActor
 final class LibraryViewModel {
@@ -12,7 +11,10 @@ final class LibraryViewModel {
     private let updater: (any LibraryUpdating)?
     private let mediaImporter: (any LibraryMediaImporting)?
     private let sharing: (any StorySharing)?
+    private let uploader: (any StoryUploading)?
     var isSharing = false
+    var isUploading = false
+    var uploadOptions = LibraryUploadOptions()
 
     func share(_ story: Story, to destination: StoryShareDestination) async {
         guard !isSharing else { return }
@@ -28,10 +30,7 @@ final class LibraryViewModel {
             case .exported(let url): actionNotice = "Story exported to \(url.lastPathComponent). Google Drive syncs files saved in its folder."
             }
         } catch {
-            actionNotice = error.localizedDescription
-            if let reason = (error as? LocalizedError)?.failureReason, !reason.isEmpty {
-                actionNotice = "\(error.localizedDescription): \(reason)"
-            }
+            actionNotice = StringFormatting.errorMessage(error)
         }
     }
 
@@ -78,21 +77,16 @@ final class LibraryViewModel {
     var isLoading = false
     var notice: String?
 
-    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil, uploader: (any StoryUploading)? = nil) {
         self.config = config
         self.repository = repository
         self.clipboard = clipboard
         self.updater = updater
         self.mediaImporter = mediaImporter
         self.sharing = sharing
+        self.uploader = uploader
     }
 
-    let aiEngines = ["None", "Local First Then Antigravity", "Antigravity", "Codex", "Grok Low", "Grok Medium", "Grok High", "On-device"]
-    var selectedAIEngine: String {
-        get { config.libraryAIEngine }
-        set { config.libraryAIEngine = newValue }
-    }
-    var isSimulation: Bool { config.dataSource == .offline }
     var busyUpdates: Set<LibraryUpdate> = []
     var actionNotice: String?
     private var removedItem: (storyID: String, item: LibraryRemovedItem)?
@@ -130,7 +124,7 @@ final class LibraryViewModel {
     var isSavingEdits = false
     var isImportingMedia = false
     var imagePreviews: [String: Data] = [:]
-    var canSaveEdits: Bool { !StringFormatting.isBlank(editedTitle) && !StringFormatting.isBlank(editedScript) && !isSavingEdits }
+    var canSaveEdits: Bool { !StringFormatting.isBlank(editedTitle) && !isSavingEdits && busyUpdates.isEmpty }
 
     func importMedia(_ source: URL, kind: LibraryMediaKind, storyID: String) async {
         guard !isImportingMedia, let importer = mediaImporter else { actionNotice = "Media import is unavailable."; return }
@@ -146,16 +140,16 @@ final class LibraryViewModel {
             }
             await persist(story)
             actionNotice = "Media added to Library"
-        } catch { actionNotice = "Could not import media: \(error.localizedDescription)" }
+        } catch { actionNotice = "Could not import media: \(StringFormatting.errorMessage(error))" }
     }
 
     func loadImagePreviews(for story: Story) async {
         guard let importer = mediaImporter else { return }
         for value in story.imageURLs ?? [] {
             guard imagePreviews[value] == nil, let url = URL(string: value),
-                  url.isFileURL || (!isSimulation && ["http", "https"].contains(url.scheme?.lowercased() ?? "")) else { continue }
+                  url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { continue }
             do { imagePreviews[value] = try await importer.imageData(at: url) }
-            catch { actionNotice = "Could not load image: \(error.localizedDescription)" }
+            catch { actionNotice = "Could not load image: \(StringFormatting.errorMessage(error))" }
         }
     }
 
@@ -167,45 +161,79 @@ final class LibraryViewModel {
         guard canSaveEdits, var story = stories.first(where: { $0.id == id }) else { return false }
         isSavingEdits = true
         defer { isSavingEdits = false }
+        let title = editedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let titleChanged = title != story.title
+        story.title = title
+        if titleChanged { story.headline = title; story.hashtags = nil; story.sourceLinks = nil; story.imageURLs = story.imageURLs?.filter { URL(string: $0)?.isFileURL == true } }
         story.summary = editedSummary.trimmingCharacters(in: .whitespacesAndNewlines)
         let script = editedScript.trimmingCharacters(in: .whitespacesAndNewlines)
-        if script != story.scriptText { appendVersion(script, instruction: nil, to: &story) }
+        if !script.isEmpty && script != story.scriptText { appendVersion(script, instruction: nil, to: &story) }
+        if script.isEmpty { story.scriptText = nil; story.currentScriptVersionID = nil }
+        story.uploadReceipt = nil
         await saveEditedCopy(story, originalID: id)
+        if titleChanged, let saved = selectedStory { await enrich(storyID: saved.id) }
         return true
     }
 
     func update(_ kind: LibraryUpdate) async {
-        guard let story = selectedStory, !busyUpdates.contains(kind) else { return }
-
-        guard let updater else { actionNotice = "Library update service is unavailable."; return }
+        guard let story = selectedStory, busyUpdates.isEmpty, !isSavingEdits else { return }
         busyUpdates.insert(kind)
-        actionNotice = nil
-        let instruction = ""
         defer { busyUpdates.remove(kind) }
         do {
-            let result = try await updater.update(kind, story: story, engine: selectedAIEngine, instruction: instruction,
-                                                 localJSON: isSimulation, delay: config.localJSONDelay,
-                                                 serverURL: isSimulation ? nil : try config.baseURL())
-            guard var current = stories.first(where: { $0.id == story.id }) else { return }
-            switch kind {
-            case .hashtags:
-                guard let values = result.hashtags else { throw APIError.malformed("Missing hashtags update") }
-                current.hashtags = values
-            case .images:
-                guard let values = result.images else { throw APIError.malformed("Missing images update") }
-                current.imageURLs = values
-            case .news:
-                guard let values = result.news else { throw APIError.malformed("Missing news update") }
-                current.sourceLinks = values
-            }
-            await persist(current)
-            if selectedStoryID == story.id { actionNotice = isSimulation ? "Local JSON · \(kind.rawValue.capitalized) updated from sample data" : "\(kind.rawValue.capitalized) updated" }
-        } catch {
-            if selectedStoryID == story.id { actionNotice = error.localizedDescription }
-        }
+            let warnings = try await applyUpdate(kind, storyID: story.id)
+            if selectedStoryID == story.id { actionNotice = "\(kind.rawValue.capitalized) updated" + (warnings.isEmpty ? "" : ". " + warnings.joined(separator: " ")) }
+        } catch { if selectedStoryID == story.id { actionNotice = StringFormatting.errorMessage(error) } }
     }
 
+    private func applyUpdate(_ kind: LibraryUpdate, storyID: String) async throws -> [String] {
+        guard let updater else { throw APIError.notImplemented("Library search is unavailable.") }
+        guard let story = stories.first(where: { $0.id == storyID }) else { throw CancellationError() }
+        let result = try await updater.update(kind, story: story, engine: "None", instruction: "",
+                                             localJSON: false, delay: 0, serverURL: nil)
+        try Task.checkCancellation()
+        guard var current = stories.first(where: { $0.id == storyID }) else { throw CancellationError() }
+        switch kind {
+        case .hashtags:
+            guard let values = result.hashtags else { throw APIError.malformed("Missing hashtags update") }
+            current.hashtags = values
+        case .images:
+            guard let values = result.images else { throw APIError.malformed("Missing images update") }
+            current.imageURLs = (current.imageURLs ?? []).filter { URL(string: $0)?.isFileURL == true } + values
+        case .news:
+            guard let values = result.news else { throw APIError.malformed("Missing news update") }
+            current.sourceLinks = values
+        }
+        await persist(current)
+        return result.warnings ?? []
+    }
 
+    func enrich(storyID: String) async {
+        guard busyUpdates.isEmpty else { return }
+        busyUpdates = Set(LibraryUpdate.allCases)
+        defer { busyUpdates = [] }
+        var warnings: [String] = []
+        for kind in [LibraryUpdate.hashtags, .news, .images] {
+            do { warnings += try await applyUpdate(kind, storyID: storyID) }
+            catch is CancellationError { warnings.append("Search cancelled. Saved story retained."); break }
+            catch { warnings.append("\(kind.rawValue.capitalized): \(StringFormatting.errorMessage(error))") }
+        }
+        if selectedStoryID == storyID { actionNotice = warnings.isEmpty ? "Related news, images and hashtags updated" : "Story saved. " + warnings.joined(separator: " ") }
+    }
+
+    func upload(_ story: Story, to destination: LibraryUploadDestination) async {
+        guard !isUploading else { return }
+        isUploading = true
+        defer { isUploading = false }
+        do {
+            guard let uploader else { throw APIError.notImplemented("Story upload is unavailable.") }
+            let result = try await uploader.upload(story, to: destination, options: uploadOptions)
+            if let receipt = result.receipt, var current = stories.first(where: { $0.id == story.id }) {
+                current.uploadReceipt = receipt
+                await persist(current)
+            }
+            if selectedStoryID == story.id { actionNotice = result.message }
+        } catch { if selectedStoryID == story.id { actionNotice = StringFormatting.errorMessage(error) } }
+    }
 
     func useVersion(_ version: StoryScriptVersion, storyID: String) async {
         guard var story = stories.first(where: { $0.id == storyID }), story.scriptVersions?.contains(version) == true else { return }
@@ -283,7 +311,7 @@ final class LibraryViewModel {
     var isAddingStory = false
 
     var canAddStory: Bool {
-        !StringFormatting.isBlank(newStoryTitle) && !StringFormatting.isBlank(newStoryScript) && !isAddingStory
+        !StringFormatting.isBlank(newStoryTitle) && !isAddingStory && busyUpdates.isEmpty
     }
 
     func prepareNewStory() {
@@ -297,14 +325,16 @@ final class LibraryViewModel {
         defer { isAddingStory = false }
         let story = Story(
             title: newStoryTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+            headline: newStoryTitle.trimmingCharacters(in: .whitespacesAndNewlines),
             status: "saved",
-            scriptText: newStoryScript.trimmingCharacters(in: .whitespacesAndNewlines)
+            scriptText: StringFormatting.isBlank(newStoryScript) ? nil : newStoryScript.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         await repository.save(story)
         stories.insert(story, at: 0)
         selectedStoryID = story.id
         notice = nil
         copyFeedback = nil
+        if updater != nil { await enrich(storyID: story.id) }
         return true
     }
 
@@ -330,34 +360,7 @@ final class LibraryViewModel {
             }
         }
         notice = nil
-        if config.dataSource != .server {
-            stories = await repository.all()
-            if !stories.contains(where: { $0.id == selectedStoryID }) { selectedStoryID = stories.first?.id }
-            do { _ = try await PipelineService(config: config).listStories() }
-            catch { notice = error.localizedDescription }
-            return
-        }
-        do {
-            let api = try PipelineService(config: config)
-            let serverDicts = try await api.listStories()
-            let serverStories = serverDicts.map(StoryMapper.from)
-            // Merge in locally saved stories (from completed generations).
-            let local = await repository.all()
-            // Deduplicate: local wins on id conflict.
-            let localIDs = Set(local.map(\.id))
-            stories = local + serverStories.filter { !localIDs.contains($0.id) }
-        } catch let e as APIError {
-            switch e {
-            case .notImplemented(let what):
-                notice = what
-            default:
-                notice = e.localizedDescription
-            }
-            stories = await repository.all()
-        } catch {
-            notice = error.localizedDescription
-            stories = await repository.all()
-        }
+        stories = await repository.all()
     }
 
     /// Delete a story (from local store; server deletion when API supports it).
@@ -381,7 +384,7 @@ final class LibraryViewModel {
             _ = try await api.select(sessionID: storyID, selection: ["action": "merge_clip"])
             await refresh()
         } catch {
-            notice = error.localizedDescription
+            notice = StringFormatting.errorMessage(error)
         }
     }
 }
