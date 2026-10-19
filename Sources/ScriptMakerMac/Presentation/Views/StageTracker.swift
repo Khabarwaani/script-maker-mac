@@ -19,9 +19,9 @@ struct StageTracker: View {
                 Text("Stage \(stageNumber): \(stage.title)")
                     .font(.headline)
                 if isRunning {
-                    Text("— Running")
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.accent)
+                    Text("— Ongoing")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.ongoingColor)
                 } else {
                     Text("— Complete")
                         .font(.subheadline)
@@ -38,9 +38,9 @@ struct StageTracker: View {
                     Text(event.label)
                         .font(.callout)
                     Spacer()
-                    Text(event.status)
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.secondaryInk)
+                    Text(event.status.lowercased() == "running" ? "Ongoing" : event.status)
+                        .font(.caption.weight(event.status.lowercased() == "running" ? .bold : .regular))
+                        .foregroundStyle(event.status.lowercased() == "running" ? AppTheme.ongoingColor : AppTheme.secondaryInk)
                 }
             }
         }
@@ -62,7 +62,7 @@ struct StageTracker: View {
     private func colorFor(status: String) -> Color {
         switch status.lowercased() {
         case "done", "complete", "passed", "success": return AppTheme.success
-        case "running": return AppTheme.accent
+        case "running": return AppTheme.ongoingColor
         case "failed", "error": return AppTheme.danger
         case "waiting": return AppTheme.secondaryInk
         default: return AppTheme.secondaryInk
@@ -101,15 +101,15 @@ struct StreamProgressAccordionView: View {
                 if viewModel.isRunning {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(AppTheme.accent)
-                            .frame(width: 7, height: 7)
+                            .fill(AppTheme.ongoingColor)
+                            .frame(width: 8, height: 8)
                         Text(viewModel.ongoingDescription ?? "Live Stream")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.accent)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(AppTheme.ongoingColor)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(AppTheme.ongoingColor.opacity(0.18), in: Capsule())
                 }
             }
 
@@ -118,7 +118,7 @@ struct StreamProgressAccordionView: View {
                     if viewModel.isRunning {
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.callout)
-                            .foregroundStyle(AppTheme.accent)
+                            .foregroundStyle(AppTheme.ongoingColor)
                         Text("Connecting to generation stream…")
                             .font(.callout)
                             .foregroundStyle(AppTheme.secondaryInk)
@@ -211,29 +211,29 @@ struct StageDropboxView: View {
 
                     Text("Stage \(stage.id): \(stage.label)")
                         .font(.headline)
-                        .foregroundStyle(AppTheme.ink)
+                        .foregroundStyle(stage.status.lowercased() == "running" ? AppTheme.ongoingColor : AppTheme.ink)
 
                     if let elapsed = stage.formattedElapsed {
                         Text(elapsed)
                             .font(.caption2.monospaced())
-                            .foregroundStyle(AppTheme.secondaryInk)
+                            .foregroundStyle(stage.status.lowercased() == "running" ? AppTheme.ongoingColor : AppTheme.secondaryInk)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(AppTheme.sunken, in: Capsule())
+                            .background(stage.status.lowercased() == "running" ? AppTheme.ongoingColor.opacity(0.12) : AppTheme.sunken, in: Capsule())
                     }
 
                     Spacer()
 
-                    statusBadge(for: stage.status)
+                    statusBadge(for: stage)
                 }
                 .contentShape(Rectangle())
             }
         }
         .padding(12)
-        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
+        .background(stage.status.lowercased() == "running" ? AppTheme.ongoingColor.opacity(0.04) : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(borderColor(for: stage.status), lineWidth: 1)
+                .stroke(borderColor(for: stage.status), lineWidth: stage.status.lowercased() == "running" ? 1.5 : 1)
         )
     }
 
@@ -242,8 +242,8 @@ struct StageDropboxView: View {
         switch status.lowercased() {
         case "running":
             Image(systemName: "arrow.triangle.2.circlepath")
-                .foregroundStyle(AppTheme.accent)
-                .font(.body)
+                .foregroundStyle(AppTheme.ongoingColor)
+                .font(.body.weight(.semibold))
         case "success", "done", "complete", "passed":
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(AppTheme.success)
@@ -260,29 +260,37 @@ struct StageDropboxView: View {
     }
 
     @ViewBuilder
-    private func statusBadge(for status: String) -> some View {
-        Text(statusLabel(for: status))
-            .font(.caption2.weight(.semibold))
+    private func statusBadge(for stage: PipelineStageState) -> some View {
+        Text(statusBadgeText(for: stage))
+            .font(.caption2.weight(.bold))
             .textCase(.uppercase)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(badgeBackground(for: status))
-            .foregroundStyle(badgeForeground(for: status))
+            .background(badgeBackground(for: stage.status))
+            .foregroundStyle(badgeForeground(for: stage.status))
             .clipShape(Capsule())
     }
 
-    private func statusLabel(for status: String) -> String {
-        switch status.lowercased() {
-        case "running": return "Running"
-        case "success", "done", "complete", "passed": return "Complete"
-        case "failed", "error": return "Failed"
-        default: return "Pending"
+    private func statusBadgeText(for stage: PipelineStageState) -> String {
+        let status = stage.status.lowercased()
+        switch status {
+        case "running":
+            return "Ongoing"
+        case "success", "done", "complete", "passed":
+            if let elapsed = stage.formattedElapsed {
+                return "Complete(\(elapsed))"
+            }
+            return "Complete"
+        case "failed", "error":
+            return "Failed"
+        default:
+            return "Pending"
         }
     }
 
     private func badgeBackground(for status: String) -> Color {
         switch status.lowercased() {
-        case "running": return AppTheme.accent.opacity(0.15)
+        case "running": return AppTheme.ongoingColor.opacity(0.18)
         case "success", "done", "complete", "passed": return AppTheme.success.opacity(0.15)
         case "failed", "error": return AppTheme.danger.opacity(0.15)
         default: return AppTheme.secondaryInk.opacity(0.1)
@@ -291,7 +299,7 @@ struct StageDropboxView: View {
 
     private func badgeForeground(for status: String) -> Color {
         switch status.lowercased() {
-        case "running": return AppTheme.accent
+        case "running": return AppTheme.ongoingColor
         case "success", "done", "complete", "passed": return AppTheme.success
         case "failed", "error": return AppTheme.danger
         default: return AppTheme.secondaryInk
@@ -300,7 +308,7 @@ struct StageDropboxView: View {
 
     private func borderColor(for status: String) -> Color {
         switch status.lowercased() {
-        case "running": return AppTheme.accent.opacity(0.4)
+        case "running": return AppTheme.ongoingColor.opacity(0.65)
         case "failed", "error": return AppTheme.danger.opacity(0.4)
         default: return AppTheme.line
         }
@@ -354,28 +362,42 @@ struct SubstepDropboxView: View {
     }
 
     private var substepHeader: some View {
-        HStack(spacing: 6) {
+        let isRunning = substep.status.lowercased() == "running"
+        return HStack(spacing: 6) {
             substepStatusIcon(for: substep.status)
 
             Text(substep.id)
                 .font(.caption.monospaced().weight(.semibold))
-                .foregroundStyle(AppTheme.secondaryInk)
+                .foregroundStyle(isRunning ? AppTheme.ongoingColor : AppTheme.secondaryInk)
 
             Text(substep.name)
                 .font(.callout)
-                .foregroundStyle(AppTheme.ink)
+                .foregroundStyle(isRunning ? AppTheme.ongoingColor : AppTheme.ink)
 
             if let elapsed = substep.formattedElapsed {
                 Text(elapsed)
                     .font(.caption2.monospaced())
-                    .foregroundStyle(AppTheme.secondaryInk)
+                    .foregroundStyle(isRunning ? AppTheme.ongoingColor : AppTheme.secondaryInk)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(isRunning ? AppTheme.ongoingColor.opacity(0.12) : AppTheme.sunken, in: Capsule())
             }
 
             Spacer()
 
-            Text(substep.status.lowercased() == "running" ? "Running…" : substep.status.capitalized)
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(substepStatusColor(for: substep.status))
+            if isRunning {
+                Text("Ongoing")
+                    .font(.caption2.weight(.bold))
+                    .textCase(.uppercase)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(AppTheme.ongoingColor.opacity(0.18), in: Capsule())
+                    .foregroundStyle(AppTheme.ongoingColor)
+            } else {
+                Text(substep.status.capitalized)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(substepStatusColor(for: substep.status))
+            }
         }
     }
 
@@ -384,8 +406,8 @@ struct SubstepDropboxView: View {
         switch status.lowercased() {
         case "running":
             Image(systemName: "arrow.triangle.2.circlepath")
-                .foregroundStyle(AppTheme.accent)
-                .font(.caption)
+                .foregroundStyle(AppTheme.ongoingColor)
+                .font(.caption.weight(.semibold))
         case "success", "done", "complete", "passed":
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(AppTheme.success)
@@ -403,7 +425,7 @@ struct SubstepDropboxView: View {
 
     private func substepStatusColor(for status: String) -> Color {
         switch status.lowercased() {
-        case "running": return AppTheme.accent
+        case "running": return AppTheme.ongoingColor
         case "success", "done", "complete", "passed": return AppTheme.success
         case "failed", "error": return AppTheme.danger
         default: return AppTheme.secondaryInk
