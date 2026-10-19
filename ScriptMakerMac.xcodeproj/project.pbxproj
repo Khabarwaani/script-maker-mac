@@ -5,6 +5,21 @@
 	};
 	objectVersion = 56;
 	objects = {
+NS001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsProviding.swift; sourceTree = "<group>"; };
+NS002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStudioNewsProvider.swift; sourceTree = "<group>"; };
+NS003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsTests.swift; sourceTree = "<group>"; };
+NS011 = {isa = PBXBuildFile; fileRef = NS001; };
+NS012 = {isa = PBXBuildFile; fileRef = NS002; };
+NS013 = {isa = PBXBuildFile; fileRef = NS003; };
+LP004 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/NewsSearch"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.1.0; }; };
+LP005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/GoogleTrends"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.1.0; }; };
+LD004 = {isa = XCSwiftPackageProductDependency; package = LP004; productName = NewsSearch; };
+LD005 = {isa = XCSwiftPackageProductDependency; package = LP005; productName = GoogleTrends; };
+LB006 = {isa = PBXBuildFile; productRef = LD004; };
+LB007 = {isa = PBXBuildFile; productRef = LD005; };
+LB008 = {isa = PBXBuildFile; productRef = LD004; };
+LB009 = {isa = PBXBuildFile; productRef = LD005; };
+
 		DY001 = {isa = PBXBuildFile; fileRef = DY101; };
 		DY101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInputSchema.swift; sourceTree = "<group>"; };
 		DY002 = {isa = PBXBuildFile; fileRef = DY102; };
@@ -244,7 +259,7 @@
 				R034 /* ImageService.swift */,
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
-				R025 /* WebClient.swift */,
+				R025 /* WebClient.swift */, NS001,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -287,7 +302,7 @@
 			isa = PBXGroup;
 			children = (
 				L103 /* TerminalLocalAgentService.swift */,
-				LL11 /* LocalLibraryUpdateClient.swift */,
+				LL11 /* LocalLibraryUpdateClient.swift */, NS002,
 				L107 /* StrictLocalAgentSession.swift */,
 				LL12 /* LocalStoryUploadClient.swift */,
 				R026 /* NetworkWebClient.swift */,
@@ -407,7 +422,7 @@
 			isa = PBXGroup;
 			children = (
 				L106 /* LocalAgentTests.swift */,
-				LL14 /* LocalLibraryTests.swift */, M101 /* MainReleaseRegressionTests.swift */,
+				LL14 /* LocalLibraryTests.swift */, NS003, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -440,7 +455,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			);
 			buildRules = ( );
 			dependencies = ( );
-			packageProductDependencies = ( LD001, LD002, LD003, );
+			packageProductDependencies = ( LD001, LD002, LD003, LD004, LD005, );
 			name = ScriptMakerMac;
 			productName = ScriptMakerMac;
 			productReference = R013 /* ScriptMakerMac.app */;
@@ -457,7 +472,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			dependencies = (
 				D001 /* PBXTargetDependency */,
 			);
-			packageProductDependencies = ( LD001, LD002, );
+			packageProductDependencies = ( LD001, LD002, LD004, LD005, );
 			name = ScriptMakerMacTests;
 			productName = ScriptMakerMacTests;
 			productReference = R024 /* ScriptMakerMacTests.xctest */;
@@ -490,7 +505,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				DY002 /* DynamicAgentInputForm.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
-				LL01 /* LocalLibraryUpdateClient.swift in Sources */,
+				LL01 /* LocalLibraryUpdateClient.swift in Sources */, NS011, NS012,
 				L007 /* StrictLocalAgentSession.swift in Sources */,
 				LL02 /* LocalStoryUploadClient.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
@@ -544,7 +559,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 		P002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( LB001, LB002, LB003, );
+			files = ( LB001, LB002, LB003, LB006, LB007, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 P006 /* Build revision */ = {
@@ -563,7 +578,7 @@ P006 /* Build revision */ = {
 			buildActionMask = 2147483647;
 			files = (
 				L006 /* LocalAgentTests.swift in Sources */,
-				LL04 /* LocalLibraryTests.swift in Sources */, M001 /* MainReleaseRegressionTests.swift in Sources */,
+				LL04 /* LocalLibraryTests.swift in Sources */, NS013, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
@@ -574,7 +589,7 @@ P006 /* Build revision */ = {
 		P005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( LB004, LB005, );
+			files = ( LB004, LB005, LB008, LB009, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P003 /* Resources */ = {
@@ -699,7 +714,7 @@ P006 /* Build revision */ = {
 			knownRegions = ( en, );
 			mainGroup = G001;
 			productRefGroup = G003 /* Products */;
-			packageReferences = ( LP001, LP002, LP003, );
+			packageReferences = ( LP001, LP002, LP003, LP004, LP005, );
 			projectDirPath = "";
 			projectRoot = "";
 			targets = ( T001 /* ScriptMakerMac */, T002 /* ScriptMakerMacTests */, );

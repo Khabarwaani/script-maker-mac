@@ -365,7 +365,7 @@ final class SharedAISelectionTests: XCTestCase {
         let original = config.selectedAI, recents = config.recentAIIdentifiers
         defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
         config.recentAIIdentifiers = []
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog())
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
         for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
         config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
         XCTAssertEqual(config.recentAIIdentifiers.count, 5)
