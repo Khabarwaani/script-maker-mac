@@ -92,7 +92,8 @@ final class ScriptChatViewModel {
         let directive = StringFormatting.isBlank(userInstruction) ? instructionDraft : userInstruction
         let starting = ScriptChatDraft(latestScript: draft.latestScript, instruction: instructionDraft)
         await run(instructions: [directive.trimmingCharacters(in: .whitespacesAndNewlines)],
-                  prefix: turns, startingDraft: starting, turnIDs: [UUID()], clearInput: true)
+                  prefix: turns, startingDraft: starting, turnIDs: [UUID()],
+                  instructionOverrides: [hasConsolidatedInstructionEdits ? instructionDraft : nil], clearInput: true)
     }
 
     func applyHistoryEdits() async {
@@ -102,11 +103,12 @@ final class ScriptChatViewModel {
             : ScriptChatDraft(latestScript: turns[index - 1].script, instruction: turns[index - 1].instruction)
         let remaining = Array(turns[index...])
         await run(instructions: remaining.map { historyInstruction(for: $0.id).trimmingCharacters(in: .whitespacesAndNewlines) },
-                  prefix: Array(turns[..<index]), startingDraft: starting, turnIDs: remaining.map(\.id), clearInput: false)
+                  prefix: Array(turns[..<index]), startingDraft: starting, turnIDs: remaining.map(\.id),
+                  instructionOverrides: remaining.map(\.instructionOverride), clearInput: false)
     }
 
     private func run(instructions: [String], prefix: [ScriptChatTurn], startingDraft: ScriptChatDraft,
-                     turnIDs: [UUID], clearInput: Bool) async {
+                     turnIDs: [UUID], instructionOverrides: [String?], clearInput: Bool) async {
         let original = originalScript
         let selectedProvider = provider
         let selectedModel = model
@@ -118,6 +120,9 @@ final class ScriptChatViewModel {
                 var completed = prefix
                 for (index, instruction) in instructions.enumerated() {
                     try Task.checkCancellation()
+                    if let override = instructionOverrides[index] {
+                        working = ScriptChatDraft(latestScript: working.latestScript, instruction: override)
+                    }
                     let result = try await service.refine(ScriptChatRequest(originalScript: original, draft: working,
                         userInstruction: instruction, provider: selectedProvider, model: selectedModel))
                     try Task.checkCancellation()
@@ -126,7 +131,8 @@ final class ScriptChatViewModel {
                         throw LocalAgentError.invalidInput("Script Chat returned an empty script or instruction.")
                     }
                     completed.append(ScriptChatTurn(id: turnIDs[index], userInstruction: instruction,
-                                                   script: result.latestScript, instruction: result.instruction))
+                                                   script: result.latestScript, instruction: result.instruction,
+                                                   instructionOverride: instructionOverrides[index]))
                     working = result
                 }
                 guard let self, self.operationID == id else { return }

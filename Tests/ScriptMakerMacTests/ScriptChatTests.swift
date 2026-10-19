@@ -403,3 +403,23 @@ extension ScriptChatTests {
         XCTAssertEqual(requests.first?.userInstruction, "Use only this new guidance")
     }
 }
+
+extension ScriptChatTests {
+    func testHistoryReplayPreservesExplicitConsolidatedOverrides() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original", instruction: "Baseline"))
+        await chat.refreshProviders()
+        chat.consolidatedInstruction = "Manually chosen context"
+        chat.userInstruction = "Shorten"
+        await chat.refine()
+        let turn = try XCTUnwrap(chat.turns.first)
+        chat.setHistoryInstruction("Expand", for: turn.id)
+        await chat.applyHistoryEdits()
+        let requests = await service.requests
+        XCTAssertEqual(requests[1].draft.instruction, "Manually chosen context")
+        XCTAssertEqual(requests[1].userInstruction, "Expand")
+        XCTAssertEqual(chat.turns.first?.instructionOverride, "Manually chosen context")
+        XCTAssertEqual(chat.originalInstruction, "Baseline")
+    }
+}
