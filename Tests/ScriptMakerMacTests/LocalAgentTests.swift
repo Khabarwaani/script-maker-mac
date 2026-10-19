@@ -1,303 +1,331 @@
 import XCTest
 import AgentAtom
+import KhabarwaaniAgent
 import TerminalAgentSession
 @testable import ScriptMakerMac
 
+private let syntheticSchema = #"{"type":"object","additionalProperties":false,"required":["title","settings","values"],"properties":{"title":{"type":"string","minLength":1},"count":{"type":"integer","default":2,"minimum":1,"maximum":5},"weight":{"type":"number","default":0.5},"extra":{"type":"string"},"settings":{"type":"object","additionalProperties":false,"required":["enabled","mode","note"],"properties":{"enabled":{"type":"boolean","default":true},"mode":{"type":"string","enum":["fast","slow"],"default":"slow"},"note":{"type":["string","null"],"default":null}}},"values":{"type":"array","minItems":1,"items":{"type":"object","required":["name"],"additionalProperties":false,"properties":{"name":{"type":"string","minLength":1}}}}}}"#
+
+private struct SyntheticSpec: ModelledSpec {
+    struct Input: Codable, Sendable {
+        struct Settings: Codable, Sendable { let enabled: Bool; let mode: String; let note: String? }
+        struct Item: Codable, Sendable { let name: String }
+        let title: String; let settings: Settings; let values: [Item]
+        let count: Int?; let weight: Double?; let extra: String?
+    }
+    struct Output: Codable, Sendable { let ok: Bool }
+    static let identity = Identity(id: "SyntheticNewAgent", name: "Synthetic New Agent", version: "1.0.0")
+    static let role = "Synthetic test agent"
+    let instructions = "Return JSON."
+    let input: Input
+    var output: Output?
+}
+private func syntheticEntry() -> AgentCatalogEntry {
+    .init(spec: SyntheticSpec.self, inputSchemaJSON: syntheticSchema, makeSpec: { SyntheticSpec(input: $0) })
+}
+private func syntheticDefinition(version: String = "1.0.0", executable: Bool = true, web: Bool = false) throws -> LocalAgentDefinition {
+    .init(agentID: "SyntheticNewAgent", name: "Synthetic New Agent", version: version,
+        schema: try AgentInputSchema(json: syntheticSchema), requiresWebResearch: web, isExecutable: executable)
+}
+private func filledDraft(_ schema: AgentInputSchema) -> AgentInputDraft {
+    var draft = AgentInputDraft(schema: schema, required: true)
+    draft.fields["title"]!.text = "A title"
+    var item = AgentInputDraft(schema: schema.properties["values"]!.items!, required: true)
+    item.fields["name"]!.text = "An item"
+    draft.fields["values"]!.items = [item]
+    return draft
+}
+private func payload() throws -> String {
+    let schema = try AgentInputSchema(json: syntheticSchema)
+    return try filledDraft(schema).value(schema: schema, required: true)!.json()
+}
+
+final class AgentInputSchemaTests: XCTestCase {
+    func testDefaultsEnumsBooleanNestedArrayAndOptionalNullPreserveTypes() throws {
+        let schema = try AgentInputSchema(json: syntheticSchema)
+        let draft = filledDraft(schema)
+        let value = try XCTUnwrap(draft.value(schema: schema, required: true))
+        try schema.validate(value)
+        XCTAssertEqual(value.object["count"], .number(2))
+        XCTAssertEqual(value.object["weight"], .number(0.5))
+        XCTAssertNil(value.object["extra"])
+        XCTAssertEqual(value.object["settings"]?.object["enabled"], .bool(true))
+        XCTAssertEqual(value.object["settings"]?.object["mode"], .string("slow"))
+        XCTAssertEqual(value.object["settings"]?.object["note"], .null)
+        XCTAssertEqual(value.object["values"]?.array.first?.object["name"], .string("An item"))
+        XCTAssertEqual(try JSONDecoder().decode(AgentJSON.self, from: Data(value.json().utf8)), value)
+    }
+    func testInvalidNumericEditsRemainUnchangedAndFailBeforeExecution() throws {
+        let schema = try AgentInputSchema(json: syntheticSchema)
+        var draft = filledDraft(schema)
+        draft.fields["count"]!.text = "-"
+        XCTAssertThrowsError(try draft.value(schema: schema, required: true))
+        XCTAssertEqual(draft.fields["count"]?.text, "-")
+        draft.fields["count"]!.text = "1.5"
+        XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+        draft.fields["count"]!.text = "9007199254740993"
+        XCTAssertThrowsError(try draft.value(schema: schema, required: true))
+        draft.fields["count"]!.text = "6"
+        XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+    }
+    func testRequiredFieldsArrayBoundsAndUnknownKeysFail() throws {
+        let schema = try AgentInputSchema(json: syntheticSchema)
+        var draft = filledDraft(schema)
+        draft.fields["title"]!.text = "  "
+        XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+        draft.fields["title"]!.text = "Title"
+        draft.fields["values"]!.items = []
+        XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+        XCTAssertThrowsError(try schema.validate(.object(["surprise": .bool(true)])))
+        XCTAssertThrowsError(try AgentInputSchema(json: #"{"type":"object","properties":{"bad":{"$ref":"missing"}}}"#))
+    }
+    func testOmittedAndExplicitNullDifferAndNonNullableNullFails() throws {
+        let schema = try AgentInputSchema(json: syntheticSchema)
+        var draft = filledDraft(schema)
+        draft.fields["extra"]!.included = true
+        draft.fields["extra"]!.text = ""
+        XCTAssertEqual(try draft.value(schema: schema, required: true)?.object["extra"], .string(""))
+        draft.fields["extra"]!.isNull = true
+        XCTAssertThrowsError(try schema.validate(draft.value(schema: schema, required: true)!))
+        let nullableEnum = try AgentInputSchema(json: #"{"type":"object","properties":{"value":{"type":["string","null"],"enum":["allowed"]}}}"#)
+        XCTAssertThrowsError(try nullableEnum.validate(.object(["value": .null])))
+    }
+}
+
 @MainActor
 final class LocalAgentViewModelTests: XCTestCase {
-    func testUnavailableProviderCannotRunAndRefreshSelectsAnAvailableProvider() async {
-        let vm = LocalAgentViewModel(service: StubLocalAgentRunner(unavailable: [.claude, .appleLocal]))
+    func testAgentChangesSelectLatestAndOldFormDraftRemainsStable() async throws {
+        let old = try syntheticDefinition()
+        let latest = try syntheticDefinition(version: "2.0.0")
+        let other = LocalAgentDefinition(agentID: "Other", name: "Other", version: "1.0.0", schema: old.schema)
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner(definitions: [old, latest, other]))
         await vm.refreshProviders()
-        vm.news = "News"
-        XCTAssertFalse(vm.isAvailable(.claude))
-        vm.selectProvider(.claude)
-        XCTAssertEqual(vm.provider, .codex)
-        vm.provider = .claude
-        vm.run()
-        XCTAssertFalse(vm.isRunning)
-        XCTAssertFalse(vm.canRun)
-        XCTAssertTrue(vm.errorMessage?.contains("not installed") == true)
-        await vm.refreshProviders()
-        XCTAssertEqual(vm.provider, .codex)
+        vm.selectAgent(old.agentID)
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.version = "1.0.0"
+        vm.draft = filledDraft(old.schema)
+        let oldDraft = try XCTUnwrap(vm.draft(for: old.id))
+        vm.selectAgent(other.agentID)
+        XCTAssertEqual(vm.draft(for: old.id)?.id, oldDraft.id)
+        var edit = oldDraft
+        edit.fields["title"]!.text = "Old form completion"
+        vm.setDraft(edit, for: old.id)
+        XCTAssertNotEqual(vm.draft?.fields["title"]?.text, "Old form completion")
+        vm.selectAgent(old.agentID)
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.version = "1.0.0"
+        XCTAssertEqual(vm.draft?.fields["title"]?.text, "Old form completion")
     }
-
-    func testOnDeviceProviderSelectsStoryAndPassesTemperature() async {
-        let runner = StubLocalAgentRunner()
+    func testSyntheticCatalogEntryGeneratesDraftAndExactExecutionJSONWithoutAppRegistration() async throws {
+        let definition = try syntheticDefinition()
+        let runner = StubLocalAgentRunner(definitions: [definition])
         let vm = LocalAgentViewModel(service: runner)
         await vm.refreshProviders()
-        vm.tool = .shekharJoke
-        vm.provider = .appleLocal
-        XCTAssertEqual(vm.tool, .threeSceneStory)
-        vm.news = "Local facts"
-        vm.sessionSettings.temperature = 0.4
+        XCTAssertEqual(vm.agents.map(\.agentID), ["SyntheticNewAgent"])
+        XCTAssertFalse(vm.canRun)
+        vm.draft = filledDraft(definition.schema)
+        let preview = vm.inputJSON
+        XCTAssertTrue(vm.canRun)
         vm.run()
-        await waitForIdle(vm)
+        await idle(vm)
         let request = await runner.requests.first
-        XCTAssertEqual(request?.provider, .appleLocal)
-        XCTAssertEqual(request?.session.temperature, 0.4)
-        XCTAssertNotNil(vm.result)
+        XCTAssertEqual(request?.inputJSON, preview)
+        XCTAssertEqual(request?.version, "1.0.0")
+        XCTAssertEqual(vm.result?.rawOutput, "{\"ok\":true}")
     }
-    func testBlankNewsDoesNotRun() async {
-        let runner = StubLocalAgentRunner()
+    func testDraftsAndVersionsSurviveSwitchesAndRemovedVersionsRequireNewSelection() async throws {
+        var another = try syntheticDefinition(version: "2.0.0")
+        another = .init(agentID: "AnotherAgent", name: "Another", version: another.version, schema: another.schema)
+        let first = try syntheticDefinition()
+        let runner = StubLocalAgentRunner(definitions: [first, another])
         let vm = LocalAgentViewModel(service: runner)
         await vm.refreshProviders()
-        vm.news = " \n "
+        vm.selectAgent(first.agentID); vm.draft = filledDraft(first.schema)
+        let preview = vm.inputJSON
+        vm.selectAgent(another.agentID)
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.selectAgent(first.agentID)
+        XCTAssertEqual(vm.version, "1.0.0")
+        XCTAssertEqual(vm.inputJSON, preview)
+        await runner.setDefinitions([try syntheticDefinition(version: "3.0.0")])
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.version, "")
+        XCTAssertFalse(vm.canRun)
+        XCTAssertTrue(vm.errorMessage?.contains("unavailable") == true)
+    }
+    func testHistoricalMetadataVersionCannotExecute() async throws {
+        let runner = StubLocalAgentRunner(definitions: [try syntheticDefinition(version: "2.0.0"), try syntheticDefinition(executable: false)])
+        let vm = LocalAgentViewModel(service: runner)
+        await vm.refreshProviders()
+        XCTAssertEqual(vm.version, "2.0.0")
+        vm.version = "1.0.0"
         XCTAssertFalse(vm.canRun)
         vm.run()
-        XCTAssertNotNil(vm.errorMessage)
+        XCTAssertTrue(vm.errorMessage?.contains("historical") == true)
         let count = await runner.requests.count
         XCTAssertEqual(count, 0)
     }
-
-    func testSuccessAndProviderConfiguration() async {
-        let runner = StubLocalAgentRunner()
+    func testProviderAvailabilityAndResearchRequirements() async throws {
+        let definition = try syntheticDefinition(web: true)
+        let runner = StubLocalAgentRunner(definitions: [definition], unavailable: [.claude])
         let vm = LocalAgentViewModel(service: runner)
         await vm.refreshProviders()
-        vm.news = "Verified facts"
-        vm.provider = .claude
-
-        vm.model = " custom-model "
-        vm.userJoke = "  joke  "
-        vm.run()
-        await waitForIdle(vm)
-        XCTAssertEqual(vm.result?.text, "Readable result")
-        XCTAssertEqual(vm.rawOutput, " raw result \n")
-        let request = await runner.requests.first
-        XCTAssertEqual(request?.provider, .claude)
-        XCTAssertEqual(request?.executable, "claude")
-        XCTAssertEqual(request?.model, "custom-model")
-        XCTAssertEqual(request?.userJoke, "joke")
-        XCTAssertNil(vm.errorMessage)
-    }
-
-    func testJokeToolDoesNotRequireNewsAndRejectsInvalidCounts() async {
-        let vm = LocalAgentViewModel(service: StubLocalAgentRunner())
-        await vm.refreshProviders()
-        vm.tool = .shekharJoke
+        XCTAssertFalse(vm.isAvailable(.claude))
+        XCTAssertFalse(vm.isAvailable(.appleLocal))
+        vm.selectProvider(.appleLocal)
+        XCTAssertEqual(vm.provider, .codex)
+        vm.draft = filledDraft(definition.schema)
         XCTAssertTrue(vm.canRun)
-        vm.newsCount = 0
-        XCTAssertFalse(vm.canRun)
-        vm.run()
-        XCTAssertNotNil(vm.errorMessage)
-        XCTAssertFalse(vm.isRunning)
     }
-
-    func testSessionSettingsAreSeparatePerProviderAndPassedToRunner() async {
-        let runner = StubLocalAgentRunner()
+    func testSessionSettingsRemainPerProviderAndInvalidTemperatureDoesNotRun() async throws {
+        let definition = try syntheticDefinition()
+        let runner = StubLocalAgentRunner(definitions: [definition])
         let vm = LocalAgentViewModel(service: runner)
-        await vm.refreshProviders()
-        vm.tool = .shekharJoke
-        vm.model = "codex-model"
-        vm.sessionSettings.persistence = .persistentStdio
-        vm.sessionSettings.keepMemory = true
-        vm.provider = .grok
-        XCTAssertEqual(vm.model, "")
-        vm.model = "grok-model"
-        vm.provider = .codex
-        XCTAssertEqual(vm.model, "codex-model")
-        vm.run()
-        await waitForIdle(vm)
-        let request = await runner.requests.first
-        XCTAssertEqual(request?.session.persistence, .persistentStdio)
-        XCTAssertEqual(request?.session.keepMemory, true)
-    }
-
-    func testInvalidTemperatureRejected() async {
-        let vm = LocalAgentViewModel(service: StubLocalAgentRunner())
-        await vm.refreshProviders()
-        vm.tool = .shekharJoke
+        await vm.refreshProviders(); vm.draft = filledDraft(definition.schema)
+        vm.model = "model-A"; vm.sessionSettings.keepMemory = true
+        vm.selectProvider(.grok); XCTAssertEqual(vm.model, "")
+        vm.selectProvider(.codex); XCTAssertEqual(vm.model, "model-A")
         vm.sessionSettings.temperature = .nan
         XCTAssertFalse(vm.canRun)
         vm.run()
         XCTAssertTrue(vm.errorMessage?.contains("Temperature") == true)
     }
-
-    func testFailurePreservesRawOutput() async {
-        let runner = StubLocalAgentRunner(failure: .invalidOutput(raw: "broken JSON", reason: "Invalid JSON"))
-        let vm = LocalAgentViewModel(service: runner)
-        await vm.refreshProviders()
-        vm.news = "News"
-        vm.run()
-        await waitForIdle(vm)
-        XCTAssertNil(vm.result)
-        XCTAssertEqual(vm.rawOutput, "broken JSON")
-        XCTAssertNotNil(vm.errorMessage)
-        XCTAssertEqual(vm.status, "Failed")
+    func testArrayActionsModifyNestedDraftAndSerializeWithoutCoercion() async throws {
+        let definition = try syntheticDefinition()
+        let vm = LocalAgentViewModel(service: StubLocalAgentRunner(definitions: [definition]))
+        await vm.refreshProviders(); vm.draft = filledDraft(definition.schema)
+        let array = try XCTUnwrap(vm.draft?.fields["values"])
+        vm.addArrayItem(id: array.id, schema: definition.schema.properties["values"]!)
+        XCTAssertEqual(vm.draft?.fields["values"]?.items.count, 2)
+        XCTAssertNil(vm.inputJSON)
+        let second = try XCTUnwrap(vm.draft?.fields["values"]?.items.last)
+        vm.removeArrayItem(parentID: array.id, itemID: second.id)
+        XCTAssertNotNil(vm.inputJSON)
     }
-
-    func testCancellationSuppressesLateResultAndPreventsDuplicateRuns() async {
+    func testDuplicateRunAndCooperativeCancellation() async throws {
         let started = expectation(description: "Started")
-        let runner = StubLocalAgentRunner(started: started, suspend: true)
+        let definition = try syntheticDefinition()
+        let runner = StubLocalAgentRunner(definitions: [definition], started: started)
         let vm = LocalAgentViewModel(service: runner)
-        await vm.refreshProviders()
-        vm.news = "News"
-        vm.run()
-        vm.run()
+        await vm.refreshProviders(); vm.draft = filledDraft(definition.schema)
+        vm.run(); vm.run()
         await fulfillment(of: [started], timeout: 2)
         vm.cancel()
         XCTAssertTrue(vm.isCancelling)
-        XCTAssertFalse(vm.canRun)
+        XCTAssertTrue(vm.isRunning)
         await runner.release()
-        await waitForIdle(vm)
+        await idle(vm)
+        XCTAssertEqual(vm.status, "Cancelled")
         let count = await runner.requests.count
         XCTAssertEqual(count, 1)
-        XCTAssertEqual(vm.status, "Cancelled")
-        XCTAssertNil(vm.result)
-        XCTAssertNil(vm.errorMessage)
-        XCTAssertTrue(vm.canRun)
     }
-
-    private func waitForIdle(_ vm: LocalAgentViewModel) async {
-        for _ in 0..<200 where vm.isRunning {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-        XCTAssertFalse(vm.isRunning, "Agent did not finish")
+    func testFailureKeepsRawOutputAndNavigationHasNoRefineTab() async throws {
+        let definition = try syntheticDefinition()
+        let runner = StubLocalAgentRunner(definitions: [definition], failure: .invalidOutput(raw: "bad", reason: "Invalid"))
+        let vm = LocalAgentViewModel(service: runner)
+        await vm.refreshProviders(); vm.draft = filledDraft(definition.schema)
+        vm.run(); await idle(vm)
+        XCTAssertEqual(vm.rawOutput, "bad")
+        XCTAssertNotNil(vm.errorMessage)
+        XCTAssertEqual(ContentViewModel.Tab.allCases.map(\.title), ["Studio", "Library", "LocalAgent"])
+    }
+    private func idle(_ vm: LocalAgentViewModel) async {
+        for _ in 0..<200 { if !vm.isRunning { return }; try? await Task.sleep(for: .milliseconds(5)) }
+        XCTFail("Execution did not complete")
     }
 }
 
 private actor StubLocalAgentRunner: LocalAgentRunning {
+    var definitions: [LocalAgentDefinition]
     var requests: [LocalAgentRequest] = []
-    let failure: LocalAgentError?
-    let started: XCTestExpectation?
-    let suspend: Bool
     let unavailable: Set<LocalAgentProvider>
+    let started: XCTestExpectation?
+    let failure: LocalAgentError?
     var continuation: CheckedContinuation<Void, Never>?
-
-    init(failure: LocalAgentError? = nil, started: XCTestExpectation? = nil, suspend: Bool = false, unavailable: Set<LocalAgentProvider> = []) {
-        self.failure = failure
-        self.started = started
-        self.suspend = suspend
-        self.unavailable = unavailable
+    init(definitions: [LocalAgentDefinition], unavailable: Set<LocalAgentProvider> = [], started: XCTestExpectation? = nil, failure: LocalAgentError? = nil) {
+        self.definitions = definitions; self.unavailable = unavailable; self.started = started; self.failure = failure
     }
-
+    func catalog() async throws -> [LocalAgentDefinition] { definitions }
+    func setDefinitions(_ definitions: [LocalAgentDefinition]) { self.definitions = definitions }
+    func availability() async -> [LocalAgentProvider: LocalAgentAvailability] {
+        Dictionary(uniqueKeysWithValues: LocalAgentProvider.allCases.map { ($0, .init(isAvailable: !unavailable.contains($0), reason: "Test availability")) })
+    }
     func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
         requests.append(request)
-        if suspend {
-            await withCheckedContinuation {
-                continuation = $0
-                started?.fulfill()
-            }
-        }
+        if let started { await withCheckedContinuation { continuation = $0; started.fulfill() } }
         if let failure { throw failure }
-        return LocalAgentResult(text: "Readable result", rawOutput: " raw result \n")
+        return .init(text: "Result", rawOutput: "{\"ok\":true}")
     }
-
-    func availability() async -> [LocalAgentProvider: LocalAgentAvailability] {
-        Dictionary(uniqueKeysWithValues: LocalAgentProvider.allCases.map {
-            ($0, LocalAgentAvailability(isAvailable: !unavailable.contains($0), reason: unavailable.contains($0) ? "CLI not installed" : "Test provider"))
-        })
-    }
-
     func release() { continuation?.resume(); continuation = nil }
 }
 
 final class TerminalLocalAgentServiceTests: XCTestCase {
-    func testStrictSchemaClosesNestedObjectsAndKeepsNullableFields() throws {
-        let input = try XCTUnwrap(JSONString("""
-        {"type":"object","properties":{"nested":{"type":"object","properties":{"count":{"type":"integer"}}},"optional":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["nested"]}
-        """))
-        let strict = try StrictLocalAgentSession.strictSchema(input)
-        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(strict.rawValue.utf8)) as? [String: Any])
-        XCTAssertEqual(object["additionalProperties"] as? Bool, false)
-        XCTAssertEqual(object["required"] as? [String], ["nested", "optional"])
-        let properties = try XCTUnwrap(object["properties"] as? [String: [String: Any]])
-        XCTAssertEqual(properties["nested"]?["additionalProperties"] as? Bool, false)
-        XCTAssertEqual(properties["nested"]?["required"] as? [String], ["count"])
-        let nullable = try XCTUnwrap(properties["optional"]?["anyOf"] as? [[String: String]])
-        XCTAssertTrue(nullable.contains(["type": "null"]))
+    private func service(_ session: StubTerminalSession, entries: [AgentCatalogEntry]? = nil) -> TerminalLocalAgentService {
+        .init(entries: entries, makeSession: { _, _ in session }, makeWorkspace: { URL(fileURLWithPath: "/unused") }, removeWorkspace: { _ in })
     }
-
-    func testCLIStdoutDiagnosticsAreRetainedOnFailure() async {
-        let session = StubTerminalSession(response: .failure(.operationFailed(reason: "CLI exited")))
-        let service = TerminalLocalAgentService(makeSession: { _, _ in session },
-                                               makeWorkspace: { URL(fileURLWithPath: "/unused") },
-                                               removeWorkspace: { _ in },
-                                               readDiagnostics: { _ in "{\"type\":\"error\",\"message\":\"Schema rejected\"}" })
-        do {
-            _ = try await service.run(request(.threeSceneStory))
-            XCTFail("Expected failure")
-        } catch LocalAgentError.executionFailed(let raw, let reason) {
-            XCTAssertTrue(raw.contains("Schema rejected"))
-            XCTAssertTrue(reason.contains("CLI exited"))
-            XCTAssertTrue(reason.contains("Schema rejected"))
-            XCTAssertFalse(reason.contains("\"type\""))
-        } catch { XCTFail("Unexpected error: \(error)") }
+    private func request(version: String = "1.0.0") throws -> LocalAgentRequest {
+        .init(agentID: "SyntheticNewAgent", version: version, inputJSON: try payload(), provider: .codex, executable: "fake")
     }
-
-    func testStorySpecRoutingAndExactRawOutput() async throws {
-        let session = StubTerminalSession(response: .success(storyJSON))
-        let service = makeService(session)
-        let result = try await service.run(request(.threeSceneStory))
-        XCTAssertEqual(result.rawOutput, storyJSON)
-        XCTAssertTrue(result.text.contains("Scene 1"))
-        XCTAssertTrue(result.text.contains("A title"))
-        let input = await session.recorder.input
-        XCTAssertTrue(input.contains("Verified news"))
-        XCTAssertTrue(input.contains("user_joke"))
-        let instructions = await session.recorder.instructions
-        XCTAssertTrue(instructions.contains("ThreeSceneStoryCreator"))
+    func testPackageDiscoveryIsTheOnlyCatalogAndHistoricalVersionsAreNotMisrouted() async throws {
+        let session = StubTerminalSession(response: .success("{}"))
+        let catalog = try await service(session).catalog()
+        XCTAssertEqual(Set(catalog.map(\.agentID)), Set(KhabarwaaniAgent.agents.keys))
+        for (id, descriptor) in KhabarwaaniAgent.agents {
+            let versions = catalog.filter { $0.agentID == id }
+            XCTAssertEqual(Set(versions.map(\.version)), Set(descriptor.allVersions))
+            XCTAssertEqual(versions.filter(\.isExecutable).map(\.version), [descriptor.latestVersion])
+        }
+        let historical = catalog.filter { !$0.isExecutable }
+        for entry in historical {
+            let input = LocalAgentRequest(agentID: entry.agentID, version: entry.version, inputJSON: "{}", provider: .codex, executable: "fake")
+            do { _ = try await service(session).run(input); XCTFail("Historical version executed current spec") }
+            catch { XCTAssertTrue(error.localizedDescription.contains("not available locally")) }
+        }
+        let sent = await session.recorder.input
+        XCTAssertEqual(sent, "")
     }
-
-    func testJokeSpecRouting() async throws {
-        let raw = """
-        {"items":[{"title":"Headline","date":"Today","link":"https://example.com","category":"Trending","joke1":"Short","joke2":"Long","script":"Script"}]}
-        """
+    func testSyntheticNewSpecUsesExactPreviewPayloadAndTypedOutput() async throws {
+        let raw = " {\"ok\":true}\n"
         let session = StubTerminalSession(response: .success(raw))
-        let result = try await makeService(session).run(request(.shekharJoke))
+        let input = try request()
+        let result = try await service(session, entries: [syntheticEntry()]).run(input)
         XCTAssertEqual(result.rawOutput, raw)
-        XCTAssertTrue(result.text.contains("Short"))
-        let input = await session.recorder.input
-        XCTAssertTrue(input.contains("news_count"))
-        XCTAssertFalse(input.contains("Verified news"))
+        let sent = await session.recorder.input
+        XCTAssertEqual(sent, input.inputJSON)
+        XCTAssertTrue(result.metadata?.contains("Synthetic New Agent") == true)
     }
-
-    func testMalformedOutputRetained() async {
-        do {
-            _ = try await makeService(StubTerminalSession(response: .success("invalid"))).run(request(.threeSceneStory))
-            XCTFail("Expected decoding failure")
-        } catch LocalAgentError.invalidOutput(let raw, _) {
-            XCTAssertEqual(raw, "invalid")
-        } catch { XCTFail("Unexpected error: \(error)") }
+    func testInvalidOutputRetainsRawAndMissingVersionFailsBeforeSession() async throws {
+        let session = StubTerminalSession(response: .success("{\"wrong\":true}"))
+        do { _ = try await service(session, entries: [syntheticEntry()]).run(request()); XCTFail("Expected typed output failure") }
+        catch LocalAgentError.invalidOutput(let raw, _) { XCTAssertEqual(raw, "{\"wrong\":true}") }
+        do { _ = try await service(session, entries: [syntheticEntry()]).run(request(version: "9.0.0")); XCTFail("Expected missing version") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("not available locally")) }
     }
-
-    func testCLIErrorSurfaces() async {
-        do {
-            _ = try await makeService(StubTerminalSession(response: .failure(.operationFailed(reason: "Sign in first")))).run(request(.threeSceneStory))
-            XCTFail("Expected CLI error")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("Sign in first")) }
-    }
-
-    func testMissingExecutableAndCleanup() async {
-        let cleaned = expectation(description: "Workspace cleaned")
-        let service = TerminalLocalAgentService(
-            makeSession: { request, _ in throw LocalAgentError.unavailable(request.executable) },
-            makeWorkspace: { URL(fileURLWithPath: "/unused-test-directory") },
-            removeWorkspace: { _ in cleaned.fulfill() })
-        do {
-            _ = try await service.run(request(.threeSceneStory))
-            XCTFail("Expected unavailable CLI")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("Could not find")) }
+    func testProviderErrorsKeepDiagnosticsAndCleanup() async throws {
+        let cleaned = expectation(description: "Cleaned")
+        let session = StubTerminalSession(response: .failure(.operationFailed(reason: "CLI exited")))
+        let service = TerminalLocalAgentService(entries: [syntheticEntry()], makeSession: { _, _ in session },
+            makeWorkspace: { URL(fileURLWithPath: "/unused") }, removeWorkspace: { _ in cleaned.fulfill() },
+            readDiagnostics: { _ in #"{"type":"error","message":"Sign in first"}"# })
+        do { _ = try await service.run(request()); XCTFail("Expected failure") }
+        catch LocalAgentError.executionFailed(let raw, let reason) {
+            XCTAssertTrue(raw.contains("Sign in first")); XCTAssertTrue(reason.contains("CLI exited")); XCTAssertTrue(reason.contains("Sign in first"))
+        }
         await fulfillment(of: [cleaned], timeout: 2)
     }
-
-    private func request(_ tool: LocalAgentTool) -> LocalAgentRequest {
-        LocalAgentRequest(tool: tool, provider: .codex, executable: "codex", model: nil,
-                          news: "Verified news", userJoke: "Joke", outputCount: 1, newsCount: 3, jokesPerCategory: 2)
-    }
-
-    private func makeService(_ session: StubTerminalSession) -> TerminalLocalAgentService {
-        TerminalLocalAgentService(makeSession: { _, _ in session },
-                                  makeWorkspace: { URL(fileURLWithPath: "/unused-test-directory") },
-                                  removeWorkspace: { _ in })
+    func testStrictSchemaClosesNestedObjectsAndKeepsNullableFields() throws {
+        let input = try XCTUnwrap(JSONString(#"{"type":"object","properties":{"nested":{"type":"object","properties":{"count":{"type":"integer"}}},"optional":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["nested"]}"#))
+        let strict = try StrictLocalAgentSession.strictSchema(input)
+        let value = try JSONDecoder().decode(AgentJSON.self, from: Data(strict.rawValue.utf8))
+        XCTAssertEqual(value.object["additionalProperties"], .bool(false))
+        XCTAssertEqual(Set(value.object["required"]!.array.compactMap(\.string)), ["nested", "optional"])
+        XCTAssertEqual(value.object["properties"]?.object["nested"]?.object["additionalProperties"], .bool(false))
     }
 }
-
 private actor SessionRecorder {
     var input = ""
-    var instructions = ""
-    func record(input: String, instructions: String) { self.input = input; self.instructions = instructions }
+    func record(_ input: String) { self.input = input }
 }
-
 private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAgentSession, Sendable {
     let configuration = TerminalAgentConfiguration(executablePath: "fake")
     var executionMetadata: [AgenticExecutionMetadata] { [] }
@@ -305,12 +333,7 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
     let recorder = SessionRecorder()
     init(response: Result<String, AgenticError>) { self.response = response }
     func respond(to input: String, instructions: String, schema: JSONString, for operation: ObjectIdentifier) async -> Result<String, AgenticError> {
-        await recorder.record(input: input, instructions: instructions)
-        return response
+        await recorder.record(input); return response
     }
+    func purgeMemory() {}
 }
-
-private let storyJSON = """
-  {"items":[{"title":"A title","scene_1":{"purpose":"Curiosity","characters":"A","setting":"Street","speech":"Speech one","speech_word_count":2},"scene_2":{"purpose":"Discussion","characters":"B","setting":"Office","speech":"Speech two","speech_word_count":2},"scene_3":{"purpose":"Reaction","characters":"C","setting":"Home","speech":"Speech three","speech_word_count":2,"joke_applied":"Joke"},"verification":{"different_concepts":true,"freshness_maintained":true,"shareability_verified":true,"notes":"Checked"}}]}
-
-"""

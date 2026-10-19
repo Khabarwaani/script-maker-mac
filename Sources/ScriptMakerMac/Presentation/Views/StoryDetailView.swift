@@ -49,7 +49,6 @@ struct StoryDetailView: View {
                                 .foregroundStyle(AppTheme.secondaryInk)
                         }
                     }
-                    StoryFineTuneSection(story: story, viewModel: viewModel)
                     StoryVersionsSection(story: story, viewModel: viewModel)
                     if !story.headline.isEmpty || !(story.stageOutputs ?? [:]).isEmpty {
                         StoryGenerationDetails(story: story)
@@ -320,46 +319,7 @@ private struct StoryVideoPreview: View {
     }
 }
 
-private struct StoryFineTuneSection: View {
-    let story: Story
-    @Bindable var viewModel: LibraryViewModel
-    var body: some View {
-        StoryDetailSection("Fine tune script") {
-            if viewModel.isSimulation {
-                Text("Local JSON simulates this workflow with a sample response.")
-                    .font(.caption).foregroundStyle(AppTheme.secondaryInk)
-            }
-            TextField("What should change? e.g. tighten the hook", text: $viewModel.refinementInstruction, axis: .vertical)
-                .textFieldStyle(.roundedBorder).lineLimit(2...4).accessibilityLabel("Refinement instruction")
-            Button { Task { await viewModel.update(.refine) } } label: {
-                HStack {
-                    Group {
-                        if viewModel.busyUpdates.contains(.refine) { StudioActivityIndicator() }
-                        else { Image(systemName: "sparkles") }
-                    }.frame(width: 16, height: 16)
-                    Text("Fine tune script")
-                }
-            }.buttonStyle(StudioPrimaryButtonStyle())
-                .disabled(viewModel.busyUpdates.contains(.refine) || viewModel.selectedAIEngine == "None" || StringFormatting.isBlank(viewModel.refinementInstruction) || StringFormatting.isBlank(story.scriptText ?? ""))
-            if viewModel.selectedAIEngine == "None" {
-                Text("Select an LLM in the toolbar to enable fine tuning.").font(.caption).foregroundStyle(AppTheme.secondaryInk)
-            }
-            if let text = viewModel.refinement {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Refinement preview").font(.headline)
-                    Text(text).font(.body).lineSpacing(5).textSelection(.enabled)
-                    HStack {
-                        Button("Save as new story") { Task { await viewModel.acceptRefinement() } }
-                            .buttonStyle(StudioPrimaryButtonStyle())
-                            .disabled(viewModel.isSavingEdits)
-                        Button("Discard preview") { viewModel.refinement = nil }.buttonStyle(StudioButtonStyle())
-                    }
-                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
-            }
-        }
-    }
-}
+
 
 private struct StoryVersionsSection: View {
     let story: Story

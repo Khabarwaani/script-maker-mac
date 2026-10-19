@@ -2,19 +2,12 @@ import SwiftUI
 
 struct LocalAgentView: View {
     @Bindable var viewModel: LocalAgentViewModel
-
     var body: some View {
         HSplitView {
-            ScrollView {
-                LocalAgentInputForm(viewModel: viewModel)
-                    .padding(24)
-            }
-            .frame(minWidth: 320, idealWidth: 390, maxWidth: 470)
-            ScrollView {
-                LocalAgentOutputView(viewModel: viewModel)
-                    .padding(24)
-            }
-            .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView { LocalAgentInputForm(viewModel: viewModel).padding(24) }
+                .frame(minWidth: 320, idealWidth: 390, maxWidth: 470)
+            ScrollView { LocalAgentOutputView(viewModel: viewModel).padding(24) }
+                .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
         .task { await viewModel.refreshProviders() }
     }
@@ -22,79 +15,78 @@ struct LocalAgentView: View {
 
 private struct LocalAgentInputForm: View {
     @Bindable var viewModel: LocalAgentViewModel
-
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("LocalAgent").font(.title2.bold())
-            Text("Run KhabarwaaniAgent on this Mac or through an installed CLI.")
-                .foregroundStyle(.secondary)
+            Text("Choose an agent from the local package catalog.").foregroundStyle(.secondary)
             Group {
-                Text("Agent").font(.headline)
-                ForEach(LocalAgentTool.allCases) { tool in
-                    Button { viewModel.selectTool(tool) } label: {
-                        Label(tool.title, systemImage: viewModel.tool == tool ? "largecircle.fill.circle" : "circle")
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.provider == .appleLocal && tool == .shekharJoke)
-                    .accessibilityValue(viewModel.tool == tool ? "Selected" : "")
-                }
+                LocalAgentSelectionRow(viewModel: viewModel)
                 Text("Provider").font(.headline)
                 ForEach(LocalAgentProvider.allCases) { provider in
                     Button { viewModel.selectProvider(provider) } label: {
                         Label(provider.title, systemImage: viewModel.provider == provider ? "largecircle.fill.circle" : "circle")
                             .foregroundStyle(viewModel.isAvailable(provider) ? AppTheme.ink : AppTheme.secondaryInk)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!viewModel.isAvailable(provider))
+                    .buttonStyle(.plain).disabled(!viewModel.isAvailable(provider))
                     .accessibilityValue(viewModel.provider == provider ? "Selected" : "")
                 }
                 Text(viewModel.availabilityReason(viewModel.provider)).font(.caption).foregroundStyle(.secondary)
-                Button("Refresh providers") { Task { await viewModel.refreshProviders() } }
-                DisclosureGroup("Provider availability") {
-                    ForEach(LocalAgentProvider.allCases) { provider in
-                        Label("\(provider.title): \(viewModel.availabilityReason(provider))",
-                              systemImage: viewModel.isAvailable(provider) ? "checkmark.circle" : "minus.circle")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                Button("Refresh agents and providers") { Task { await viewModel.refreshProviders() } }.disabled(viewModel.isRefreshing)
                 if viewModel.provider != .appleLocal {
-                    TextField("Model (provider default)", text: $viewModel.model)
-                        .accessibilityLabel("Model override")
+                    TextField("Model (provider default)", text: $viewModel.model).accessibilityLabel("Model override")
                 }
                 LocalAgentSessionSettingsView(viewModel: viewModel)
-                Stepper("Output count: \(viewModel.outputCount)", value: $viewModel.outputCount, in: 1...20)
-                if viewModel.tool == .threeSceneStory {
-                    Text("News facts").font(.headline)
-                    TextEditor(text: $viewModel.news)
-                        .frame(minHeight: 170)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.line))
-                        .accessibilityLabel("News facts")
-                    Text("Optional joke").font(.headline)
-                    TextEditor(text: $viewModel.userJoke)
-                        .frame(minHeight: 80)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.line))
-                        .accessibilityLabel("Optional joke")
-                } else {
-                    Stepper("News to research: \(viewModel.newsCount)", value: $viewModel.newsCount, in: 1...50)
-                    Stepper("Jokes per category: \(viewModel.jokesPerCategory)", value: $viewModel.jokesPerCategory, in: 1...20)
+                if let definition = viewModel.definition, definition.isExecutable, let snapshot = viewModel.draft(for: definition.id) {
+                    DynamicAgentInputForm(draft: Binding(
+                        get: { viewModel.draft(for: definition.id) ?? snapshot },
+                        set: { viewModel.setDraft($0, for: definition.id) }), schema: definition.schema, label: "Inputs", required: true,
+                        addItem: { viewModel.addArrayItem(id: $0, schema: $1) }, removeItem: { viewModel.removeArrayItem(parentID: $0, itemID: $1) })
+                        .id(definition.id)
+                }
+                if let error = viewModel.inputError { Text(error).font(.caption).foregroundStyle(AppTheme.warning) }
+                DisclosureGroup("Input JSON") {
+                    Text(viewModel.inputJSON ?? "Complete the required inputs to construct JSON.")
+                        .font(.callout.monospaced()).textSelection(.enabled)
                 }
             }
-            .disabled(viewModel.isRunning)
-            .textFieldStyle(.roundedBorder)
+            .disabled(viewModel.isRunning).textFieldStyle(.roundedBorder)
             HStack {
-                Button("Run") { viewModel.run() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!viewModel.canRun)
+                Button("Run") { viewModel.run() }.buttonStyle(.borderedProminent).disabled(!viewModel.canRun)
                 if viewModel.isRunning {
                     ProgressView().controlSize(.small)
-                    Button("Cancel") { viewModel.cancel() }
-                        .disabled(viewModel.isCancelling)
+                    Button("Cancel") { viewModel.cancel() }.disabled(viewModel.isCancelling)
                 }
             }
             Text(viewModel.status).font(.callout).foregroundStyle(.secondary)
-            Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model. No terminal provider or pipeline server is used." : "Uses your CLI account and provider connection. Studio server settings do not apply here.")
+            Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model." : "Uses your installed CLI and account. Studio server settings do not apply.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct LocalAgentSelectionRow: View {
+    @Bindable var viewModel: LocalAgentViewModel
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Agent").font(.headline)
+                Picker("Agent", selection: Binding(get: { viewModel.agentID }, set: { viewModel.selectAgent($0) })) {
+                    if !viewModel.agents.contains(where: { $0.agentID == viewModel.agentID }) { Text("Unavailable").tag(viewModel.agentID) }
+                    ForEach(viewModel.agents) { agent in Text(agent.name).tag(agent.agentID) }
+                }.labelsHidden().pickerStyle(.menu).accessibilityLabel("Agent")
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Version").font(.headline)
+                Picker("Agent version", selection: $viewModel.version) {
+                    if viewModel.version.isEmpty { Text("Unavailable").tag("") }
+                    ForEach(viewModel.versions, id: \.self) { version in
+                        Text(viewModel.isVersionExecutable(version) ? version : "\(version) · unavailable")
+                            .tag(version).disabled(!viewModel.isVersionExecutable(version))
+                    }
+                }.labelsHidden().pickerStyle(.menu).accessibilityLabel("Agent version")
+            }.frame(width: 105, alignment: .leading)
+        }
+        .disabled(viewModel.isRefreshing || viewModel.agents.isEmpty)
     }
 }
 

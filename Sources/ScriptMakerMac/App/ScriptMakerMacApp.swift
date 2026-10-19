@@ -36,7 +36,6 @@ enum CompositionRoot {
         let repository = LocalStoryRepository()
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
         let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()))
-        let refiner = RefineViewModel(config: config)
         let files = FileStore()
         let localAgent = LocalAgentViewModel(service: TerminalLocalAgentService(
             makeSession: { request, workspace in
@@ -106,6 +105,6 @@ enum CompositionRoot {
                     return (provider, LocalAgentAvailability(isAvailable: available, reason: reason))
                 })
             }))
-        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, refineViewModel: refiner, localAgentViewModel: localAgent)
+        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, localAgentViewModel: localAgent)
     }
 }

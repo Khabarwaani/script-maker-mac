@@ -1,14 +1,14 @@
 import Foundation
 
-enum LocalAgentTool: String, CaseIterable, Identifiable, Sendable {
-    case threeSceneStory, shekharJoke
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .threeSceneStory: return "3-Scene Story Creator"
-        case .shekharJoke: return "Shekhar Joke Generator"
-        }
-    }
+struct LocalAgentDefinition: Identifiable, Equatable, Sendable {
+    let agentID: String
+    let name: String
+    let version: String
+    let schema: AgentInputSchema
+    var requiresWebResearch = false
+    var isExecutable = true
+    var id: String { agentID + "@" + version }
+    func supports(_ provider: LocalAgentProvider) -> Bool { provider != .appleLocal || !requiresWebResearch }
 }
 
 enum LocalAgentProvider: String, CaseIterable, Identifiable, Sendable {
@@ -30,7 +30,6 @@ struct LocalAgentSessionSettings: Sendable {
     var recordModel = true
     var recordDuration = true
     var recordTokens = false
-
 }
 
 struct LocalAgentAvailability: Sendable {
@@ -39,38 +38,19 @@ struct LocalAgentAvailability: Sendable {
 }
 
 struct LocalAgentRequest: Sendable {
-    var tool: LocalAgentTool
-    var provider: LocalAgentProvider
-    var executable: String
-    var model: String?
-    var news: String
-    var userJoke: String?
-    var outputCount: Int
-    var newsCount: Int
-    var jokesPerCategory: Int
+    let agentID: String
+    let version: String
+    let inputJSON: String
+    let provider: LocalAgentProvider
+    let executable: String
+    var model: String? = nil
     var session = LocalAgentSessionSettings()
 
     func validate() throws {
-        guard !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw LocalAgentError.invalidInput("Enter a CLI executable name or absolute path.")
-        }
-        guard outputCount > 0 else { throw LocalAgentError.invalidInput("Output count must be positive.") }
-        guard session.temperature.isFinite, (0...1).contains(session.temperature) else {
-            throw LocalAgentError.invalidInput("Temperature must be between 0 and 1.")
-        }
-        switch tool {
-        case .threeSceneStory:
-            guard !news.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw LocalAgentError.invalidInput("Enter the news facts for your story.")
-            }
-        case .shekharJoke:
-            guard provider != .appleLocal else {
-                throw LocalAgentError.invalidInput("Shekhar Joke Generator requires live news research. Choose a terminal provider.")
-            }
-            guard newsCount > 0, jokesPerCategory > 0 else {
-                throw LocalAgentError.invalidInput("News and joke counts must be positive.")
-            }
-        }
+        guard !agentID.isEmpty, !version.isEmpty else { throw LocalAgentError.invalidInput("Select an agent and version.") }
+        guard !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw LocalAgentError.invalidInput("A provider executable is required.") }
+        guard case .object = try JSONDecoder().decode(AgentJSON.self, from: Data(inputJSON.utf8)) else { throw LocalAgentError.invalidInput("Agent input must be a JSON object.") }
+        guard session.temperature.isFinite, (0...1).contains(session.temperature) else { throw LocalAgentError.invalidInput("Temperature must be between 0 and 1.") }
     }
 }
 
@@ -85,12 +65,10 @@ enum LocalAgentError: LocalizedError {
     case unavailable(String)
     case invalidOutput(raw: String, reason: String)
     case executionFailed(raw: String, reason: String)
-
     var errorDescription: String? {
         switch self {
         case .invalidInput(let message): return message
-        case .unavailable(let executable):
-            return "Could not find \(executable). Install and sign in to the CLI, or enter its absolute executable path."
+        case .unavailable(let executable): return "Could not find \(executable). Install and sign in to the CLI."
         case .invalidOutput(_, let reason): return "The agent returned invalid output: \(reason)"
         case .executionFailed(_, let reason): return reason
         }

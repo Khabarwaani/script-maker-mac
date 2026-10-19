@@ -38,7 +38,7 @@ final class LibraryViewModel {
     var stories: [Story] = []
     var selectedStoryID: String? {
         didSet {
-            if selectedStoryID != oldValue { copyFeedback = nil; refinement = nil; refinementInstruction = ""; actionNotice = nil }
+            if selectedStoryID != oldValue { copyFeedback = nil; actionNotice = nil }
             if let id = selectedStoryID, !selectedStoryIDs.contains(id) { selectedStoryIDs = [id] }
             if selectedStoryID == nil { selectedStoryIDs = [] }
         }
@@ -124,10 +124,6 @@ final class LibraryViewModel {
         removedItem = nil
         actionNotice = "Item restored"
     }
-    var refinementInstruction = ""
-    var refinement: String?
-    private var refinementStoryID: String?
-    private var acceptedInstruction: String?
     var editedTitle = ""
     var editedScript = ""
     var editedSummary = ""
@@ -180,14 +176,11 @@ final class LibraryViewModel {
 
     func update(_ kind: LibraryUpdate) async {
         guard let story = selectedStory, !busyUpdates.contains(kind) else { return }
-        if kind == .refine && (StringFormatting.isBlank(refinementInstruction) || selectedAIEngine == "None") {
-            actionNotice = "Select an LLM and enter a refinement instruction."
-            return
-        }
+
         guard let updater else { actionNotice = "Library update service is unavailable."; return }
         busyUpdates.insert(kind)
         actionNotice = nil
-        let instruction = refinementInstruction
+        let instruction = ""
         defer { busyUpdates.remove(kind) }
         do {
             let result = try await updater.update(kind, story: story, engine: selectedAIEngine, instruction: instruction,
@@ -204,14 +197,6 @@ final class LibraryViewModel {
             case .news:
                 guard let values = result.news else { throw APIError.malformed("Missing news update") }
                 current.sourceLinks = values
-            case .refine:
-                guard let value = result.script, !StringFormatting.isBlank(value) else { throw APIError.malformed("Missing refined script") }
-                if selectedStoryID == story.id {
-                    refinement = value; refinementStoryID = story.id
-                    acceptedInstruction = instruction
-                    actionNotice = isSimulation ? "Local JSON preview · sample refinement" : "Refinement ready to review"
-                }
-                return
             }
             await persist(current)
             if selectedStoryID == story.id { actionNotice = isSimulation ? "Local JSON · \(kind.rawValue.capitalized) updated from sample data" : "\(kind.rawValue.capitalized) updated" }
@@ -220,14 +205,7 @@ final class LibraryViewModel {
         }
     }
 
-    func acceptRefinement() async {
-        guard !isSavingEdits, let text = refinement, let id = refinementStoryID, id == selectedStoryID,
-              var story = stories.first(where: { $0.id == id }) else { return }
-        isSavingEdits = true
-        defer { isSavingEdits = false }
-        appendVersion(text, instruction: acceptedInstruction, to: &story)
-        await saveEditedCopy(story, originalID: id)
-    }
+
 
     func useVersion(_ version: StoryScriptVersion, storyID: String) async {
         guard var story = stories.first(where: { $0.id == storyID }), story.scriptVersions?.contains(version) == true else { return }

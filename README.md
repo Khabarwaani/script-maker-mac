@@ -3,7 +3,7 @@
 Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
 MVVM, async/await throughout.
 
-Requires **macOS 27+ and Xcode 27+**. Studio, Library, and Script Refine use the
+Requires **macOS 27+ and Xcode 27+**. Studio and Library use the
 pipeline server configured in Preferences (Cmd+,). The **LocalAgent** tab runs
 KhabarwaaniAgent through an installed terminal AI provider.
 
@@ -16,61 +16,49 @@ KhabarwaaniAgent through an installed terminal AI provider.
 
 ## LocalAgent
 
-Keep the unpublished `KhabarwaaniAgent` checkout beside this repository:
+Keep the local KhabarwaaniAgent checkout beside this repository. AgentAtom and
+TerminalAgentSession resolve from GitHub release ranges; KhabarwaaniAgent stays
+a local path dependency.
 
-```text
-Khabarwaani/
-  ScriptMakerMac/
-  KhabarwaaniAgent/
-```
+Validated with KhabarwaaniAgent 1.1.0, including ThreeSceneStoryCreator 2.1.0
+and its progressive Inquire → Clarify → Payoff instructions. Agent versions come
+from discovery metadata; the app does not pin or relabel them.
 
-Open the Xcode workspace and let Swift Package Manager resolve **AgentAtom** and
-**TerminalAgentSession** from GitHub releases. Release ranges allow new major
-and minor releases; the resolver selects the latest version satisfying the whole
-graph. No exact release or local checkout is pinned by the app. Use Xcode's
-**File → Packages → Update to Latest Package Versions** to refresh an existing
-resolution. The local KhabarwaaniAgent package uses your working-tree sources.
+The Agent dropdown and its Version dropdown share one row. Both come from the
+package's `KhabarwaaniAgent.agents` discovery descriptors and executable hooks.
+The app has no agent enum or per-agent form switch. Register a new
+`DiscoverableAgentSpec` in the package, rebuild, and its form appears automatically.
 
-In LocalAgent, choose **3-Scene Story Creator** (news, optional joke, output count)
-or **Shekhar Joke Generator** (output count, news count, jokes per category).
-Choose Codex, Claude, Antigravity, or Grok and sign in to that CLI beforehand,
-or choose **Apple Intelligence (on-device)** to use AgentAtom's native Mac
-session. Missing CLIs and unavailable Apple Intelligence models are grayed out
-and cannot be selected. **Refresh providers** rechecks availability; installed
-CLIs still need valid provider authentication. Executables are found on PATH,
-`/opt/homebrew/bin`, and `/usr/local/bin`.
+Input controls come from JSON Schema: strings, numbers, integers, booleans,
+enums, optional and nullable values, nested objects, and arrays. Defaults are
+preserved. Invalid edits remain visible and prevent Run. **Input JSON** shows
+the same payload validated and sent to the package executor. Drafts are retained
+separately per agent/version while the app is open. Changing agents selects the
+latest executable stable version.
 
-Expand **Session settings** for the package's runtime process mode, memory
-policy, and execution metadata. The on-device provider offers temperature
-instead of terminal process/memory settings. CLI model overrides are in the
-main form. Settings are kept separately per provider while the app is open.
-Each Run creates a new session; provider capabilities determine process support.
-Codex and Claude normalize persistent stdin/stdout to one-shot execution.
-Metadata appears only when the provider returns and retains it.
-The on-device session runs the supplied-news 3-scene tool; Shekhar's fresh-news
-research tool requires a terminal provider and is disabled for Apple Intelligence.
+Historical versions listed only as discovery metadata remain unavailable until
+the package supplies their executor. Selecting an older version never executes
+the current spec under that version number.
 
-Run displays readable results and preserves the exact final response under
-**Raw output**, including undecodable responses. Output text is selectable for
-copying. Each run uses a temporary working directory and does not write into
-your repositories. Cancel requests cooperative CLI cancellation and keeps Run
-disabled until cleanup finishes. Provider access may require internet and uses
-your existing CLI account. Results remain in memory while switching tabs;
-automatic import into Studio/Library is not included.
+Unavailable providers are disabled. Research agents require a terminal provider;
+Apple Intelligence runs compatible agents on-device. Runtime settings remain
+separate per provider. Codex, Claude, Antigravity and Grok use installed CLI
+accounts. Each Run uses a temporary workspace with cleanup and cooperative
+cancellation. Raw JSON and typed decoding errors remain available for inspection.
 
-The CLI launcher supplies EOF on stdin for GUI launches, adds executable
-search paths to the child environment, and captures stdout for failure details.
-The package adapter closes derived object schemas for strict structured output,
-including nullable optional fields. It translates Grok's schema option to the
-installed CLI's `--json-schema` interface and does not forward permission-bypass
-flags inserted by provider defaults.
+Script refinement is an ordinary catalog agent. The dedicated Script Refine tab,
+its server integration, settings, and Library fine-tuning flow have been removed.
+There is no automatic import of agent results into Studio or Library. Humans
+review content quality.
 
-CI and release workflows check out `KhabarwaaniAgent`'s `develop` branch beside
-the app. `KHABARWAANI_AGENT_READ_KEY` supplies a dedicated read-only deploy key
-for the private package. A token with package read access can alternatively be
-provided as `KHABARWAANI_AGENT_READ_TOKEN`; the workflow token is the fallback.
-The `xcode-27` runner provides macOS 27/Xcode 27. Tests fake sessions and never
-invoke a live provider.
+The CLI launcher supplies EOF on stdin, adds executable search paths, captures
+stdout for failure details, and closes strict object schemas. It translates
+Grok's schema option and omits permission-bypass flags from provider defaults.
+
+This integration currently uses the package discovery-hook branch in CI, pending
+its dependency PR. Production release checkouts continue to use package main.
+CI needs the existing read-only `KHABARWAANI_AGENT_READ_KEY` for that private
+checkout. The xcode-27 runner supplies macOS/Xcode 27.
 
 ## Architecture
 
