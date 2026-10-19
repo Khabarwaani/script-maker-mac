@@ -22,6 +22,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var scriptVersions: [StoryScriptVersion]?
     var sourceStoryID: String?
     var currentScriptVersionID: String?
+    var uploadReceipt: StoryUploadReceipt?
 
     init(
         id: String = UUID().uuidString,
@@ -42,7 +43,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         imageURLs: [String]? = nil,
         scriptVersions: [StoryScriptVersion]? = nil,
         sourceStoryID: String? = nil,
-        currentScriptVersionID: String? = nil
+        currentScriptVersionID: String? = nil,
+        uploadReceipt: StoryUploadReceipt? = nil
     ) {
         self.id = id
         self.title = title
@@ -63,6 +65,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.scriptVersions = scriptVersions
         self.sourceStoryID = sourceStoryID
         self.currentScriptVersionID = currentScriptVersionID
+        self.uploadReceipt = uploadReceipt
     }
 }
 
@@ -86,6 +89,7 @@ struct LibraryUpdateResult: Codable, Sendable {
     var hashtags: [String]?
     var images: [String]?
     var news: [StorySourceLink]?
+    var warnings: [String]? = nil
 }
 
 enum StoryCopyFormat: String, CaseIterable, Identifiable {
@@ -110,4 +114,26 @@ struct StorySourceLink: Codable, Sendable, Hashable {
         guard let value = URL(string: url), ["http", "https"].contains(value.scheme?.lowercased() ?? "") else { return nil }
         return value
     }
+}
+
+struct StoryUploadReceipt: Codable, Sendable, Hashable {
+    var id: Int
+    var previewURL: String
+    var thumbnailURL: String
+    var uploadedAt: String
+}
+
+enum LibraryUploadDestination: Sendable, Equatable { case telegram, googleSheets }
+
+struct LibraryUploadOptions: Sendable {
+    var telegramToken = ""
+    var telegramChatID = ""
+    var includeTelegramGroups = false
+    var googleAccessToken = ""
+    var googleEndpoint = ""
+}
+
+struct LibraryUploadResult: Sendable {
+    var message: String
+    var receipt: StoryUploadReceipt? = nil
 }

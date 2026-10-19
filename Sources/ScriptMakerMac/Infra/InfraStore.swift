@@ -163,3 +163,23 @@ struct SharingStore {
         return url
     }
 }
+
+private final class NoHTTPRedirects: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? { nil }
+}
+
+extension HTTPClient {
+    static func withoutRedirects() -> HTTPClient {
+        HTTPClient(session: URLSession(configuration: .ephemeral, delegate: NoHTTPRedirects(), delegateQueue: nil))
+    }
+}
+
+extension FileStore {
+    var homeDirectory: URL { fileManager.homeDirectoryForCurrentUser }
+    func environmentValue(_ key: String) -> String? { ProcessInfo.processInfo.environment[key] }
+    func writeCreatingDirectory(_ data: Data, to url: URL) throws {
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
+    }
+}

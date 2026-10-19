@@ -12,6 +12,9 @@ struct StoryDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             StoryDetailToolbar(story: story, viewModel: viewModel, onDelete: onDelete)
+            if viewModel.isUploading {
+                HStack { ProgressView().controlSize(.small); Text("Uploading…").font(.caption); Spacer() }.padding(12)
+            }
             Divider().overlay(AppTheme.line)
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -33,24 +36,31 @@ struct StoryDetailView: View {
                             viewModel.prepareEdits(story); showingEdit = true
                         } label: { Image(systemName: "pencil") }
                         .buttonStyle(.plain).help("Edit and save as a new story")
-                        .accessibilityLabel("Edit story")
+                        .accessibilityLabel("Edit story").disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
                     }
                     if !story.summary.isEmpty {
                         StoryDetailSection("Summary") { Text(story.summary).font(.body) }
                     }
+                    if let receipt = story.uploadReceipt {
+                        StoryDetailSection("Google upload") {
+                            Text("Row \(receipt.id) · \(receipt.uploadedAt)")
+                            if let url = URL(string: receipt.previewURL), url.scheme == "https" {
+                                Link("Open uploaded video", destination: url)
+                            }
+                        }
+                    }
                     StorySourcesSection(story: story, viewModel: viewModel)
                     StoryImagesSection(story: story, viewModel: viewModel)
-                    StoryDetailSection("Screenplay") {
-                        if let script = story.scriptText, !script.isEmpty {
+                    if !StringFormatting.isBlank(story.scriptText ?? "") {
+                        StoryDetailSection("Screenplay") {
+                            if let script = story.scriptText {
                             Text(script).font(.body).lineSpacing(5)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Label("No screenplay was included in this story.", systemImage: "doc.text")
-                                .foregroundStyle(AppTheme.secondaryInk)
+                            }
                         }
                     }
                     StoryVersionsSection(story: story, viewModel: viewModel)
-                    if !story.headline.isEmpty || !(story.stageOutputs ?? [:]).isEmpty {
+                    if !(story.stageOutputs ?? [:]).isEmpty {
                         StoryGenerationDetails(story: story)
                     }
                     if let videoURL = story.videoURL, !videoURL.isEmpty {
@@ -89,6 +99,8 @@ private struct StoryDetailToolbar: View {
     let onDelete: () -> Void
     @State private var showingReset = false
     @State private var showingImport = false
+    @State private var showingUpload = false
+    @State private var uploadDestination: LibraryUploadDestination = .telegram
     @State private var importKind: LibraryMediaKind = .image
 
     var body: some View {
@@ -97,10 +109,15 @@ private struct StoryDetailToolbar: View {
                 LibraryActionLabel(icon: "photo.badge.arrow.down", isLoading: viewModel.busyUpdates.contains(.images))
             }.buttonStyle(.plain).help("Update images").accessibilityLabel("Update images")
                 .disabled(viewModel.busyUpdates.contains(.images))
+            Button { Task { await viewModel.enrich(storyID: story.id) } } label: {
+                LibraryActionLabel(icon: "arrow.triangle.2.circlepath", isLoading: !viewModel.busyUpdates.isEmpty)
+            }.buttonStyle(.plain).help("Refresh news, images and hashtags from this title").accessibilityLabel("Refresh related content")
+                .disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
             Divider().frame(height: 24)
             Menu {
                 Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Google Drive…", systemImage: "externaldrive") }
-                Button { Task { await viewModel.share(story, to: .telegram) } } label: { Label("Telegram…", systemImage: "paperplane") }
+                Button { uploadDestination = .telegram; showingUpload = true } label: { Label("Upload to Telegram…", systemImage: "paperplane") }
+                Button { uploadDestination = .googleSheets; showingUpload = true } label: { Label("Upload to Google Drive / Sheets…", systemImage: "tablecells") }
                 Divider()
                 Button("Copy News Links + Hashtags") { viewModel.copy(viewModel.shareText(for: story), label: "News links and hashtags") }
                 Divider()
@@ -110,7 +127,7 @@ private struct StoryDetailToolbar: View {
             } label: { LibraryActionLabel(icon: "square.and.arrow.up") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Share story").accessibilityLabel("Share story")
-                .disabled(viewModel.isSharing)
+                .disabled(viewModel.isSharing || viewModel.isUploading)
             Menu {
                 ForEach(StoryCopyFormat.allCases) { format in
                     if format == .all { Divider() }
@@ -142,6 +159,7 @@ private struct StoryDetailToolbar: View {
         }
         .buttonStyle(StudioButtonStyle())
         .padding(.horizontal, 20).padding(.vertical, 12)
+        .sheet(isPresented: $showingUpload) { LibraryUploadView(story: story, destination: uploadDestination, viewModel: viewModel) }
         .fileImporter(isPresented: $showingImport, allowedContentTypes: importKind == .video ? [.movie] : [.image]) { result in
             switch result {
             case .success(let url): Task { await viewModel.importMedia(url, kind: importKind, storyID: story.id) }
@@ -354,12 +372,12 @@ private struct EditLibraryStoryView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Edit story").font(.title2.weight(.semibold))
             Text("Title").font(.headline)
-            Text(viewModel.editedTitle).font(.body.weight(.medium)).textSelection(.enabled)
-            Text("The edited copy keeps this title and gets a new UUID and timestamp.")
+            TextField("Title / headline", text: $viewModel.editedTitle).textFieldStyle(.roundedBorder)
+            Text("Changing the title refreshes related news, images and hashtags for the edited copy.")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Text("Summary").font(.headline)
             TextField("Summary", text: $viewModel.editedSummary, axis: .vertical).lineLimit(2...3).textFieldStyle(.roundedBorder)
-            Text("Script").font(.headline)
+            Text("Script (optional)").font(.headline)
             TextEditor(text: $viewModel.editedScript).font(.body).scrollContentBackground(.hidden).padding(8)
                 .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                 .background(ScrollBarConfiguration()).accessibilityLabel("Edit script")

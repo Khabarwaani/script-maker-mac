@@ -41,3 +41,7 @@ protocol LibraryMediaImporting: Sendable {
     func importFile(_ url: URL) async throws -> URL
     func imageData(at url: URL) async throws -> Data
 }
+
+protocol StoryUploading: Sendable {
+    func upload(_ story: Story, to destination: LibraryUploadDestination, options: LibraryUploadOptions) async throws -> LibraryUploadResult
+}
