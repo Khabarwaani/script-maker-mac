@@ -259,4 +259,47 @@ final class LocalLibraryNetworkTests: XCTestCase {
         XCTAssertEqual(chunks.joined(), text)
         XCTAssertTrue(chunks.allSatisfy { $0.utf16.count <= 4096 })
     }
+
+    func testHashtagsPreserveHindiMarksAndShortNames() {
+        XCTAssertEqual(LocalLibraryUpdateClient.hashtags(for: "दिल्ली में AI मिशन"), ["#दिल्ली", "#में", "#AI", "#मिशन"])
+    }
+
+    func testGoogleRefreshesExistingClaspLoginBeforeUpload() async throws {
+        let home = try temporaryHome()
+        let video = home.appendingPathComponent("reel.mp4")
+        try Data([1]).write(to: video)
+        try Data(#"{"tokens":{"default":{"client_id":"test-client","client_secret":"test-secret","refresh_token":"refresh+value"}}}"#.utf8).write(to: home.appendingPathComponent(".clasprc.json"))
+        LocalLibraryHTTPStub.handler = { request in
+            if request.url?.host == "oauth2.googleapis.com" {
+                XCTAssertEqual(request.httpMethod, "POST")
+                let body = String(decoding: request.httpBody!, as: UTF8.self)
+                XCTAssertTrue(body.contains("refresh_token=refresh%2Bvalue"))
+                XCTAssertTrue(body.contains("grant_type=refresh_token"))
+                return (200, [:], Data(#"{"access_token":"refreshed-access"}"#.utf8))
+            }
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer refreshed-access")
+            return (200, [:], Data(#"{"status":"success","id":2,"previewUrl":"https://drive.google.com/preview","timestamp":"now"}"#.utf8))
+        }
+        let result = try await uploader(home: home).upload(Story(title: "Headline", videoURL: video.absoluteString), to: .googleSheets, options: .init())
+        XCTAssertEqual(result.receipt?.id, 2)
+    }
+
+    func testTelegramGroupFailureReportsSuccessfulDirectDelivery() async throws {
+        let home = try temporaryHome()
+        try FileStore().writeCreatingDirectory(Data("-1001\n-1001\n".utf8), to: home.appendingPathComponent("Documents/telegrambot/group_ids.txt"))
+        LocalLibraryHTTPStub.handler = { request in
+            if request.url?.lastPathComponent == "getUpdates" {
+                return (200, [:], Data(#"{"ok":true,"result":[]}"#.utf8))
+            }
+            let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
+            if body["chat_id"] == "42" { return (200, [:], Data(#"{"ok":true,"result":{}}"#.utf8)) }
+            XCTAssertEqual(body["chat_id"], "-1001")
+            return (403, [:], Data(#"{"ok":false,"description":"Forbidden"}"#.utf8))
+        }
+        let result = try await uploader(home: home).upload(Story(title: "Title only"), to: .telegram,
+            options: .init(telegramToken: "123:fake", telegramChatID: "42", includeTelegramGroups: true))
+        XCTAssertTrue(result.message.contains("sent to 1 chat(s)"))
+        XCTAssertTrue(result.message.contains("Partial failure"))
+        XCTAssertTrue(result.message.contains("-1001"))
+    }
 }

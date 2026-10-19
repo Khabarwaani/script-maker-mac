@@ -184,7 +184,7 @@ private struct StoryDetailHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(story.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? "Generated" : "Edited") \(DateFormatting.generationTime(story.createdAt))")
+            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? (story.stageOutputs?.isEmpty == false ? "Generated" : "Saved") : "Edited") \(DateFormatting.generationTime(story.createdAt))")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Text("UUID · \(story.id)").font(.caption.monospaced())
                 .foregroundStyle(AppTheme.secondaryInk).fixedSize(horizontal: false, vertical: true)

@@ -171,7 +171,7 @@ final class LibraryViewModel {
         story.summary = editedSummary.trimmingCharacters(in: .whitespacesAndNewlines)
         let script = editedScript.trimmingCharacters(in: .whitespacesAndNewlines)
         if !script.isEmpty && script != story.scriptText { appendVersion(script, instruction: nil, to: &story) }
-        if script.isEmpty { story.scriptText = nil }
+        if script.isEmpty { story.scriptText = nil; story.currentScriptVersionID = nil }
         story.uploadReceipt = nil
         await saveEditedCopy(story, originalID: id)
         if titleChanged, let saved = selectedStory { await enrich(storyID: saved.id) }

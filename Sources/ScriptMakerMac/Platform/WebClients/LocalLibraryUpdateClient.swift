@@ -98,7 +98,12 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
 
     static func hashtags(for title: String) -> [String] {
         let stop: Set<String> = ["the", "and", "for", "with", "from", "this", "that", "into", "after", "over", "has", "have", "are", "was", "will", "news", "today"]
-        let words = title.components(separatedBy: .alphanumerics.inverted).filter { $0.count > 2 && !stop.contains($0.lowercased()) }
+        guard let regex = try? NSRegularExpression(pattern: #"[\p{L}\p{M}\p{N}]+"#) else { return [] }
+        let words = regex.matches(in: title, range: NSRange(title.startIndex..., in: title)).compactMap { match -> String? in
+            guard let range = Range(match.range, in: title) else { return nil }
+            let word = String(title[range])
+            return stop.contains(word.lowercased()) ? nil : word
+        }
         var seen: Set<String> = []
         return Array(words.map { "#" + $0 }.filter { seen.insert($0.lowercased()).inserted }.prefix(5))
     }

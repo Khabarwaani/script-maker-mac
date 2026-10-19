@@ -366,13 +366,12 @@ final class SharedAISelectionTests: XCTestCase {
         defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
         config.recentAIIdentifiers = []
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog())
-        let library = LibraryViewModel(config: config)
         for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
         config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
         XCTAssertEqual(config.recentAIIdentifiers.count, 5)
         XCTAssertEqual(Set(config.recentAIIdentifiers).count, 5)
         XCTAssertEqual(config.recentAIIdentifiers.first, "Provider/model-3/high")
-        XCTAssertEqual(generator.selectedAIIdentifier, library.selectedAIEngine)
+        XCTAssertEqual(generator.selectedAIIdentifier, config.selectedAI.identifier)
         generator.resetConfiguration()
         XCTAssertEqual(generator.selectedAIIdentifier, "Provider/model-3/high")
         XCTAssertEqual(AppConfig(defaults: defaults).selectedAI.identifier, config.selectedAI.identifier)
