@@ -46,7 +46,13 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
 ## Rules
 
 1. **Branches & PR flow:** `main` and `develop`. Feature branches off `develop`,
-   PRs target `develop`. Never push direct to `main`/`develop`.
+   PRs target `develop`. Complete integrations by merging the approved, green PR
+   into `develop`; leaving code only on a feature branch is not completion.
+   Never push direct to `main`/`develop`. Delete merged feature branches locally
+   and remotely. Preserve unmerged work until integrated or explicitly discarded.
+   Keep the primary checkout on current `develop`. Make implementation changes
+   in a separate Git worktree; do not switch the user's primary checkout.
+   Remove the worktree after merging and verifying the integration.
 2. **Thin client:** pipeline generation goes through `PipelineAPI`. The
    `LocalAgent` workspace may execute KhabarwaaniAgent through installed CLI
    providers or AgentAtom's on-device session via its injected service.
@@ -71,3 +77,6 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
     Domain. UI state, ViewModel. Shared helper, Core.
 11. **Inject, don't create:** ViewModels/Services take `any Protocol` in
     `init`, never `ConcreteType()`. The Composition Root wires concretes.
+12. **Local builds:** use Xcode's default DerivedData location. Do not create
+    repo-local `build/` output or temporary custom build directories. When asked
+    to launch or verify, build and run the integrated `develop` checkout.
