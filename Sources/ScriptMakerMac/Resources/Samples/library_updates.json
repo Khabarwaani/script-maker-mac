@@ -1,0 +1,18 @@
+{
+  "hashtags": [
+    "#Delhi",
+    "#AirQuality",
+    "#OddEven"
+  ],
+  "images": [
+    "sample://library-image-1",
+    "sample://library-image-2"
+  ],
+  "news": [
+    {
+      "title": "Local JSON sample news source",
+      "url": "https://example.com/",
+      "source": "Sample source · simulation only"
+    }
+  ]
+}

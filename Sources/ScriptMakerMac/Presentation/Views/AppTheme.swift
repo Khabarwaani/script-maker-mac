@@ -18,6 +18,34 @@ enum AppTheme {
     static let ongoingColor = Color.orange
 }
 
+struct LibraryActionLabel: View {
+    let icon: String
+    var isLoading = false
+    var body: some View {
+        Group {
+            if isLoading { StudioActivityIndicator() }
+            else { Image(systemName: icon).font(.system(size: 15)) }
+        }.modifier(LibraryActionFrame())
+    }
+}
+
+struct StudioActivityIndicator: View {
+    var body: some View {
+        ProgressView().progressViewStyle(.circular).controlSize(.small)
+            .frame(width: 16, height: 16).accessibilityLabel("Loading")
+    }
+}
+
+struct LibraryActionFrame: ViewModifier {
+    func body(content: Content) -> some View {
+        content.foregroundStyle(AppTheme.ink).tint(AppTheme.ink)
+            .frame(width: 40, height: 36)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+            .contentShape(Rectangle())
+    }
+}
+
 struct StudioButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

@@ -3,15 +3,88 @@
 Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
 MVVM, async/await throughout.
 
-Same use cases as the classic app. Every task goes over HTTP to the pipeline
-server configured in Preferences (Cmd+,); nothing is computed locally.
+Requires **macOS 27+ and Xcode 27+**. Studio uses the pipeline server configured in Preferences (Cmd+,).
+Library saves and enriches stories locally with direct HTTP requests. The **LocalAgent** tab runs
+KhabarwaaniAgent through an installed terminal AI provider.
 
-- **Works offline**: server defaults to `http://localhost:8501` — no internet needed.
+- **Server URL** defaults to `http://localhost:8000`.
 - **Server URL** is a top-level setting (IPv6-aware) — point it at a remote server anytime.
 - **Long generations** stream progress via Server-Sent Events; the UI never blocks.
 - **Failures** offer the same four options as the classic app: retry stage, retry fresh, skip, dismiss.
 
 ---
+
+## LocalAgent
+
+Keep the local KhabarwaaniAgent checkout beside this repository. AgentAtom and
+TerminalAgentSession resolve from GitHub release ranges; KhabarwaaniAgent stays
+a local path dependency.
+
+Validated with KhabarwaaniAgent 1.1.0, including ThreeSceneStoryCreator 2.1.0
+and its progressive Inquire → Clarify → Payoff instructions. Agent versions come
+from discovery metadata; the app does not pin or relabel them.
+
+The Agent dropdown and its Version dropdown share one row. Both come from the
+package's `KhabarwaaniAgent.agents` discovery descriptors and executable hooks.
+The app has no agent enum or per-agent form switch. Register a new
+`DiscoverableAgentSpec` in the package, rebuild, and its form appears automatically.
+
+Input controls come from JSON Schema: strings, numbers, integers, booleans,
+enums, optional and nullable values, nested objects, and arrays. Defaults are
+preserved. Invalid edits remain visible and prevent Run. **Input JSON** shows
+the same payload validated and sent to the package executor. Drafts are retained
+separately per agent/version while the app is open. Changing agents selects the
+latest executable stable version.
+
+Historical versions listed only as discovery metadata remain unavailable until
+the package supplies their executor. Selecting an older version never executes
+the current spec under that version number.
+
+Unavailable providers are disabled. Research agents require a terminal provider;
+Apple Intelligence runs compatible agents on-device. Runtime settings remain
+separate per provider. Codex, Claude, Antigravity and Grok use installed CLI
+accounts. Each Run uses a temporary workspace with cleanup and cooperative
+cancellation. Raw JSON and typed decoding errors remain available for inspection.
+
+Script refinement is an ordinary catalog agent. The dedicated Script Refine tab,
+its server integration, settings, and Library fine-tuning flow have been removed.
+There is no automatic import of agent results into Studio or Library. Humans
+review content quality.
+
+The CLI launcher supplies EOF on stdin, adds executable search paths, captures
+stdout for failure details, and closes strict object schemas. It translates
+Grok's schema option and omits permission-bypass flags from provider defaults.
+
+This integration currently uses the package discovery-hook branch in CI, pending
+its dependency PR. Production release checkouts continue to use package main.
+CI needs the existing read-only `KHABARWAANI_AGENT_READ_KEY` for that private
+checkout. The xcode-27 runner supplies macOS/Xcode 27.
+
+## Library
+
+Use **Add** with just a title/headline. Script, generation metadata and media are
+optional. The Mac searches news feeds (Bing, then Google News), reads publisher
+Open Graph / Twitter images and checks image availability. Hashtags are derived
+from the title locally. No AI, Python or ScriptMakerServer is used. Internet is
+needed for search and uploads. Search failures keep the saved story and show the
+cause; refresh related content to retry. Editing a title saves a new copy and
+refreshes its related content while preserving the original and imported images.
+
+**Share → Upload to Telegram** sends the title/hashtags, optional local video,
+then source links. It reads the same `~/Documents/telegrambot/bot_token.txt` and
+`~/.cache/telegram_bot_chat_id.json` as ScriptMaker. Enter a chat ID or tap Start
+in the bot to establish your destination. Group sending is opt-in and uses
+`~/Documents/telegrambot/group_ids.txt` plus discovered groups. The sheet also
+accepts a temporary token/chat override. Upload errors report partial delivery;
+retrying may resend messages that already arrived.
+
+**Share → Upload to Google Drive / Sheets** ports ScriptMaker’s Kops reel upload.
+Attach a local MP4, MOV or WebM video first; only this upload endpoint requires
+video. Authentication uses `GOOGLE_ACCESS_TOKEN`, then `~/.clasprc.json` (run
+`npx clasp login`), then an optional temporary access token. The default Apps
+Script deployment matches ScriptMaker and can be overridden in the upload sheet.
+The returned Drive preview, sheet row and timestamp are saved with the story.
+The existing Drive text export remains available separately.
 
 ## Architecture
 
@@ -114,3 +187,20 @@ packaging/mac/build_dmg.sh 1.0
 ## CI
 
 `.github/workflows/ci.yml` — `xcodebuild` Debug build on every push/PR (public repo: free).
+
+Studio news discovery runs locally in Swift using the public personal packages
+[NewsSearch](https://github.com/abhi266raj/NewsSearch) and
+[GoogleTrends](https://github.com/abhi266raj/GoogleTrends). Headline/category refresh
+and Google Trends topics work without ScriptMakerServer; internet is required.
+Bundled sample mode remains available. Script generation still uses the configured
+pipeline server. Both packages offer source and XCFramework products at the same
+version; this app consumes the framework products.
+
+In Library, open a story with a screenplay and choose **Refine with Script Chat**.
+Choose an available local provider, enter a refinement instruction, and review the
+updated draft. Each turn keeps the original script and carries the latest draft
+and consolidated instructions forward. **Save as new script** creates a separate
+Library entry with version history and a link to the source story. Closing or
+cancelling does not save or change the original. This uses KhabarwaaniAgent 1.3.0;
+installed CLI providers require their existing sign-in, or use available Apple
+Intelligence. Generated video and upload receipts are cleared on the refined copy.

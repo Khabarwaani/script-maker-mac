@@ -8,9 +8,25 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: xcode-27
+    defaults:
+      run:
+        working-directory: ScriptMakerMac
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: ScriptMakerMac
+      - name: Check out KhabarwaaniAgent 1.3.0
+        uses: actions/checkout@v4
+        with:
+          repository: Khabarwaani/KhabarwaaniAgent
+          ref: 1.3.0
+          path: KhabarwaaniAgent
+          token: ${{ secrets.KHABARWAANI_AGENT_READ_TOKEN || github.token }}
+          ssh-key: ${{ secrets.KHABARWAANI_AGENT_READ_KEY }}
+          persist-credentials: false
+      - name: Check macOS 27 toolchain
+        run: bash scripts/check-localagent-toolchain.sh
       - name: Build & Test (Debug)
         run: |
           xcodebuild -scheme ScriptMakerMac \

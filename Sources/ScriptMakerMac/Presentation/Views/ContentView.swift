@@ -5,6 +5,7 @@ struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
     @State private var generateViewModel: GenerateViewModel
     @State private var libraryViewModel: LibraryViewModel
+    @State private var localAgentViewModel: LocalAgentViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
@@ -24,6 +25,7 @@ struct ContentView: View {
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
         )
+        _localAgentViewModel = State(wrappedValue: viewModel.localAgentViewModel)
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
         )
@@ -63,6 +65,7 @@ struct ContentView: View {
                 switch viewModel.selectedTab {
                 case .studio: GenerateView(viewModel: generateViewModel)
                 case .library: LibraryView(viewModel: libraryViewModel)
+                case .localAgent: LocalAgentView(viewModel: localAgentViewModel)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -88,51 +91,12 @@ struct LibraryView: View {
     @Bindable var viewModel: LibraryViewModel
 
     var body: some View {
-        Group {
-            if let notice = viewModel.notice, viewModel.stories.isEmpty {
-                notImplementedView(notice)
-            } else if viewModel.stories.isEmpty && !viewModel.isLoading {
-                emptyView
-            } else {
-                VStack(spacing: 0) {
-                    if let notice = viewModel.notice {
-                        Text(notice).font(.callout).foregroundStyle(AppTheme.warning).padding(12)
-                    }
-                    StoryListView(viewModel: viewModel)
-                }
+        VStack(spacing: 0) {
+            if let notice = viewModel.notice {
+                Text(notice).font(.callout).foregroundStyle(AppTheme.warning).padding(12)
             }
+            StoryListView(viewModel: viewModel)
         }
         .task { await viewModel.refresh() }
-    }
-
-    @ViewBuilder
-    private func notImplementedView(_ notice: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "books.vertical")
-                .font(.largeTitle)
-                .foregroundStyle(AppTheme.secondaryInk)
-            Text("Library unavailable")
-                .font(.headline)
-            Text(notice)
-                .font(.callout)
-                .foregroundStyle(AppTheme.secondaryInk)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-    }
-
-    private var emptyView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "books.vertical")
-                .font(.largeTitle)
-                .foregroundStyle(AppTheme.secondaryInk)
-            Text("No saved stories yet.")
-                .font(.headline)
-            Text("Generate a reel in the Studio tab — it auto-saves here on completion.")
-                .font(.callout)
-                .foregroundStyle(AppTheme.secondaryInk)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
     }
 }

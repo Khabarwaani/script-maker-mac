@@ -5,44 +5,47 @@ struct StoryListView: View {
     @State private var storyToDelete: Story?
     @State private var deletingAll = false
     @State private var isCollapsed = false
-
-    @State private var showingAddStorySheet = false
-    @State private var newStoryTitle = ""
-    @State private var newStoryInstruction = ""
-    @State private var newStorySummary = ""
-    @State private var newStoryScreenplay = ""
-    @State private var newStoryEmotion = ""
-    @State private var newStoryFormat = ""
+    @State private var showingAddStory = false
+    @State private var selectedDeletion: Set<String> = []
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack(spacing: 12) {
+            HStack {
                 Button { isCollapsed.toggle() } label: {
                     Label("Stories · \(viewModel.stories.count)", systemImage: isCollapsed ? "chevron.right" : "chevron.down")
                         .font(.headline)
-                }.buttonStyle(.plain).help(Text(verbatim: isCollapsed ? "Expand stories" : "Collapse stories"))
-
-                Spacer()
-
-                Button {
-                    showingAddStorySheet = true
-                } label: {
-                    Label("Add Story", systemImage: "plus")
+                }.buttonStyle(.plain).help(isCollapsed ? "Expand stories" : "Collapse stories")
+                if viewModel.selectedStoryIDs.count > 1 {
+                    Text("\(viewModel.selectedStoryIDs.count) selected").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                 }
-                .help(Text(verbatim: "Add or import a story to the library"))
-
+                Spacer()
+                if viewModel.selectedStoryIDs.count > 1 {
+                    Text("\(viewModel.selectedStoryIDs.count) selected").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                }
+                Button {
+                    viewModel.prepareNewStory()
+                    showingAddStory = true
+                } label: { LibraryActionLabel(icon: "plus") }
+                .buttonStyle(.plain)
+                .help("Add story from a title").accessibilityLabel("Add story")
                 Button { Task { await viewModel.refresh() } } label: {
-                    Image(systemName: "arrow.clockwise")
-                }.help(Text(verbatim: "Refresh library")).disabled(viewModel.isLoading)
-
-                Button { deletingAll = true } label: {
-                    Image(systemName: "trash")
-                }.help(Text(verbatim: "Delete all stories")).accessibilityLabel("Delete all stories")
-                    .disabled(viewModel.stories.isEmpty || viewModel.isLoading)
+                    LibraryActionLabel(icon: "arrow.clockwise", isLoading: viewModel.isLoading)
+                }.buttonStyle(.plain).help("Refresh library").disabled(viewModel.isLoading)
+                Menu {
+                    Button("Select all") { isCollapsed = false; viewModel.selectAllStories() }
+                    Button("Deselect all") { viewModel.selectStories([]) }.disabled(viewModel.selectedStoryIDs.isEmpty)
+                    Divider()
+                    Button("Delete selected stories (\(viewModel.selectedStoryIDs.count))", role: .destructive) {
+                        selectedDeletion = viewModel.selectedStoryIDs
+                    }.disabled(viewModel.selectedStoryIDs.isEmpty)
+                    Button("Delete all stories…", role: .destructive) { deletingAll = true }
+                } label: { LibraryActionLabel(icon: "trash") }
+                    .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
+                    .help("Select or delete stories").accessibilityLabel("Story selection and deletion")
+                    .disabled(viewModel.stories.isEmpty || viewModel.isLoading || viewModel.isDeletingStories)
             }
             Divider().overlay(AppTheme.line)
             if isCollapsed {
-                storyList(limit: 2).frame(height: 116)
                 detail
             } else {
                 HStack(alignment: .top, spacing: 24) {
@@ -52,11 +55,7 @@ struct StoryListView: View {
             }
         }
         .padding(24).background(AppTheme.paper)
-        .onChange(of: isCollapsed) { _, collapsed in
-            if collapsed && !viewModel.stories.prefix(2).contains(where: { $0.id == viewModel.selectedStoryID }) {
-                viewModel.selectedStoryID = viewModel.stories.first?.id
-            }
-        }
+        .sheet(isPresented: $showingAddStory) { AddLibraryStoryView(viewModel: viewModel) }
         .alert("Delete story?", isPresented: Binding(get: { storyToDelete != nil }, set: { if !$0 { storyToDelete = nil } })) {
             Button("Cancel", role: .cancel) { storyToDelete = nil }
             Button("Delete story", role: .destructive) {
@@ -74,96 +73,42 @@ struct StoryListView: View {
         } message: {
             Text("All \(viewModel.stories.count) saved stories will be permanently deleted. This cannot be undone.")
         }
-        .sheet(isPresented: $showingAddStorySheet) {
-            NavigationStack {
-                Form {
-                    Section("Story Details") {
-                        TextField("Title", text: $newStoryTitle)
-                        TextField("Emotion (e.g. Curiosity)", text: $newStoryEmotion)
-                        TextField("Format (e.g. Normal Talk)", text: $newStoryFormat)
-                    }
-                    Section("Instruction") {
-                        TextField("Instruction…", text: $newStoryInstruction, axis: .vertical)
-                            .lineLimit(2...4)
-                    }
-                    Section("Summary") {
-                        TextField("Summary", text: $newStorySummary, axis: .vertical)
-                            .lineLimit(3...6)
-                    }
-                    Section("Screenplay") {
-                        TextField("Screenplay content…", text: $newStoryScreenplay, axis: .vertical)
-                            .lineLimit(6...12)
-                    }
-                }
-                .formStyle(.grouped)
-                .navigationTitle("Add Story")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            resetNewStoryForm()
-                            showingAddStorySheet = false
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            let title = newStoryTitle
-                            let summary = newStorySummary
-                            let screenplay = newStoryScreenplay
-                            let instruction = newStoryInstruction
-                            let emotion = newStoryEmotion
-                            let format = newStoryFormat
-                            Task {
-                                await viewModel.addStory(
-                                    title: title,
-                                    summary: summary,
-                                    screenplay: screenplay,
-                                    instruction: instruction,
-                                    emotion: emotion,
-                                    format: format
-                                )
-                            }
-                            resetNewStoryForm()
-                            showingAddStorySheet = false
-                        }
-                        .disabled(newStoryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-                .frame(minWidth: 480, minHeight: 460)
+        .alert("Delete \(selectedDeletion.count) selected stories?", isPresented: Binding(get: { !selectedDeletion.isEmpty }, set: { if !$0 { selectedDeletion = [] } })) {
+            Button("Cancel", role: .cancel) { selectedDeletion = [] }
+            Button("Delete selected stories", role: .destructive) {
+                let ids = selectedDeletion
+                selectedDeletion = []
+                Task { await viewModel.deleteStories(ids: ids) }
             }
-        }
+        } message: { Text("Only the selected stories will be permanently deleted. This cannot be undone.") }
     }
 
-    private func resetNewStoryForm() {
-        newStoryTitle = ""
-        newStoryInstruction = ""
-        newStorySummary = ""
-        newStoryScreenplay = ""
-        newStoryEmotion = ""
-        newStoryFormat = ""
-    }
-
-    private func storyList(limit: Int? = nil) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 4) {
-                ForEach(Array(viewModel.stories.prefix(limit ?? viewModel.stories.count))) { story in
-                    Button { viewModel.selectedStoryID = story.id } label: {
+    private func storyList() -> some View {
+        List(selection: Binding(get: { viewModel.selectedStoryIDs }, set: { viewModel.selectStories($0) })) {
+                ForEach(viewModel.stories) { story in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(story.title).font(.body.weight(.medium)).lineLimit(2)
-                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")Generated \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? (story.stageOutputs?.isEmpty == false ? "Generated" : "Saved") : "Edited") \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                             Text(story.id).font(.caption2.monospaced()).foregroundStyle(AppTheme.secondaryInk).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                        .background(viewModel.selectedStoryID == story.id ? AppTheme.accentTint : Color.clear, in: RoundedRectangle(cornerRadius: 8))
                         .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityValue(viewModel.selectedStoryID == story.id ? "Selected" : "")
+                    .tag(story.id)
+                    .listRowInsets(EdgeInsets()).listRowSeparator(.hidden)
+                    .listRowBackground(viewModel.selectedStoryIDs.contains(story.id) ? AppTheme.accentTint : Color.clear)
                     .contextMenu {
+                        Button("Copy script") { viewModel.copy(story.scriptText ?? "", label: "Script") }
+                            .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
+                        Divider()
+                        if viewModel.selectedStoryIDs.count > 1 {
+                            Button("Delete selected stories", role: .destructive) { selectedDeletion = viewModel.selectedStoryIDs }
+                        }
                         Button("Delete story", role: .destructive) { storyToDelete = story }
                     }
                 }
-            }
-        }.scrollIndicators(.visible).background(ScrollBarConfiguration())
+        }.listStyle(.sidebar).scrollContentBackground(.hidden)
+            .scrollIndicators(.visible).background(ScrollBarConfiguration())
+            .onDeleteCommand { selectedDeletion = viewModel.selectedStoryIDs }
     }
 
     @ViewBuilder
@@ -174,8 +119,60 @@ struct StoryListView: View {
             }
             .id(story.id).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            Text("Select a story").foregroundStyle(AppTheme.secondaryInk)
+            VStack(spacing: 12) {
+                Image(systemName: "doc.text").font(.largeTitle)
+                Text(viewModel.stories.isEmpty ? "No saved stories" : "Select a story").font(.headline)
+                if viewModel.stories.isEmpty {
+                    Text("Use the plus button to add a news title, or generate a story in Studio.")
+                        .font(.callout).multilineTextAlignment(.center)
+                }
+            }.foregroundStyle(AppTheme.secondaryInk)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+private struct AddLibraryStoryView: View {
+    @Bindable var viewModel: LibraryViewModel
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var titleFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Add story").font(.title2.weight(.semibold))
+            Text("Enter a news title. Related news, images and hashtags are fetched directly from the web; no AI or Script Maker server is needed.")
+                .font(.callout).foregroundStyle(AppTheme.secondaryInk)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Title / headline").font(.headline)
+                TextField("News title or headline", text: $viewModel.newStoryTitle)
+                    .textFieldStyle(.roundedBorder).focused($titleFocused)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Script (optional)").font(.headline)
+                TextEditor(text: $viewModel.newStoryScript)
+                    .font(.body).scrollContentBackground(.hidden).padding(8)
+                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+                    .accessibilityLabel("Story script")
+                    .frame(minHeight: 240)
+                    .background(ScrollBarConfiguration())
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                    .buttonStyle(StudioButtonStyle())
+                    .disabled(viewModel.isAddingStory)
+                if viewModel.isAddingStory { ProgressView().controlSize(.small); Text("Fetching related news…").font(.caption) }
+                Button("Add story") {
+                    Task { if await viewModel.addStory() { dismiss() } }
+                }
+                .buttonStyle(StudioPrimaryButtonStyle()).keyboardShortcut(.defaultAction)
+                .disabled(!viewModel.canAddStory)
+            }
+        }
+        .padding(24).frame(width: 600, height: 600)
+        .interactiveDismissDisabled(viewModel.isAddingStory)
+        .foregroundStyle(AppTheme.ink).background(AppTheme.card)
+        .onAppear { titleFocused = true }
     }
 }

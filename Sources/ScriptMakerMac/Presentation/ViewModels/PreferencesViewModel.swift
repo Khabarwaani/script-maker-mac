@@ -8,35 +8,75 @@ import Observation
 final class PreferencesViewModel {
     private let config: AppConfig
     private let connectionChecker: any ServerConnectionChecking
-    private let catalogProvider: any StudioCatalogProviding
-    private var catalog: StudioCatalog?
+    private let modelCatalogProvider: (any AIModelCatalogProviding)?
+    private var modelCatalog: AIModelCatalog?
+    var isLoadingModels = false
+    var isEditingModel = false
+    var draftProvider = ""
+    var draftModel = ""
+    var draftReasoning = "default"
+    var modelError: String?
+
+    var selectedModelIdentifier: String { config.selectedAI.identifier }
+    var recentModels: [String] { Array(([selectedModelIdentifier] + config.recentAIIdentifiers.filter { $0 != selectedModelIdentifier }).prefix(5)) }
+    var providerOptions: [String] { modelCatalog?.providers.map(\.id) ?? [] }
+    var modelOptions: [String] { modelCatalog?.providers.first { $0.id == draftProvider }?.models.map(\.id) ?? [] }
+    var reasoningOptions: [String] { modelCatalog?.providers.first { $0.id == draftProvider }?.models.first { $0.id == draftModel }?.reasoning ?? [] }
+    var draftIdentifier: String { AIConfig(source: draftProvider, model: draftModel, power: draftReasoning).identifier }
+    var canSaveModel: Bool { providerOptions.contains(draftProvider) && modelOptions.contains(draftModel) && reasoningOptions.contains(draftReasoning) }
+
+    func selectRecentModel(_ identifier: String) {
+        guard let selection = AIConfig(identifier: identifier) else { return }
+        config.selectAI(selection)
+    }
+
+    func editModel() async {
+        draftProvider = config.selectedAI.source
+        draftModel = config.selectedAI.model
+        draftReasoning = config.selectedAI.power.lowercased()
+        isEditingModel = true
+        await refreshModelCatalog()
+    }
+
+    func refreshModelCatalog() async {
+        guard !isLoadingModels else { return }
+        isLoadingModels = true
+        defer { isLoadingModels = false }
+        modelError = nil
+        modelCatalog = nil
+        do {
+            guard let modelCatalogProvider else { throw APIError.notImplemented("Model catalog is unavailable.") }
+            let loaded = try await modelCatalogProvider.load(localJSON: config.dataSource != .server, delay: config.localJSONDelay, serverURL: config.dataSource == .server ? try config.baseURL() : nil)
+            guard !loaded.providers.isEmpty, loaded.providers.allSatisfy({ !$0.id.isEmpty && !$0.models.isEmpty && $0.models.allSatisfy({ !$0.id.isEmpty && !$0.reasoning.isEmpty }) }) else { throw APIError.malformed("Empty AI model catalog") }
+            modelCatalog = loaded
+            if !providerOptions.contains(draftProvider) { draftProvider = providerOptions.first ?? "" }
+            updateModelOptions()
+        } catch { modelError = error.localizedDescription }
+    }
+
+    func updateModelOptions() {
+        if !modelOptions.contains(draftModel) { draftModel = modelOptions.first ?? "" }
+        if !reasoningOptions.contains(draftReasoning) { draftReasoning = reasoningOptions.first ?? "" }
+    }
+
+    func saveModelSelection() {
+        guard canSaveModel else { modelError = "Choose a provider, model and reasoning level from the catalog."; return }
+        config.selectAI(AIConfig(source: draftProvider, model: draftModel, power: draftReasoning))
+        isEditingModel = false
+    }
 
     var draftURL: String
     var dataSource: DataSource
-    var aiSource: String
-    var aiModel: String
-    var aiPower: String
-    var aiSources: [String] = []
-    var aiModels: [String] = ["Default"]
-    var aiPowers: [String] = ["Default"]
     var errorMessage: String?
     var noticeMessage: String?
     var isTesting = false
 
-    init(
-        config: AppConfig,
-        connectionChecker: any ServerConnectionChecking,
-        catalogProvider: any StudioCatalogProviding = BundledStudioCatalog()
-    ) {
+    init(config: AppConfig, connectionChecker: any ServerConnectionChecking, modelCatalogProvider: (any AIModelCatalogProviding)? = nil) {
         self.config = config
         self.connectionChecker = connectionChecker
-        self.catalogProvider = catalogProvider
+        self.modelCatalogProvider = modelCatalogProvider
         self.draftURL = config.serverURL
         self.dataSource = config.dataSource
-        self.aiSource = config.aiSource
-        self.aiModel = config.aiModel
-        self.aiPower = config.aiPower
-        loadCatalog()
     }
 
     var localJSONDelay: Double {
@@ -50,35 +90,9 @@ final class PreferencesViewModel {
     }
 
     var currentURL: String { config.serverURL }
-    var currentDataSource: DataSource { config.dataSource }
-    var currentAISource: String { config.aiSource }
-    var currentAIModel: String { config.aiModel }
-    var currentAIPower: String { config.aiPower }
     var appearance: AppAppearance {
         get { config.appearance }
         set { config.appearance = newValue }
-    }
-
-    func modelLabel(_ id: String) -> String {
-        catalog?.modelCatalogs[aiSource]?.models.first { $0.id == id }?.label ?? id
-    }
-
-    func updateAIOptions(resetModel: Bool = false) {
-        aiModels = ["Default"] + (catalog?.modelCatalogs[aiSource]?.models.map(\.id) ?? [])
-        if resetModel || !aiModels.contains(aiModel) { aiModel = "Default" }
-        aiPowers = ["Default"] + (catalog?.modelCatalogs[aiSource]?.models.first { $0.id == aiModel }?.efforts.map { $0.capitalized } ?? [])
-        if !aiPowers.contains(aiPower) { aiPower = "Default" }
-    }
-
-    private func loadCatalog() {
-        if let loaded = try? catalogProvider.load() {
-            catalog = loaded
-            aiSources = loaded.aiSources
-            if !aiSources.contains(aiSource), let first = aiSources.first {
-                aiSource = first
-            }
-            updateAIOptions()
-        }
     }
 
     /// Save all staged changes to config.
@@ -86,11 +100,6 @@ final class PreferencesViewModel {
         guard !isTesting else { return }
         errorMessage = nil
         noticeMessage = nil
-
-        // Save AI preferences
-        config.aiSource = aiSource
-        config.aiModel = aiModel
-        config.aiPower = aiPower
 
         if dataSource != .server {
             if let normalized = try? AppConfig.normalize(raw: draftURL), URL(string: normalized) != nil {
@@ -120,10 +129,6 @@ final class PreferencesViewModel {
     func resetToDefaults() {
         draftURL = AppConfig.defaultServerURL
         dataSource = .offline
-        aiSource = "Antigravity"
-        updateAIOptions(resetModel: true)
-        aiModel = "Default"
-        aiPower = "Default"
         errorMessage = nil
         noticeMessage = "Defaults restored. Save to apply."
     }
