@@ -388,8 +388,8 @@ final class GenerateViewModel {
             if isLocalJSON {
                 response = try await api().fetchTopTitles(category: categoryParam, n: pageSize)
             } else {
-    response = try await newsProvider.headlines(category: categoryParam, limit: pageSize)
-}
+                response = try await newsProvider.headlines(category: categoryParam, limit: pageSize)
+            }
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
                 config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
