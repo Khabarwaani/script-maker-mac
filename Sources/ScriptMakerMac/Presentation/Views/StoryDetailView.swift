@@ -67,6 +67,8 @@ struct StoryDetailView: View {
                         StoryDetailSection("Video") {
                             if let url = URL(string: videoURL) {
                                 StoryVideoPreview(url: url)
+                                    .frame(height: 260)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .overlay(alignment: .topTrailing) {
                                         Button { Task { await viewModel.remove(.video(videoURL), from: story.id) } } label: {
                                             Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)
@@ -327,13 +329,33 @@ private struct StoryImagesSection: View {
     }
 }
 
-private struct StoryVideoPreview: View {
+private struct StoryVideoPreview: NSViewRepresentable {
     let url: URL
-    @State private var player: AVPlayer
-    init(url: URL) { self.url = url; _player = State(initialValue: AVPlayer(url: url)) }
-    var body: some View {
-        VideoPlayer(player: player).frame(height: 260).clipShape(RoundedRectangle(cornerRadius: 8))
-            .onDisappear { player.pause() }
+
+    final class Coordinator {
+        var sourceURL: URL?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .default
+        view.videoGravity = .resizeAspect
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        guard context.coordinator.sourceURL != url else { return }
+        view.player?.pause()
+        view.player = AVPlayer(url: url)
+        context.coordinator.sourceURL = url
+    }
+
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: Coordinator) {
+        view.player?.pause()
+        view.player = nil
+        coordinator.sourceURL = nil
     }
 }
 
