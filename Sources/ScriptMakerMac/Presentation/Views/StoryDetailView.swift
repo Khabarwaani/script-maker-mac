@@ -176,7 +176,7 @@ private struct StoryDetailToolbar: View {
                         }
                     }.disabled(story.imageURLs?.isEmpty != false || viewModel.isCopyingImage)
                 }
-            } label: { LibraryActionLabel(icon: "photo.badge.plus") }
+            } label: { LibraryActionLabel(icon: "rectangle.stack.badge.plus") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Add media or copy an image").accessibilityLabel("Media actions").disabled(viewModel.isImportingMedia)
             Divider().frame(height: 24)
