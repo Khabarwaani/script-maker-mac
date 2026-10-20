@@ -47,15 +47,15 @@ struct LocalStoryUploadClient: StoryUploading {
     }
 
     private func telegram(_ story: Story, options: LibraryUploadOptions) async throws -> LibraryUploadResult {
-        let fileToken = lines(try readOptional("Documents/telegrambot/bot_token.txt")).first ?? ""
-        let token = fileToken.isEmpty ? options.telegramToken.trimmingCharacters(in: .whitespacesAndNewlines) : fileToken
+        let savedToken = options.telegramToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = savedToken.isEmpty ? lines(try readOptional("Documents/telegrambot/bot_token.txt")).first ?? "" : savedToken
         guard !token.isEmpty, token.allSatisfy({ $0.isLetter || $0.isNumber || ":_-".contains($0) }) else {
-            throw LibraryOperationError.invalidInput("Set up Telegram: put your BotFather token in ~/Documents/telegrambot/bot_token.txt, or enter it in the upload sheet.")
+            throw LibraryOperationError.invalidInput("Set up Telegram in Settings → Uploads: save your bot token and chat ID.")
         }
         var chatID = options.telegramChatID.trimmingCharacters(in: .whitespacesAndNewlines)
         if chatID.isEmpty, let data = try readOptional(".cache/telegram_bot_chat_id.json") {
             guard let cached = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw LibraryOperationError.invalidInput("Could not read cached Telegram chat ID. Enter a chat ID in the upload sheet.")
+                throw LibraryOperationError.invalidInput("Could not read cached Telegram chat ID. Save a chat ID in Settings → Uploads.")
             }
             if let number = cached["chat_id"] as? NSNumber { chatID = number.stringValue }
             else { chatID = cached["chat_id"] as? String ?? "" }
@@ -70,7 +70,7 @@ struct LocalStoryUploadClient: StoryUploading {
                 ((update["message"] ?? update["channel_post"]) as? [String: Any])?["chat"] as? [String: Any]
             }
             guard let chat = chats.first(where: { $0["type"] as? String == "private" }), let id = chat["id"] as? NSNumber else {
-                throw LibraryOperationError.invalidInput("Open your bot in Telegram and tap Start, or enter the destination chat ID.")
+                throw LibraryOperationError.invalidInput("Open your bot in Telegram and tap Start, or save the destination chat ID in Settings → Uploads.")
             }
             chatID = id.stringValue
             let data = try JSONSerialization.data(withJSONObject: ["chat_id": id])
@@ -235,6 +235,8 @@ struct LocalStoryUploadClient: StoryUploading {
     }
 
     private func googleToken(manual: String) async throws -> String {
+        let savedToken = manual.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !savedToken.isEmpty { return savedToken }
         if let token = environmentToken()?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty { return token }
         if let data = try readOptional(".clasprc.json") {
             guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -261,9 +263,7 @@ struct LocalStoryUploadClient: StoryUploading {
             }
             return token
         }
-        let token = manual.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty else { throw LibraryOperationError.invalidInput("Set up Google upload: run npx clasp login once, or enter a Google access token in the upload sheet.") }
-        return token
+        throw LibraryOperationError.invalidInput("Set up Google upload in Settings → Uploads: save an access token, or sign in once with npx clasp login.")
     }
 
     private func googleRequest(_ initial: URLRequest) async throws -> (Data, URLResponse) {

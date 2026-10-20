@@ -25,7 +25,7 @@ struct StudioDetailView: View {
                         }
                         .foregroundStyle(AppTheme.ink)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.vertical, 4)
                         .background(AppTheme.sunken, in: Capsule())
                     }
 
@@ -34,18 +34,20 @@ struct StudioDetailView: View {
                     if viewModel.isRunning {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(AppTheme.accent)
+                                .fill(AppTheme.ongoingColor)
                                 .frame(width: 8, height: 8)
                             Text("Ongoing: \(viewModel.ongoingDescription ?? "Running…")")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppTheme.accent)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(AppTheme.ongoingColor)
+                                .lineLimit(1)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                        .background(AppTheme.ongoingColor.opacity(0.18), in: Capsule())
                     }
                 }
-                .frame(height: 34)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 34)
 
                 if viewModel.errorMessage != nil {
                     errorBannerView
@@ -177,10 +179,10 @@ struct StudioDetailView: View {
                             Text("Ongoing")
                                 .font(.caption2.weight(.bold))
                                 .textCase(.uppercase)
-                                .foregroundStyle(AppTheme.accent)
-                                .padding(.horizontal, 6)
+                                .foregroundStyle(AppTheme.ongoingColor)
+                                .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
-                                .background(AppTheme.accent.opacity(0.15), in: Capsule())
+                                .background(AppTheme.ongoingColor.opacity(0.18), in: Capsule())
                         }
                     }
 
@@ -325,14 +327,14 @@ struct StudioDetailView: View {
 
             if isRunning {
                 Circle()
-                    .fill(AppTheme.accent)
-                    .frame(width: 6, height: 6)
+                    .fill(AppTheme.ongoingColor)
+                    .frame(width: 7, height: 7)
             }
         }
         .font(.caption)
-        .foregroundStyle(isSelected ? AppTheme.accent : isDone ? AppTheme.success : isRunning ? AppTheme.accent : AppTheme.secondaryInk)
+        .foregroundStyle(isSelected ? AppTheme.accent : isDone ? AppTheme.success : isRunning ? AppTheme.ongoingColor : AppTheme.secondaryInk)
         .padding(10)
-        .background(isSelected ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(isRunning ? AppTheme.accent.opacity(0.5) : AppTheme.line, lineWidth: 1))
+        .background(isSelected ? AppTheme.sunken : isRunning ? AppTheme.ongoingColor.opacity(0.06) : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(isRunning ? AppTheme.ongoingColor.opacity(0.65) : AppTheme.line, lineWidth: isRunning ? 1.5 : 1))
     }
 }

@@ -57,7 +57,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		LL02 = {isa = PBXBuildFile; fileRef = LL12; };
 		LL12 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoryUploadClient.swift; sourceTree = "<group>"; };
 		LL03 = {isa = PBXBuildFile; fileRef = LL13; };
-		LL13 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryUploadView.swift; sourceTree = "<group>"; };
+		LL13 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryUploadSettingsView.swift; sourceTree = "<group>"; };
 		LL04 = {isa = PBXBuildFile; fileRef = LL14; };
 		LL14 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
 		/* Build files */
@@ -351,7 +351,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				L105 /* LocalAgentView.swift */,
-				LL13 /* LibraryUploadView.swift */,
+				LL13 /* LibraryUploadSettingsView.swift */,
 				DY102 /* DynamicAgentInputForm.swift */,
 				R008 /* ContentView.swift */,
 				R049 /* AppTheme.swift */,
@@ -511,7 +511,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			buildActionMask = 2147483647;
 			files = (
 				L005 /* LocalAgentView.swift in Sources */,
-				LL03 /* LibraryUploadView.swift in Sources */,
+				LL03 /* LibraryUploadSettingsView.swift in Sources */,
 				DY002 /* DynamicAgentInputForm.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,

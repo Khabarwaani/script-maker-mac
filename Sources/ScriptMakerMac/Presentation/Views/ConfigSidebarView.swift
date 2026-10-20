@@ -29,20 +29,10 @@ struct ConfigSidebarView: View {
             EmptyView()
         } content: {
             StudioRow("Source", inset: 0) {
-                HStack(spacing: 8) {
-                    StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
-                        .disabled(viewModel.isRefreshingCategories)
-                        .onChange(of: viewModel.selectedStorySource) { _, _ in
-                            Task { await viewModel.onStorySourceChanged() }
-                        }
-                    StudioRefreshButton(
-                        isRefreshing: viewModel.isRefreshingCategories,
-                        helpText: "Refresh news categories"
-                    ) {
-                        Task { await viewModel.loadNewsCategories() }
+                StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                    .onChange(of: viewModel.selectedStorySource) { _, _ in
+                        Task { await viewModel.onStorySourceChanged() }
                     }
-                    .padding(.trailing, 10)
-                }
             }
             if viewModel.isHashtagSource {
                 StudioRow("Trending hashtag", inset: 0) {
@@ -212,7 +202,6 @@ struct ConfigSidebarView: View {
             if let notice = viewModel.setupNotice { Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
             Button { Task { await viewModel.start() } } label: {
                 HStack {
-                    if viewModel.isRunning { ProgressView().controlSize(.small) }
                     Text(viewModel.isRunning ? "Generating…" : "Generate")
                 }.frame(maxWidth: .infinity)
             }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)

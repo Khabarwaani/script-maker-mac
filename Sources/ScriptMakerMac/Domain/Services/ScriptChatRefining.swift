@@ -19,7 +19,17 @@ protocol ScriptChatRefining: Sendable {
 }
 
 struct ScriptChatTurn: Identifiable, Equatable, Sendable {
-    let id = UUID()
+    let id: UUID
     let userInstruction: String
     let script: String
+    let instruction: String
+    let instructionOverride: String?
+
+    init(id: UUID = UUID(), userInstruction: String, script: String, instruction: String, instructionOverride: String? = nil) {
+        self.id = id
+        self.userInstruction = userInstruction
+        self.script = script
+        self.instruction = instruction
+        self.instructionOverride = instructionOverride
+    }
 }

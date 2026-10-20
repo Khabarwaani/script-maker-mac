@@ -16,10 +16,16 @@ final class MainReleaseSampleAPITests: XCTestCase {
 @MainActor
 private final class TestClipboard: ClipboardWriting {
     var contents: String?
+    var imageData: Data?
     var succeeds = true
     func write(_ text: String) -> Bool {
         guard succeeds else { return false }
         contents = text
+        return true
+    }
+    func writeImage(_ data: Data) -> Bool {
+        guard succeeds else { return false }
+        imageData = data
         return true
     }
 }
@@ -36,6 +42,34 @@ private actor MainReleaseWorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class MainReleaseLocalWorkflowTests: XCTestCase {
+    func testCopyImageWritesCachedBytesAndReportsClipboardFailure() async {
+        let clipboard = TestClipboard()
+        let vm = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard)
+        let data = Data([4, 5, 6])
+        vm.imagePreviews["sample://image"] = data
+        await vm.copyImage("sample://image")
+        XCTAssertEqual(clipboard.imageData, data)
+        XCTAssertEqual(vm.copyFeedback, "Image copied")
+        clipboard.succeeds = false
+        await vm.copyImage("sample://image")
+        XCTAssertTrue(vm.copyFeedback?.contains("Could not copy image") == true)
+        XCTAssertFalse(vm.isCopyingImage)
+    }
+
+    func testCopyImageLoadsUncachedImageAndReportsLoadFailure() async {
+        let clipboard = TestClipboard()
+        let url = URL(fileURLWithPath: "/tmp/image.png")
+        let vm = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url))
+        await vm.copyImage(url.absoluteString)
+        XCTAssertEqual(clipboard.imageData, Data([1, 2, 3]))
+        let failing = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url, fails: true))
+        clipboard.imageData = nil
+        await failing.copyImage(url.absoluteString)
+        XCTAssertNil(clipboard.imageData)
+        XCTAssertTrue(failing.copyFeedback?.contains("Could not copy image") == true)
+        XCTAssertFalse(failing.isCopyingImage)
+    }
+
     func testAddStoryAcceptsOptionalScriptAndSelectsSavedUUID() async throws {
         let repository = MainReleaseWorkflowStoryRepository()
         let library = LibraryViewModel(config: releaseTestConfig(), repository: repository)
@@ -253,7 +287,10 @@ private struct TestMediaImporter: LibraryMediaImporting {
         if fails { throw APIError.transport("Test import failure") }
         return destination
     }
-    func imageData(at url: URL) async throws -> Data { Data([1, 2, 3]) }
+    func imageData(at url: URL) async throws -> Data {
+        if fails { throw APIError.transport("Test image load failure") }
+        return Data([1, 2, 3])
+    }
 }
 
 final class LibraryNetworkContractTests: XCTestCase {

@@ -13,6 +13,7 @@ final class GenerateViewModel {
     private let newsProvider: any StudioNewsProviding
     private let catalogProvider: any StudioCatalogProviding
     private var catalog: StudioCatalog?
+    private var localNewsCategories: NewsCategoriesResponse?
     private var eventTask: Task<Void, Never>?
 
     /// Config for child views that need it (e.g. thumbnails).
@@ -65,10 +66,13 @@ final class GenerateViewModel {
     /// Formatted total elapsed time across the entire pipeline.
     var formattedTotalElapsed: String? {
         guard let ms = totalElapsedMs, ms > 0 else { return nil }
-        if ms < 1000 {
-            return "\(ms)ms"
+        let sec = Double(ms) / 1000.0
+        if sec >= 10.0 {
+            return "\(Int(round(sec)))s"
+        } else if sec >= 1.0 {
+            return String(format: "%.1fs", sec)
         } else {
-            return String(format: "%.1fs", Double(ms) / 1000.0)
+            return String(format: "%.2fs", sec)
         }
     }
 
@@ -297,7 +301,7 @@ final class GenerateViewModel {
         do {
             let loaded = try catalogProvider.load()
             catalog = loaded
-            storySources = loaded.storySources
+            if isLocalJSON || localNewsCategories == nil { storySources = loaded.storySources }
             aiSources = loaded.aiSources
             emotions = loaded.emotions
             characterKinds = loaded.characterKinds
@@ -495,18 +499,20 @@ final class GenerateViewModel {
         }
     }
 
-    var isRefreshingCategories = false
-
     /// Load categories from the local package, or the bundled sample catalog.
     func loadNewsCategories() async {
-        isRefreshingCategories = true
-        defer { isRefreshingCategories = false }
         guard !isLocalJSON else {
             loadCatalog()
             return
         }
         do {
-            let response = try await newsProvider.categories()
+            let response: NewsCategoriesResponse
+            if let cached = localNewsCategories {
+                response = cached
+            } else {
+                response = try await newsProvider.categories()
+                if !response.categories.isEmpty { localNewsCategories = response }
+            }
             let categoryLabels = response.categories.map(\.label)
             if !categoryLabels.isEmpty {
                 var combined = [Self.manualSourceLabel]
@@ -524,9 +530,6 @@ final class GenerateViewModel {
                         selectedStorySource = first
                     }
                 }
-                if !isManualSource && !isHashtagSource {
-                    await refreshHeadlines(forceFresh: false)
-                }
             }
         } catch {
             setError(error)
@@ -540,6 +543,8 @@ final class GenerateViewModel {
             await loadNewsCategories()
             if isHashtagSource {
                 await refreshHashtags()
+            } else if !isManualSource {
+                await refreshHeadlines(forceFresh: false)
             }
         } else {
             loadCatalog()
@@ -801,7 +806,7 @@ final class GenerateViewModel {
                     }
 
                 case .end(let endPayload):
-                    if let endMs = endPayload?.elapsedMs {
+                    if let endMs = endPayload?.effectiveElapsedMs {
                         streamTotalElapsedMs = endMs
                     }
                     if let endPayload, endPayload.result == "failure" {
@@ -816,7 +821,7 @@ final class GenerateViewModel {
                             }
                         }
                         generationCompleted = true
-                        await saveToLibrary()
+                        await saveToLibrary(endScripts: endPayload?.scripts)
                     }
                 }
             }
@@ -1002,7 +1007,43 @@ final class GenerateViewModel {
     // MARK: - Helpers
 
     /// Save the completed generation to the Library via the repository.
-    private func saveToLibrary() async {
+    /// Prioritizes final script text and title delivered in stream end payload.
+    private func saveToLibrary(endScripts: [StreamEndScript]? = nil) async {
+        if let endScripts, !endScripts.isEmpty {
+            for (index, script) in endScripts.enumerated() {
+                guard let scriptText = script.text, !scriptText.isEmpty else { continue }
+                let id = generatedStoryIDs[index] ?? UUID().uuidString
+                generatedStoryIDs[index] = id
+                let rawTitle = script.title ?? (!StringFormatting.isBlank(topic) ? topic : (!StringFormatting.isBlank(selectedHeadline) ? selectedHeadline : "Untitled Story"))
+                let title = StringFormatting.isBlank(rawTitle) ? "Untitled Story \(index + 1)" : rawTitle
+                let initialVersions = [
+                    StoryScriptVersion(
+                        number: 1,
+                        text: scriptText,
+                        createdAt: generationCreatedAt,
+                        instruction: instructionText.isEmpty ? nil : instructionText
+                    )
+                ]
+                let story = Story(
+                    id: id,
+                    title: title,
+                    summary: "",
+                    headline: selectedHeadline,
+                    createdAt: generationCreatedAt,
+                    status: "completed",
+                    emotion: selectedEmotion,
+                    format: selectedFormat,
+                    scriptText: scriptText,
+                    instruction: instructionText.isEmpty ? nil : instructionText,
+                    generationNumber: script.id ?? (index + 1),
+                    scriptVersions: initialVersions
+                )
+                await repository.save(story)
+            }
+            isSavedToLibrary = true
+            return
+        }
+
         let scripts = stagePayloads[.script]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.validation]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.storyboard]?["scripts"] as? [[String: Any]]

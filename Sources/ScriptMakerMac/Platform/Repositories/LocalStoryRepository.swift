@@ -64,6 +64,19 @@ final class LocalStoryRepository: StoryRepository, @unchecked Sendable {
 struct MacClipboardWriter: ClipboardWriting {
     let store: PasteboardStore
     func write(_ text: String) -> Bool { store.write(text) }
+    func writeImage(_ data: Data) -> Bool { store.writeImage(data) }
+}
+
+@MainActor
+struct MacUploadSettingsStore: UploadSettingsStoring {
+    let credentials: CredentialStore
+    func load() throws -> LibraryUploadOptions {
+        guard let data = try credentials.read() else { return LibraryUploadOptions() }
+        return try JSONDecoder().decode(LibraryUploadOptions.self, from: data)
+    }
+    func save(_ options: LibraryUploadOptions) throws {
+        try credentials.write(JSONEncoder().encode(options))
+    }
 }
 
 @MainActor

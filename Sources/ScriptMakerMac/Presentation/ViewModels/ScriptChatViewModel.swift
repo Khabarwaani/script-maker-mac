@@ -6,6 +6,8 @@ final class ScriptChatViewModel {
     private let service: any ScriptChatRefining
     private var task: Task<Void, Never>?
     private var operationID = UUID()
+    private var historyEdits: [UUID: String] = [:]
+    private var instructionDraft = ""
     private(set) var source: Story?
     private(set) var draft = ScriptChatDraft(latestScript: "", instruction: "")
     private(set) var turns: [ScriptChatTurn] = []
@@ -20,25 +22,59 @@ final class ScriptChatViewModel {
 
     init(service: any ScriptChatRefining) { self.service = service }
 
-    var canRefine: Bool {
+    var originalScript: String { source?.scriptText ?? "" }
+    var originalInstruction: String { source?.instruction ?? "" }
+    var hasHistoryEdits: Bool { !historyEdits.isEmpty }
+    var consolidatedInstruction: String {
+        get { instructionDraft }
+        set {
+            guard !isRefining, !hasHistoryEdits, source != nil else { return }
+            instructionDraft = newValue
+        }
+    }
+    var hasConsolidatedInstructionEdits: Bool { instructionDraft != draft.instruction }
+    private var canUseProvider: Bool {
         source != nil && !isRefining && !isLoadingProviders && providers[provider]?.isAvailable == true
-            && !StringFormatting.isBlank(userInstruction)
+    }
+    var canRefine: Bool {
+        canUseProvider && !hasHistoryEdits && (!StringFormatting.isBlank(userInstruction)
+            || (hasConsolidatedInstructionEdits && !StringFormatting.isBlank(instructionDraft)))
+    }
+    var canApplyHistoryEdits: Bool {
+        canUseProvider && !hasConsolidatedInstructionEdits && hasHistoryEdits
+            && turns.allSatisfy { !StringFormatting.isBlank(historyInstruction(for: $0.id)) }
     }
     var canSave: Bool {
-        !isRefining && !hasSavedDraft && !turns.isEmpty && !StringFormatting.isBlank(draft.latestScript)
+        !isRefining && !hasHistoryEdits && !hasConsolidatedInstructionEdits && !hasSavedDraft
+            && !turns.isEmpty && !StringFormatting.isBlank(draft.latestScript)
             && draft.latestScript != source?.scriptText
     }
 
+    func historyInstruction(for id: UUID) -> String {
+        historyEdits[id] ?? turns.first(where: { $0.id == id })?.userInstruction ?? ""
+    }
+
+    func setHistoryInstruction(_ value: String, for id: UUID) {
+        guard !isRefining, !hasConsolidatedInstructionEdits,
+              let turn = turns.first(where: { $0.id == id }) else { return }
+        historyEdits[id] = value == turn.userInstruction ? nil : value
+    }
+
+    func discardHistoryEdits() { if !isRefining { historyEdits = [:] } }
+    func discardConsolidatedInstructionEdits() { if !isRefining { instructionDraft = draft.instruction } }
+
     func begin(_ story: Story) {
         cancel()
-        source = nil; turns = []; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
+        source = nil; turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
+        instructionDraft = ""
         guard let script = story.scriptText, !StringFormatting.isBlank(script) else {
             errorMessage = "This story has no script to refine."
             return
         }
         source = story
-        draft = ScriptChatDraft(latestScript: script, instruction: "")
+        draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
+        instructionDraft = draft.instruction
     }
 
     func refreshProviders() async {
@@ -52,22 +88,59 @@ final class ScriptChatViewModel {
     }
 
     func refine() async {
-        guard canRefine, let original = source?.scriptText else { return }
-        let instruction = userInstruction.trimmingCharacters(in: .whitespacesAndNewlines)
-        let request = ScriptChatRequest(originalScript: original, draft: draft, userInstruction: instruction, provider: provider, model: model)
+        guard canRefine else { return }
+        let directive = StringFormatting.isBlank(userInstruction) ? instructionDraft : userInstruction
+        let starting = ScriptChatDraft(latestScript: draft.latestScript, instruction: instructionDraft)
+        await run(instructions: [directive.trimmingCharacters(in: .whitespacesAndNewlines)],
+                  prefix: turns, startingDraft: starting, turnIDs: [UUID()],
+                  instructionOverrides: [hasConsolidatedInstructionEdits ? instructionDraft : nil], clearInput: true)
+    }
+
+    func applyHistoryEdits() async {
+        guard canApplyHistoryEdits, let index = turns.firstIndex(where: { historyEdits[$0.id] != nil }) else { return }
+        let starting = index == 0
+            ? ScriptChatDraft(latestScript: originalScript, instruction: originalInstruction)
+            : ScriptChatDraft(latestScript: turns[index - 1].script, instruction: turns[index - 1].instruction)
+        let remaining = Array(turns[index...])
+        await run(instructions: remaining.map { historyInstruction(for: $0.id).trimmingCharacters(in: .whitespacesAndNewlines) },
+                  prefix: Array(turns[..<index]), startingDraft: starting, turnIDs: remaining.map(\.id),
+                  instructionOverrides: remaining.map(\.instructionOverride), clearInput: false)
+    }
+
+    private func run(instructions: [String], prefix: [ScriptChatTurn], startingDraft: ScriptChatDraft,
+                     turnIDs: [UUID], instructionOverrides: [String?], clearInput: Bool) async {
+        let original = originalScript
+        let selectedProvider = provider
+        let selectedModel = model
         let id = UUID()
         operationID = id; isRefining = true; errorMessage = nil
         task = Task { [weak self, service] in
             do {
-                let result = try await service.refine(request)
-                try Task.checkCancellation()
-                guard let self, self.operationID == id else { return }
-                guard !StringFormatting.isBlank(result.latestScript), !StringFormatting.isBlank(result.instruction) else {
-                    throw LocalAgentError.invalidInput("Script Chat returned an empty script or instruction.")
+                var working = startingDraft
+                var completed = prefix
+                for (index, instruction) in instructions.enumerated() {
+                    try Task.checkCancellation()
+                    if let override = instructionOverrides[index] {
+                        working = ScriptChatDraft(latestScript: working.latestScript, instruction: override)
+                    }
+                    let result = try await service.refine(ScriptChatRequest(originalScript: original, draft: working,
+                        userInstruction: instruction, provider: selectedProvider, model: selectedModel))
+                    try Task.checkCancellation()
+                    guard self?.operationID == id else { return }
+                    guard !StringFormatting.isBlank(result.latestScript), !StringFormatting.isBlank(result.instruction) else {
+                        throw LocalAgentError.invalidInput("Script Chat returned an empty script or instruction.")
+                    }
+                    completed.append(ScriptChatTurn(id: turnIDs[index], userInstruction: instruction,
+                                                   script: result.latestScript, instruction: result.instruction,
+                                                   instructionOverride: instructionOverrides[index]))
+                    working = result
                 }
-                self.draft = result
-                self.turns.append(ScriptChatTurn(userInstruction: instruction, script: result.latestScript))
-                self.userInstruction = ""
+                guard let self, self.operationID == id else { return }
+                self.draft = working
+                self.instructionDraft = working.instruction
+                self.turns = completed
+                self.historyEdits = [:]
+                if clearInput { self.userInstruction = "" }
                 self.hasSavedDraft = false
             } catch {
                 guard let self, self.operationID == id, !Task.isCancelled else { return }
