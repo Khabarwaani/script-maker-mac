@@ -86,6 +86,11 @@ final class StudioNewsTests: XCTestCase {
         await vm.refreshHashtags()
         XCTAssertEqual(vm.trendingHashtags, ["#ISRO"])
         XCTAssertEqual(vm.topic, "Local trend")
+        XCTAssertEqual(vm.headlines, ["Local trend"])
+        XCTAssertEqual(vm.selectedHeadline, "Local trend")
+        vm.onHashtagChanged("")
+        XCTAssertTrue(vm.headlines.isEmpty)
+        XCTAssertTrue(vm.topic.isEmpty)
     }
 
     @MainActor
