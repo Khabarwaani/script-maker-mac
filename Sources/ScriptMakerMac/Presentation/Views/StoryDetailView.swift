@@ -116,8 +116,6 @@ private struct StoryDetailToolbar: View {
     let onDelete: () -> Void
     @State private var showingReset = false
     @State private var showingImport = false
-    @State private var showingUpload = false
-    @State private var uploadDestination: LibraryUploadDestination = .telegram
     @State private var importKind: LibraryMediaKind = .image
 
     var body: some View {
@@ -132,9 +130,9 @@ private struct StoryDetailToolbar: View {
                 .disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
             Divider().frame(height: 24)
             Menu {
-                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Google Drive…", systemImage: "externaldrive") }
-                Button { uploadDestination = .telegram; showingUpload = true } label: { Label("Upload to Telegram…", systemImage: "paperplane") }
-                Button { uploadDestination = .googleSheets; showingUpload = true } label: { Label("Upload to Google Drive / Sheets…", systemImage: "tablecells") }
+                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Export story text…", systemImage: "doc.text") }
+                Button { Task { await viewModel.upload(story, to: .telegram) } } label: { Label("Upload to Telegram", systemImage: "paperplane") }
+                Button { Task { await viewModel.upload(story, to: .googleSheets) } } label: { Label("Upload to Google Drive / Sheets", systemImage: "tablecells") }
                 Divider()
                 Button("Copy News Links + Hashtags") { viewModel.copy(viewModel.shareText(for: story), label: "News links and hashtags") }
                 Divider()
@@ -160,11 +158,27 @@ private struct StoryDetailToolbar: View {
             .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
             .help("Copy story content").accessibilityLabel("Copy story content")
             Menu {
-                Button("Add image…") { importKind = .image; showingImport = true }
-                Button("Add video…") { importKind = .video; showingImport = true }
-            } label: { LibraryActionLabel(icon: "square.and.arrow.down") }
+                Button("Add image…", systemImage: "photo.badge.plus") { importKind = .image; showingImport = true }
+                Button("Add video…", systemImage: "video.badge.plus") { importKind = .video; showingImport = true }
+                Divider()
+                if let images = story.imageURLs, images.count > 1 {
+                    Menu("Copy image", systemImage: "doc.on.doc") {
+                        ForEach(Array(images.enumerated()), id: \.offset) { index, source in
+                            Button("Image \(index + 1)", systemImage: "photo") {
+                                Task { await viewModel.copyImage(source) }
+                            }
+                        }
+                    }.disabled(viewModel.isCopyingImage)
+                } else {
+                    Button("Copy image", systemImage: "doc.on.doc") {
+                        if let source = story.imageURLs?.first {
+                            Task { await viewModel.copyImage(source) }
+                        }
+                    }.disabled(story.imageURLs?.isEmpty != false || viewModel.isCopyingImage)
+                }
+            } label: { LibraryActionLabel(icon: "rectangle.stack.badge.plus") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
-                .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
+                .help("Add media or copy an image").accessibilityLabel("Media actions").disabled(viewModel.isImportingMedia)
             Divider().frame(height: 24)
             Spacer(minLength: 0)
             Button { showingReset = true } label: { LibraryActionLabel(icon: "arrow.counterclockwise") }
@@ -176,7 +190,6 @@ private struct StoryDetailToolbar: View {
         }
         .buttonStyle(StudioButtonStyle())
         .padding(.horizontal, 20).padding(.vertical, 12)
-        .sheet(isPresented: $showingUpload) { LibraryUploadView(story: story, destination: uploadDestination, viewModel: viewModel) }
         .fileImporter(isPresented: $showingImport, allowedContentTypes: importKind == .video ? [.movie] : [.image]) { result in
             switch result {
             case .success(let url): Task { await viewModel.importMedia(url, kind: importKind, storyID: story.id) }
@@ -328,6 +341,11 @@ private struct StoryImagesSection: View {
                                 Link("Open image", destination: url)
                             }
                         }.padding(12).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                            .contextMenu {
+                                Button("Copy image", systemImage: "doc.on.doc") {
+                                    Task { await viewModel.copyImage(value) }
+                                }.disabled(viewModel.isCopyingImage)
+                            }
                             .overlay(alignment: .topTrailing) {
                                 Button { Task { await viewModel.remove(.image(value), from: story.id) } } label: {
                                     Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)

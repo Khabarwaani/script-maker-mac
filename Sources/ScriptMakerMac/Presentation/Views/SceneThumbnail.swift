@@ -20,10 +20,9 @@ struct SceneThumbnail: View {
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
-                // Placeholder: film icon on gray
                 ZStack {
                     Color(nsColor: .controlBackgroundColor)
-                    Image(systemName: "film")
+                    Image(systemName: "photo")
                         .font(.largeTitle)
                         .foregroundStyle(AppTheme.secondaryInk)
                 }

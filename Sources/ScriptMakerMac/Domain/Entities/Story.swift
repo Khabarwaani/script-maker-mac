@@ -125,7 +125,7 @@ struct StoryUploadReceipt: Codable, Sendable, Hashable {
 
 enum LibraryUploadDestination: Sendable, Equatable { case telegram, googleSheets }
 
-struct LibraryUploadOptions: Sendable {
+struct LibraryUploadOptions: Codable, Sendable, Equatable {
     var telegramToken = ""
     var telegramChatID = ""
     var includeTelegramGroups = false
