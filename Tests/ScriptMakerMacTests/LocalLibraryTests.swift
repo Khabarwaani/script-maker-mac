@@ -32,8 +32,97 @@ private struct LocalUploaderStub: StoryUploading {
 }
 
 @MainActor
+private final class UploadSettingsStub: UploadSettingsStoring {
+    var options = LibraryUploadOptions()
+    var fails = false
+    func load() throws -> LibraryUploadOptions {
+        if fails { throw LibraryOperationError.requestFailed("Settings locked") }
+        return options
+    }
+    func save(_ options: LibraryUploadOptions) throws {
+        if fails { throw LibraryOperationError.requestFailed("Settings locked") }
+        self.options = options
+    }
+}
+
+private actor CapturingUploader: StoryUploading {
+    var received: [LibraryUploadOptions] = []
+    func upload(_ story: Story, to destination: LibraryUploadDestination, options: LibraryUploadOptions) async throws -> LibraryUploadResult {
+        received.append(options)
+        return .init(message: "Uploaded")
+    }
+}
+
+private struct UploadSettingsChecker: ServerConnectionChecking {
+    func isReachable(at url: URL) async -> Bool { false }
+}
+
+@MainActor
 final class LocalLibraryWorkflowTests: XCTestCase {
     private func config() -> AppConfig { AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!) }
+
+    func testUploadUsesLatestSavedSettingsWithoutAnUploadForm() async throws {
+        let settings = UploadSettingsStub()
+        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        preferences.loadUploadSettings()
+        preferences.uploadOptions = .init(telegramToken: " 123:token ", telegramChatID: " 42 ", includeTelegramGroups: true,
+                                          googleAccessToken: " access ", googleEndpoint: "https://script.google.com/macros/s/test/exec")
+        preferences.saveUploadSettings()
+        XCTAssertNil(preferences.uploadSettingsError)
+        XCTAssertNotNil(preferences.uploadSettingsNotice)
+        let reopened = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        reopened.loadUploadSettings()
+        XCTAssertEqual(reopened.uploadOptions, settings.options)
+        XCTAssertEqual(reopened.uploadOptions.telegramChatID, "42")
+        let uploader = CapturingUploader()
+        let story = Story(title: "One click")
+        let vm = LibraryViewModel(config: config(), repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
+        vm.stories = [story]
+        await vm.upload(story, to: .telegram)
+        reopened.uploadOptions.telegramChatID = "84"
+        reopened.saveUploadSettings()
+        await vm.upload(story, to: .googleSheets)
+        let received = await uploader.received
+        XCTAssertEqual(received.count, 2)
+        XCTAssertEqual(received.first?.telegramChatID, "42")
+        XCTAssertEqual(received.last, settings.options)
+        XCTAssertFalse(vm.isUploading)
+    }
+
+    func testUploadSettingsFailuresPreventUploadAndReportSaveFailure() async {
+        let settings = UploadSettingsStub()
+        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        preferences.loadUploadSettings()
+        settings.fails = true
+        preferences.saveUploadSettings()
+        XCTAssertNotNil(preferences.uploadSettingsError)
+        XCTAssertNil(preferences.uploadSettingsNotice)
+        preferences.loadUploadSettings()
+        XCTAssertFalse(preferences.canSaveUploadSettings)
+        let uploader = CapturingUploader()
+        let vm = LibraryViewModel(config: config(), repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
+        await vm.upload(Story(title: "Blocked"), to: .telegram)
+        let received = await uploader.received
+        XCTAssertTrue(received.isEmpty)
+        XCTAssertTrue(vm.actionNotice?.contains("Settings locked") == true)
+        XCTAssertFalse(vm.isUploading)
+    }
+
+    func testInvalidUploadSettingsPreserveSavedValues() {
+        let settings = UploadSettingsStub()
+        settings.options.telegramChatID = "42"
+        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        preferences.loadUploadSettings()
+        preferences.uploadOptions.telegramChatID = "invalid"
+        preferences.saveUploadSettings()
+        XCTAssertEqual(settings.options.telegramChatID, "42")
+        XCTAssertNotNil(preferences.uploadSettingsError)
+        preferences.uploadOptions.telegramChatID = "84"
+        preferences.uploadOptions.googleEndpoint = "https://example.com/upload"
+        preferences.saveUploadSettings()
+        XCTAssertEqual(settings.options.telegramChatID, "42")
+        XCTAssertNotNil(preferences.uploadSettingsError)
+    }
 
     func testTitleOnlySavesAndEnrichesWithoutGenerationMetadata() async throws {
         let repository = LocalLibraryRepository()
@@ -210,6 +299,33 @@ final class LocalLibraryNetworkTests: XCTestCase {
         }
         let result = try await uploader(home: home).upload(Story(title: "Only a title", hashtags: ["#News"]), to: .telegram, options: .init())
         XCTAssertEqual(result.message, "Telegram: sent to 1 chat(s).")
+    }
+
+    func testSavedTelegramSettingsOverrideExistingFiles() async throws {
+        let home = try temporaryHome()
+        try FileStore().writeCreatingDirectory(Data("123:old-token".utf8), to: home.appendingPathComponent("Documents/telegrambot/bot_token.txt"))
+        LocalLibraryHTTPStub.handler = { request in
+            XCTAssertEqual(request.url?.path, "/bot456:saved-token/sendMessage")
+            let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
+            XCTAssertEqual(body["chat_id"], "84")
+            return (200, [:], Data(#"{"ok":true,"result":{}}"#.utf8))
+        }
+        _ = try await uploader(home: home).upload(Story(title: "Saved settings"), to: .telegram,
+            options: .init(telegramToken: "456:saved-token", telegramChatID: "84"))
+    }
+
+    func testSavedGoogleSettingsOverrideEnvironmentAndClasp() async throws {
+        let home = try temporaryHome()
+        let video = home.appendingPathComponent("reel.mp4")
+        try Data([1]).write(to: video)
+        try Data("invalid old login".utf8).write(to: home.appendingPathComponent(".clasprc.json"))
+        LocalLibraryHTTPStub.handler = { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://script.google.com/macros/s/saved/exec")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer saved-access")
+            return (200, [:], Data(#"{"status":"success","id":2,"previewUrl":"https://drive.google.com/preview","timestamp":"now"}"#.utf8))
+        }
+        _ = try await uploader(home: home, token: "old-access").upload(Story(title: "Saved settings", videoURL: video.absoluteString), to: .googleSheets,
+            options: .init(googleAccessToken: "saved-access", googleEndpoint: "https://script.google.com/macros/s/saved/exec"))
     }
 
     func testTelegramSurfacesRejectedSendAndNeverLeaksToken() async throws {

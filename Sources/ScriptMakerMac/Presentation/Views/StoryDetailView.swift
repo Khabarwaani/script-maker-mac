@@ -116,8 +116,6 @@ private struct StoryDetailToolbar: View {
     let onDelete: () -> Void
     @State private var showingReset = false
     @State private var showingImport = false
-    @State private var showingUpload = false
-    @State private var uploadDestination: LibraryUploadDestination = .telegram
     @State private var importKind: LibraryMediaKind = .image
 
     var body: some View {
@@ -132,9 +130,9 @@ private struct StoryDetailToolbar: View {
                 .disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
             Divider().frame(height: 24)
             Menu {
-                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Google Drive…", systemImage: "externaldrive") }
-                Button { uploadDestination = .telegram; showingUpload = true } label: { Label("Upload to Telegram…", systemImage: "paperplane") }
-                Button { uploadDestination = .googleSheets; showingUpload = true } label: { Label("Upload to Google Drive / Sheets…", systemImage: "tablecells") }
+                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Export story text…", systemImage: "doc.text") }
+                Button { Task { await viewModel.upload(story, to: .telegram) } } label: { Label("Upload to Telegram", systemImage: "paperplane") }
+                Button { Task { await viewModel.upload(story, to: .googleSheets) } } label: { Label("Upload to Google Drive / Sheets", systemImage: "tablecells") }
                 Divider()
                 Button("Copy News Links + Hashtags") { viewModel.copy(viewModel.shareText(for: story), label: "News links and hashtags") }
                 Divider()
@@ -192,7 +190,6 @@ private struct StoryDetailToolbar: View {
         }
         .buttonStyle(StudioButtonStyle())
         .padding(.horizontal, 20).padding(.vertical, 12)
-        .sheet(isPresented: $showingUpload) { LibraryUploadView(story: story, destination: uploadDestination, viewModel: viewModel) }
         .fileImporter(isPresented: $showingImport, allowedContentTypes: importKind == .video ? [.movie] : [.image]) { result in
             switch result {
             case .success(let url): Task { await viewModel.importMedia(url, kind: importKind, storyID: story.id) }

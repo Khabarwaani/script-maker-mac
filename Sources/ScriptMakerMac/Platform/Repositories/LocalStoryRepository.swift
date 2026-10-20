@@ -68,6 +68,18 @@ struct MacClipboardWriter: ClipboardWriting {
 }
 
 @MainActor
+struct MacUploadSettingsStore: UploadSettingsStoring {
+    let credentials: CredentialStore
+    func load() throws -> LibraryUploadOptions {
+        guard let data = try credentials.read() else { return LibraryUploadOptions() }
+        return try JSONDecoder().decode(LibraryUploadOptions.self, from: data)
+    }
+    func save(_ options: LibraryUploadOptions) throws {
+        try credentials.write(JSONEncoder().encode(options))
+    }
+}
+
+@MainActor
 struct MacStorySharing: StorySharing {
     let store: SharingStore
 

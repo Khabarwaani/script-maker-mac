@@ -13,9 +13,9 @@ final class LibraryViewModel {
     private let mediaImporter: (any LibraryMediaImporting)?
     private let sharing: (any StorySharing)?
     private let uploader: (any StoryUploading)?
+    private let uploadSettings: (any UploadSettingsStoring)?
     var isSharing = false
     var isUploading = false
-    var uploadOptions = LibraryUploadOptions()
 
     func share(_ story: Story, to destination: StoryShareDestination) async {
         guard !isSharing else { return }
@@ -78,7 +78,7 @@ final class LibraryViewModel {
     var isLoading = false
     var notice: String?
 
-    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil, uploader: (any StoryUploading)? = nil, scriptChat: ScriptChatViewModel? = nil) {
+    init(config: AppConfig, repository: any StoryRepository = LocalStoryRepository(), clipboard: (any ClipboardWriting)? = nil, updater: (any LibraryUpdating)? = nil, mediaImporter: (any LibraryMediaImporting)? = nil, sharing: (any StorySharing)? = nil, uploader: (any StoryUploading)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil, scriptChat: ScriptChatViewModel? = nil) {
         self.config = config
         self.scriptChat = scriptChat
         self.repository = repository
@@ -87,6 +87,7 @@ final class LibraryViewModel {
         self.mediaImporter = mediaImporter
         self.sharing = sharing
         self.uploader = uploader
+        self.uploadSettings = uploadSettings
     }
 
     var busyUpdates: Set<LibraryUpdate> = []
@@ -248,6 +249,7 @@ final class LibraryViewModel {
         defer { isUploading = false }
         do {
             guard let uploader else { throw APIError.notImplemented("Story upload is unavailable.") }
+            let uploadOptions = try uploadSettings?.load() ?? LibraryUploadOptions()
             let result = try await uploader.upload(story, to: destination, options: uploadOptions)
             if let receipt = result.receipt, var current = stories.first(where: { $0.id == story.id }) {
                 current.uploadReceipt = receipt

@@ -46,3 +46,9 @@ protocol LibraryMediaImporting: Sendable {
 protocol StoryUploading: Sendable {
     func upload(_ story: Story, to destination: LibraryUploadDestination, options: LibraryUploadOptions) async throws -> LibraryUploadResult
 }
+
+@MainActor
+protocol UploadSettingsStoring {
+    func load() throws -> LibraryUploadOptions
+    func save(_ options: LibraryUploadOptions) throws
+}
