@@ -160,9 +160,9 @@ private struct StoryDetailToolbar: View {
             .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
             .help("Copy story content").accessibilityLabel("Copy story content")
             Menu {
-                Button("Add image…") { importKind = .image; showingImport = true }
-                Button("Add video…") { importKind = .video; showingImport = true }
-            } label: { LibraryActionLabel(icon: "square.and.arrow.down") }
+                Button("Add image…", systemImage: "photo.badge.plus") { importKind = .image; showingImport = true }
+                Button("Add video…", systemImage: "video.badge.plus") { importKind = .video; showingImport = true }
+            } label: { LibraryActionLabel(icon: "photo.badge.plus") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
             Divider().frame(height: 24)
