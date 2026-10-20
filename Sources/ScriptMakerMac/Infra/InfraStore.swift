@@ -132,6 +132,12 @@ struct FileStore: Sendable {
 
 @MainActor
 struct PasteboardStore {
+    func writeImage(_ data: Data) -> Bool {
+        guard let image = NSImage(data: data), image.isValid else { return false }
+        NSPasteboard.general.clearContents()
+        return NSPasteboard.general.writeObjects([image])
+    }
+
     func write(_ text: String) -> Bool {
         NSPasteboard.general.clearContents()
         return NSPasteboard.general.setString(text, forType: .string)

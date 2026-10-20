@@ -361,6 +361,33 @@ final class LibraryViewModel {
     }
 
     var copyFeedback: String?
+    private(set) var isCopyingImage = false
+
+    func copyImage(_ source: String) async {
+        guard !isCopyingImage else { return }
+        isCopyingImage = true
+        copyFeedback = nil
+        defer { isCopyingImage = false }
+        do {
+            guard let clipboard else { throw LibraryOperationError.invalidInput("Image copying is unavailable.") }
+            let data: Data
+            if let cached = imagePreviews[source] {
+                data = cached
+            } else {
+                guard let mediaImporter, let url = URL(string: source),
+                      url.isFileURL || ["https", "http"].contains(url.scheme?.lowercased() ?? "") else {
+                    throw LibraryOperationError.invalidInput("This image is unavailable.")
+                }
+                data = try await mediaImporter.imageData(at: url)
+            }
+            guard clipboard.writeImage(data) else {
+                throw LibraryOperationError.requestFailed("Could not write the image to the clipboard.")
+            }
+            copyFeedback = "Image copied"
+        } catch {
+            copyFeedback = "Could not copy image: \(StringFormatting.errorMessage(error))"
+        }
+    }
 
     func copy(_ text: String, label: String) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

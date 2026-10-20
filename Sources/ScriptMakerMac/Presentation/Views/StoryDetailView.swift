@@ -162,9 +162,25 @@ private struct StoryDetailToolbar: View {
             Menu {
                 Button("Add image…", systemImage: "photo.badge.plus") { importKind = .image; showingImport = true }
                 Button("Add video…", systemImage: "video.badge.plus") { importKind = .video; showingImport = true }
+                Divider()
+                if let images = story.imageURLs, images.count > 1 {
+                    Menu("Copy image", systemImage: "doc.on.doc") {
+                        ForEach(Array(images.enumerated()), id: \.offset) { index, source in
+                            Button("Image \(index + 1)", systemImage: "photo") {
+                                Task { await viewModel.copyImage(source) }
+                            }
+                        }
+                    }.disabled(viewModel.isCopyingImage)
+                } else {
+                    Button("Copy image", systemImage: "doc.on.doc") {
+                        if let source = story.imageURLs?.first {
+                            Task { await viewModel.copyImage(source) }
+                        }
+                    }.disabled(story.imageURLs?.isEmpty != false || viewModel.isCopyingImage)
+                }
             } label: { LibraryActionLabel(icon: "photo.badge.plus") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
-                .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
+                .help("Add media or copy an image").accessibilityLabel("Media actions").disabled(viewModel.isImportingMedia)
             Divider().frame(height: 24)
             Spacer(minLength: 0)
             Button { showingReset = true } label: { LibraryActionLabel(icon: "arrow.counterclockwise") }
@@ -328,6 +344,11 @@ private struct StoryImagesSection: View {
                                 Link("Open image", destination: url)
                             }
                         }.padding(12).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                            .contextMenu {
+                                Button("Copy image", systemImage: "doc.on.doc") {
+                                    Task { await viewModel.copyImage(value) }
+                                }.disabled(viewModel.isCopyingImage)
+                            }
                             .overlay(alignment: .topTrailing) {
                                 Button { Task { await viewModel.remove(.image(value), from: story.id) } } label: {
                                     Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)

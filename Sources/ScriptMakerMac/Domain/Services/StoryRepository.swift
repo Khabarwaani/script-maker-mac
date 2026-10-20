@@ -20,6 +20,7 @@ protocol StoryRepository: Sendable {
 @MainActor
 protocol ClipboardWriting {
     func write(_ text: String) -> Bool
+    func writeImage(_ data: Data) -> Bool
 }
 
 enum StoryShareDestination { case googleDrive, telegram }
