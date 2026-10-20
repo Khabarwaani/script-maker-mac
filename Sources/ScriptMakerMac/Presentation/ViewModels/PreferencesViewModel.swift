@@ -14,6 +14,36 @@ final class PreferencesViewModel {
     var uploadSettingsError: String?
     var uploadSettingsNotice: String?
     private(set) var canSaveUploadSettings = false
+    var draftNewsSettings: NewsDiscoverySettings
+    private var draftNewsPageSize: Int
+    var newsSettingsError: String?
+    var newsSettingsNotice: String?
+
+    var newsSearchHours: Double {
+        get { draftNewsSettings.searchDuration / 3600 }
+        set { draftNewsSettings.searchDuration = newValue * 3600 }
+    }
+    var newsCacheHours: Double {
+        get { draftNewsSettings.cacheDuration / 3600 }
+        set { draftNewsSettings.cacheDuration = newValue * 3600 }
+    }
+
+    func loadNewsSettings() {
+        draftNewsSettings = config.newsSettings
+        draftNewsPageSize = config.newsPageSize
+    }
+
+    func saveNewsSettings() {
+        newsSettingsError = nil
+        newsSettingsNotice = nil
+        do {
+            let validated = try draftNewsSettings.validated()
+            config.newsPageSize = draftNewsPageSize
+            config.newsSettings = validated
+            draftNewsSettings = validated
+            newsSettingsNotice = "News settings saved for Studio and Library."
+        } catch { newsSettingsError = error.localizedDescription }
+    }
 
     func loadUploadSettings() {
         do {
@@ -120,6 +150,8 @@ final class PreferencesViewModel {
         self.connectionChecker = connectionChecker
         self.modelCatalogProvider = modelCatalogProvider
         self.uploadSettings = uploadSettings
+        self.draftNewsSettings = config.newsSettings
+        self.draftNewsPageSize = config.newsPageSize
         self.draftURL = config.serverURL
         self.dataSource = config.dataSource
     }
@@ -130,8 +162,8 @@ final class PreferencesViewModel {
     }
 
     var newsPageSize: Int {
-        get { config.newsPageSize }
-        set { config.newsPageSize = min(max(newValue, 1), 50) }
+        get { draftNewsPageSize }
+        set { draftNewsPageSize = min(max(newValue, 1), 100) }
     }
 
     var currentURL: String { config.serverURL }

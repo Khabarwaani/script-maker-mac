@@ -2,6 +2,53 @@ import XCTest
 @testable import ScriptMakerMac
 
 final class AppConfigTests: XCTestCase {
+    @MainActor
+    func testNewsSettingsPersistAndInvalidEditsPreserveSavedSettings() {
+        struct Checker: ServerConnectionChecking {
+            func isReachable(at url: URL) async -> Bool { false }
+        }
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfig(defaults: defaults)
+        XCTAssertEqual(config.newsSettings, NewsDiscoverySettings())
+        let vm = PreferencesViewModel(config: config, connectionChecker: Checker())
+        vm.newsSearchHours = 12
+        vm.newsCacheHours = 2
+        vm.draftNewsSettings.providerOrder = .bingThenGoogle
+        vm.draftNewsSettings.region = " us "
+        vm.draftNewsSettings.language = " HI "
+        vm.newsPageSize = 75
+        XCTAssertEqual(config.newsPageSize, 20)
+        vm.saveNewsSettings()
+        XCTAssertNil(vm.newsSettingsError)
+        XCTAssertNotNil(vm.newsSettingsNotice)
+        let reopened = AppConfig(defaults: defaults)
+        XCTAssertEqual(reopened.newsSettings, config.newsSettings)
+        XCTAssertEqual(reopened.newsSettings.searchDuration, 12 * 3600)
+        XCTAssertEqual(reopened.newsSettings.cacheDuration, 2 * 3600)
+        XCTAssertEqual(reopened.newsSettings.region, "US")
+        XCTAssertEqual(reopened.newsSettings.language, "hi")
+        XCTAssertEqual(reopened.newsPageSize, 75)
+        let saved = config.newsSettings
+        vm.newsPageSize = 100
+        vm.newsCacheHours = -1
+        vm.saveNewsSettings()
+        XCTAssertNotNil(vm.newsSettingsError)
+        XCTAssertNil(vm.newsSettingsNotice)
+        XCTAssertEqual(config.newsSettings, saved)
+        XCTAssertEqual(config.newsPageSize, 75)
+        vm.loadNewsSettings()
+        vm.draftNewsSettings.region = "invalid"
+        vm.saveNewsSettings()
+        XCTAssertNotNil(vm.newsSettingsError)
+        XCTAssertEqual(config.newsSettings, saved)
+        vm.loadNewsSettings()
+        vm.draftNewsSettings.language = ""
+        vm.saveNewsSettings()
+        XCTAssertNotNil(vm.newsSettingsError)
+        config.resetToDefaults()
+        XCTAssertEqual(config.newsSettings, NewsDiscoverySettings())
+    }
+
     func testNormalizeBareHostAssumesHTTP() throws {
         XCTAssertEqual(try AppConfig.normalize(raw: "localhost:8000"), "http://localhost:8000")
     }

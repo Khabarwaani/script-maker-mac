@@ -1,8 +1,10 @@
 import Foundation
+import NewsSearch
 
 /// Direct news search and publisher images, matching ScriptMaker's non-AI enrichment.
 struct LocalLibraryUpdateClient: LibraryUpdating {
     let httpClient: HTTPClient
+    let news: @MainActor @Sendable () throws -> (client: any NewsSearching, limit: Int)
 
     func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
                 localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
@@ -61,31 +63,20 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
     }
 
     private func search(_ title: String) async throws -> [StorySourceLink] {
-        let sources = [("https://www.bing.com/news/search", "q"), ("https://news.google.com/rss/search", "q")]
-        var failures: [String] = []
-        for (endpoint, key) in sources {
-            do {
-                var components = URLComponents(string: endpoint)!
-                components.queryItems = [URLQueryItem(name: key, value: title)] + (endpoint.contains("bing.com")
-                    ? [URLQueryItem(name: "format", value: "rss")]
-                    : [URLQueryItem(name: "hl", value: "en-IN"), URLQueryItem(name: "gl", value: "IN"), URLQueryItem(name: "ceid", value: "IN:en")])
-                let (data, _) = try await fetch(components.url!)
-                let parser = LibraryNewsFeedParser()
-                let xml = XMLParser(data: data)
-                xml.shouldResolveExternalEntities = false
-                xml.delegate = parser
-                guard xml.parse() else { throw LibraryOperationError.invalidInput("Invalid news feed") }
-                var seen: Set<String> = []
-                let links = parser.items.compactMap { item -> StorySourceLink? in
-                    guard let url = Self.articleURL(item.url), seen.insert(url.absoluteString).inserted else { return nil }
-                    return StorySourceLink(title: item.title, url: url.absoluteString, source: item.source.isEmpty ? (url.host ?? "News") : item.source)
-                }
-                if !links.isEmpty { return Array(links.prefix(6)) }
-                failures.append("\(components.host ?? "News search"): no matching articles.")
-            } catch is CancellationError { throw CancellationError() }
-            catch { failures.append(error.localizedDescription) }
+        do {
+            let configured = try await news()
+            let articles = try await configured.client.search(title, limit: configured.limit)
+            var seen: Set<String> = []
+            let links = articles.compactMap { article -> StorySourceLink? in
+                guard let url = Self.articleURL(article.url.absoluteString), seen.insert(url.absoluteString).inserted else { return nil }
+                return StorySourceLink(title: article.title, url: url.absoluteString, source: article.source.isEmpty ? (url.host ?? "News") : article.source)
+            }
+            guard !links.isEmpty else { throw LibraryOperationError.requestFailed("No matching articles.") }
+            return links
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            throw LibraryOperationError.requestFailed("Could not find related news. \(error.localizedDescription)")
         }
-        throw LibraryOperationError.requestFailed("Could not find related news. \(failures.joined(separator: " "))")
     }
 
     static func articleURL(_ value: String) -> URL? {
@@ -129,30 +120,5 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
             return url
         }
         return nil
-    }
-}
-
-private final class LibraryNewsFeedParser: NSObject, XMLParserDelegate {
-    var items: [StorySourceLink] = []
-    private var inItem = false
-    private var element = ""
-    private var title = ""
-    private var link = ""
-    private var source = ""
-    func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
-        element = name
-        if name == "item" { inItem = true; title = ""; link = ""; source = "" }
-    }
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        guard inItem else { return }
-        switch element { case "title": title += string; case "link": link += string; case "source": source += string; default: break }
-    }
-    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) { self.parser(parser, foundCharacters: String(decoding: CDATABlock, as: UTF8.self)) }
-    func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
-        if name == "item" {
-            items.append(.init(title: title.trimmingCharacters(in: .whitespacesAndNewlines), url: link.trimmingCharacters(in: .whitespacesAndNewlines), source: source.trimmingCharacters(in: .whitespacesAndNewlines)))
-            inItem = false
-        }
-        element = ""
     }
 }

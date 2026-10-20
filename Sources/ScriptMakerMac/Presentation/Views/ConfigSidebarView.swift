@@ -22,6 +22,9 @@ struct ConfigSidebarView: View {
         .onChange(of: viewModel.appConfig.dataSource) { _, _ in
             Task { await viewModel.initialLoad() }
         }
+        .onChange(of: viewModel.appConfig.newsDiscoveryCacheIdentifier) { _, _ in
+            Task { await viewModel.initialLoad() }
+        }
     }
 
     private var storySection: some View {

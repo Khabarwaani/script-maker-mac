@@ -381,7 +381,9 @@ final class GenerateViewModel {
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
         let cacheKey = newsCacheKey(categoryParam)
 
-        if !forceFresh, let cached = config.getCachedHeadlines(forSource: cacheKey), !cached.isEmpty {
+        let cacheDuration = isLocalJSON ? 86400 : config.newsSettings.cacheDuration
+        if !forceFresh, cacheDuration > 0,
+           let cached = config.getCachedHeadlines(forSource: cacheKey, maxAge: cacheDuration), !cached.isEmpty {
             applyHeadlines(cached, forSource: cacheKey)
             return
         }
@@ -392,7 +394,7 @@ final class GenerateViewModel {
             if isLocalJSON {
                 response = try await api().fetchTopTitles(category: categoryParam, n: pageSize)
             } else {
-                response = try await newsProvider.headlines(category: categoryParam, limit: pageSize)
+                response = try await newsProvider.headlines(category: categoryParam, limit: pageSize, forceFresh: forceFresh)
             }
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
@@ -414,7 +416,9 @@ final class GenerateViewModel {
     }
 
     private func newsCacheKey(_ category: String?) -> String {
-        (isLocalJSON ? "sample:" : "local-news:") + (category ?? "default")
+        let source = category ?? "default"
+        if isLocalJSON { return "sample:" + source }
+        return "local-news:\(config.newsDiscoveryCacheIdentifier)|\(source)"
     }
 
     private func applyHeadlines(_ loadedHeadlines: [String], forSource cacheKey: String) {
