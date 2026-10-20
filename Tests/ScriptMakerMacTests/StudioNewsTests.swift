@@ -9,7 +9,7 @@ struct StubStudioNewsProvider: StudioNewsProviding {
     func categories() async throws -> NewsCategoriesResponse {
         NewsCategoriesResponse(categories: [NewsCategory(id: "india", label: "🇮🇳 India Top Stories & Breaking")], defaultCategory: "india")
     }
-    func headlines(category: String?, limit: Int) async throws -> TopTitlesResponse {
+    func headlines(category: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
         if fails { throw APIError.transport("Feed unavailable") }
         return TopTitlesResponse(category: "india", label: "India", n: 1, mode: "local", titles: [NewsTitle(title: "Local headline", link: "https://example.com/news")])
     }
@@ -20,6 +20,77 @@ struct StubStudioNewsProvider: StudioNewsProviding {
 }
 
 final class StudioNewsTests: XCTestCase {
+    func testNewsSettingsMatchFrameworkDefaultsAndRefreshDisablesCache() throws {
+        let settings = NewsDiscoverySettings()
+        XCTAssertEqual(try settings.frameworkConfiguration(), NewsSearchConfiguration.default)
+        let fresh = try settings.frameworkConfiguration(forceFresh: true)
+        XCTAssertEqual(fresh.cacheDuration, 0)
+        XCTAssertEqual(fresh.searchDuration, settings.searchDuration)
+        for order in NewsFeedOrder.allCases {
+            var changed = settings
+            changed.providerOrder = order
+            XCTAssertEqual(try changed.frameworkConfiguration().rssProviders.map(\.rawValue), order.providers)
+        }
+    }
+
+    func testNewsSettingsAllowDisabledDurationsAndRejectNonfiniteValues() throws {
+        var settings = NewsDiscoverySettings(searchDuration: 0, cacheDuration: 0)
+        XCTAssertEqual(try settings.validated(), settings)
+        settings.searchDuration = .infinity
+        XCTAssertThrowsError(try settings.validated())
+        settings.searchDuration = 3600
+        settings.cacheDuration = .nan
+        XCTAssertThrowsError(try settings.validated())
+    }
+
+    @MainActor
+    func testSavedSettingsChangeCacheScopeAndExplicitRefreshIsForwarded() async {
+        let config = AppConfig(defaults: UserDefaults(suiteName: "news.settings.cache.\(UUID().uuidString)")!)
+        config.dataSource = .server
+        let provider = RecordingStudioNewsProvider()
+        let vm = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: provider)
+        await vm.refreshHeadlines()
+        await vm.refreshHeadlines()
+        var calls = await provider.calls
+        XCTAssertEqual(calls.headlines.count, 1)
+        var settings = config.newsSettings
+        settings.region = "US"
+        config.newsSettings = settings
+        await vm.refreshHeadlines()
+        config.newsPageSize = 42
+        await vm.refreshHeadlines()
+        await vm.refreshHeadlines(forceFresh: true)
+        calls = await provider.calls
+        XCTAssertEqual(calls.headlines.count, 4)
+        XCTAssertEqual(calls.limits, [20, 20, 42, 42])
+        XCTAssertEqual(calls.freshness, [false, false, false, true])
+        settings.cacheDuration = 0
+        config.newsSettings = settings
+        await vm.refreshHeadlines()
+        await vm.refreshHeadlines()
+        calls = await provider.calls
+        XCTAssertEqual(calls.headlines.count, 6)
+    }
+
+    @MainActor
+    func testStudioAdapterUsesCurrentSettingsAndForwardsFreshRequests() async throws {
+        let config = AppConfig(defaults: UserDefaults(suiteName: "news.settings.adapter.\(UUID().uuidString)")!)
+        let probe = NewsConfigurationProbe()
+        let provider = LocalStudioNewsProvider(news: { fresh in
+            probe.configurations.append(try config.newsSettings.frameworkConfiguration(forceFresh: fresh))
+            return FixtureNewsSearch()
+        }, trends: FixtureTrendsSearch())
+        _ = try await provider.headlines(category: "india", limit: 5)
+        config.newsSettings = .init(searchDuration: 3600, cacheDuration: 7200, providerOrder: .bingOnly, region: "US", language: "hi")
+        _ = try await provider.headlines(category: "india", limit: 5, forceFresh: true)
+        XCTAssertEqual(probe.configurations.first, NewsSearchConfiguration.default)
+        XCTAssertEqual(probe.configurations.last?.rssProviders, [.bing])
+        XCTAssertEqual(probe.configurations.last?.searchDuration, 3600)
+        XCTAssertEqual(probe.configurations.last?.cacheDuration, 0)
+        XCTAssertEqual(probe.configurations.last?.region, "US")
+        XCTAssertEqual(probe.configurations.last?.language, "hi")
+    }
+
     @MainActor
     func testLocalCategoryLoadingDoesNotFetchNewsAndKeepsSelection() async {
         let config = AppConfig(defaults: UserDefaults(suiteName: "news.sources.\(UUID().uuidString)")!)
@@ -109,7 +180,7 @@ final class StudioNewsTests: XCTestCase {
     }
 
     func testAdapterMapsCategoryLabelsAndTrendMetadata() async throws {
-        let provider = LocalStudioNewsProvider(news: FixtureNewsSearch(), trends: FixtureTrendsSearch())
+        let provider = LocalStudioNewsProvider(news: { _ in FixtureNewsSearch() }, trends: FixtureTrendsSearch())
         let categories = try await provider.categories()
         XCTAssertEqual(categories.categories.count, 11)
         let headlines = try await provider.headlines(category: "🇮🇳 India Top Stories & Breaking", limit: 5)
@@ -125,8 +196,13 @@ final class StudioNewsTests: XCTestCase {
     }
 }
 
+@MainActor
+private final class NewsConfigurationProbe {
+    var configurations: [NewsSearchConfiguration] = []
+}
+
 private actor RecordingStudioNewsProvider: StudioNewsProviding {
-    var calls = (categories: 0, headlines: [String](), hashtags: 0)
+    var calls = (categories: 0, headlines: [String](), hashtags: 0, freshness: [Bool](), limits: [Int]())
     func categories() async throws -> NewsCategoriesResponse {
         calls.categories += 1
         return NewsCategoriesResponse(categories: [
@@ -134,9 +210,11 @@ private actor RecordingStudioNewsProvider: StudioNewsProviding {
             NewsCategory(id: "tech", label: "💻 Technology & AI")
         ], defaultCategory: "india")
     }
-    func headlines(category: String?, limit: Int) async throws -> TopTitlesResponse {
+    func headlines(category: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
         let category = category ?? "default"
         calls.headlines.append(category)
+        calls.freshness.append(forceFresh)
+        calls.limits.append(limit)
         return TopTitlesResponse(category: category, label: category, n: 1, mode: "local",
                                  titles: [NewsTitle(title: "\(category) headline", link: "https://example.com/news")])
     }

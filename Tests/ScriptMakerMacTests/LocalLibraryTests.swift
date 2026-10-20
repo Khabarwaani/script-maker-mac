@@ -1,4 +1,5 @@
 import XCTest
+import NewsSearch
 @testable import ScriptMakerMac
 
 private actor LocalLibraryRepository: StoryRepository {
@@ -57,9 +58,31 @@ private struct UploadSettingsChecker: ServerConnectionChecking {
     func isReachable(at url: URL) async -> Bool { false }
 }
 
+private actor LibrarySearchProbe: NewsSearching {
+    var limits: [Int] = []
+    func headlines(category: NewsSearch.NewsCategory, limit: Int) async throws -> [NewsArticle] { [] }
+    func search(_ query: String, limit: Int) async throws -> [NewsArticle] {
+        limits.append(limit)
+        return [NewsArticle(title: query, url: URL(string: "https://publisher.test/article")!, source: "Publisher")]
+    }
+}
+
 @MainActor
 final class LocalLibraryWorkflowTests: XCTestCase {
     private func config() -> AppConfig { AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!) }
+
+    func testLibraryUsesConfiguredFrameworkAndCurrentResultLimit() async throws {
+        let config = config()
+        let probe = LibrarySearchProbe()
+        let client = LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (probe, config.newsPageSize) })
+        let story = Story(title: "ISRO mission")
+        let result = try await client.update(.news, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        XCTAssertEqual(result.news?.first?.url, "https://publisher.test/article")
+        config.newsPageSize = 42
+        _ = try await client.update(.news, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let limits = await probe.limits
+        XCTAssertEqual(limits, [20, 42])
+    }
 
     func testUploadUsesLatestSavedSettingsWithoutAnUploadForm() async throws {
         let settings = UploadSettingsStub()
@@ -240,6 +263,14 @@ final class LocalLibraryNetworkTests: XCTestCase {
         configuration.protocolClasses = [LocalLibraryHTTPStub.self]
         return HTTPClient(session: URLSession(configuration: configuration))
     }
+    private func updater() -> LocalLibraryUpdateClient {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LocalLibraryHTTPStub.self]
+        let session = URLSession(configuration: configuration)
+        let client = NewsSearchClient(configuration: NewsSearchConfiguration(cacheDuration: 0),
+                                      transport: URLSessionNewsTransport(session: session), cache: NewsSearchCache())
+        return LocalLibraryUpdateClient(httpClient: HTTPClient(session: session), news: { (client, 20) })
+    }
     private func uploader(home: URL, token: String? = nil) -> LocalStoryUploadClient {
         LocalStoryUploadClient(httpClient: http(), googleHTTPClient: http(), files: FileStore(), home: home, environmentToken: { token })
     }
@@ -253,8 +284,8 @@ final class LocalLibraryNetworkTests: XCTestCase {
     func testDirectSearchUnwrapsPublisherURLAndChecksArticleImage() async throws {
         LocalLibraryHTTPStub.handler = { request in
             let url = request.url!
-            if url.host == "www.bing.com" {
-                XCTAssertEqual(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "q" }?.value, "ISRO mission")
+            if url.host == "news.google.com" {
+                XCTAssertEqual(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "q" }?.value, "ISRO mission when:24h")
                 let rss = "<rss><channel><item><title>ISRO mission</title><link>https://www.bing.com/news/apiclick.aspx?url=https%3A%2F%2Fpublisher.test%2Farticle</link><source>Publisher</source></item></channel></rss>"
                 return (200, [:], Data(rss.utf8))
             }
@@ -267,7 +298,7 @@ final class LocalLibraryNetworkTests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "HEAD")
             return (200, ["Content-Type": "image/jpeg"], Data())
         }
-        let client = LocalLibraryUpdateClient(httpClient: http())
+        let client = updater()
         var story = Story(title: "ISRO mission")
         let news = try await client.update(.news, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
         XCTAssertEqual(news.news?.first?.url, "https://publisher.test/article")
@@ -278,7 +309,7 @@ final class LocalLibraryNetworkTests: XCTestCase {
 
     func testTagsNeedNoNetworkAndFailedNewsNeverUsesFixtures() async throws {
         LocalLibraryHTTPStub.handler = { _ in XCTFail("Hashtags must not use the network"); throw URLError(.notConnectedToInternet) }
-        let client = LocalLibraryUpdateClient(httpClient: http())
+        let client = updater()
         let result = try await client.update(.hashtags, story: Story(title: "ISRO mission and ISRO crew"), engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
         XCTAssertEqual(result.hashtags, ["#ISRO", "#mission", "#crew"])
         LocalLibraryHTTPStub.handler = { _ in throw URLError(.notConnectedToInternet) }

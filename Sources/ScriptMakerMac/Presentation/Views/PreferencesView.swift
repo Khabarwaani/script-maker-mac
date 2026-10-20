@@ -52,19 +52,7 @@ struct PreferencesView: View {
                 .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("CONTENT & FETCH").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
-                    HStack {
-                        Text("Default news fetch size")
-                        TextField("Count", value: $viewModel.newsPageSize, format: .number)
-                            .frame(width: 50).textFieldStyle(.roundedBorder)
-                        Stepper("", value: $viewModel.newsPageSize, in: 1...50).labelsHidden()
-                        Text("(1–50, default 20)").font(.caption).foregroundStyle(AppTheme.secondaryInk)
-                    }
-                }
-                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
+                NewsDiscoverySettingsView(viewModel: viewModel)
 
                 LibraryUploadSettingsView(viewModel: viewModel)
 
@@ -83,7 +71,10 @@ struct PreferencesView: View {
         .buttonStyle(StudioButtonStyle())
         .preferredColorScheme(viewModel.appearance.colorScheme)
         .sheet(isPresented: $viewModel.isEditingModel) { AIModelEditor(viewModel: viewModel) }
-        .onAppear { viewModel.loadUploadSettings() }
+        .onAppear {
+            viewModel.loadUploadSettings()
+            viewModel.loadNewsSettings()
+        }
     }
 }
 

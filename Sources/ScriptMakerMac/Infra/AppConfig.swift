@@ -40,6 +40,18 @@ final class AppConfig {
 
     private let defaults: UserDefaults
 
+    var newsSettings: NewsDiscoverySettings {
+        didSet {
+            defaults.set(newsSettings.searchDuration, forKey: "news.searchDuration")
+            defaults.set(newsSettings.cacheDuration, forKey: "news.cacheDuration")
+            defaults.set(newsSettings.providerOrder.rawValue, forKey: "news.providerOrder")
+            defaults.set(newsSettings.region, forKey: "news.region")
+            defaults.set(newsSettings.language, forKey: "news.language")
+        }
+    }
+
+    var newsDiscoveryCacheIdentifier: String { "\(newsSettings.cacheIdentifier)|\(newsPageSize)" }
+
     var appearance: AppAppearance {
         didSet { defaults.set(appearance.rawValue, forKey: "appearance") }
     }
@@ -117,6 +129,13 @@ final class AppConfig {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let newsDefaults = NewsDiscoverySettings()
+        self.newsSettings = NewsDiscoverySettings(
+            searchDuration: defaults.object(forKey: "news.searchDuration") as? Double ?? newsDefaults.searchDuration,
+            cacheDuration: defaults.object(forKey: "news.cacheDuration") as? Double ?? newsDefaults.cacheDuration,
+            providerOrder: defaults.string(forKey: "news.providerOrder").flatMap(NewsFeedOrder.init(rawValue:)) ?? newsDefaults.providerOrder,
+            region: defaults.string(forKey: "news.region") ?? newsDefaults.region,
+            language: defaults.string(forKey: "news.language") ?? newsDefaults.language)
         self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
         let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
         self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize
@@ -156,6 +175,7 @@ final class AppConfig {
         serverURL = Self.defaultServerURL
         dataSource = .offline
         newsPageSize = Self.defaultNewsPageSize
+        newsSettings = NewsDiscoverySettings()
         aiSource = "Antigravity"
         aiModel = "Default"
         aiPower = "Default"
