@@ -1,6 +1,6 @@
 import SwiftUI
 import NewsSearch
-import GoogleTrends
+import TrendingHashtag
 import AgentAtom
 import TerminalAgentSession
 
@@ -40,7 +40,10 @@ enum CompositionRoot {
         let makeNews: @MainActor @Sendable (Bool) throws -> any NewsSearching = { forceFresh in
             NewsSearchClient(configuration: try config.newsSettings.frameworkConfiguration(forceFresh: forceFresh))
         }
-        let newsProvider = LocalStudioNewsProvider(news: makeNews, trends: GoogleTrendsClient())
+        let trendClients = TrendingClientProvider(settings: { config.trendingSettings }, makeClient: { settings in
+            TrendingHashtagClient(provider: try settings.frameworkProvider(), configuration: try settings.frameworkConfiguration())
+        })
+        let newsProvider = LocalStudioNewsProvider(news: makeNews, trends: { try trendClients.client() })
         let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: newsProvider)
         let files = FileStore()
         let agentService = TerminalLocalAgentService(

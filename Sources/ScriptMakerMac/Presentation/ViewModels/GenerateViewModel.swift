@@ -15,6 +15,8 @@ final class GenerateViewModel {
     private var catalog: StudioCatalog?
     private var localNewsCategories: NewsCategoriesResponse?
     private var eventTask: Task<Void, Never>?
+    private var headlineRequestID: UUID?
+    private var hashtagRequestID: UUID?
 
     /// Config for child views that need it (e.g. thumbnails).
     var appConfig: AppConfig { config }
@@ -152,6 +154,7 @@ final class GenerateViewModel {
     // Story & Topic — verified against Streamlit (ai-script-maker) 2026-10-11.
     // Order: STORY_SECTION_ORDER; labels: SECTION_LABELS.
     static let manualSourceLabel = "✏️ Manual Topic"
+    static let hashtagSourceLabel = "#️⃣ Trending Hashtags"
     var storySources: [String] = []
     var selectedStorySource: String = "🇮🇳 India Top Stories & Breaking"
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
@@ -159,6 +162,9 @@ final class GenerateViewModel {
     var hashtagItems: [NewsHashtag] = []
     var selectedHashtag: String = ""
     var hashtagsErrorMessage: String?
+    var selectedHashtagDetails: NewsHashtag?
+    var hashtagDetailError: String?
+    var isLoadingHashtagDetail = false
     var customHashtag: String = "" {
         didSet { if !isApplyingConfig { saveStudioConfig() } }
     }
@@ -243,7 +249,7 @@ final class GenerateViewModel {
 
     var isLocalJSON: Bool { config.dataSource != .server }
     var isCatalogReady: Bool { catalog != nil }
-    var isHashtagSource: Bool { selectedStorySource == "#️⃣ Trending Hashtags (Google)" }
+    var isHashtagSource: Bool { selectedStorySource == Self.hashtagSourceLabel }
     var retryRange: ClosedRange<Int> { 1...5 }
     var setupNotice: String?
 
@@ -361,6 +367,7 @@ final class GenerateViewModel {
         selectedHashtag = c.hashtag
         selectedHeadline = c.headline
         let source = c.storySource
+            .replacingOccurrences(of: "#️⃣ Trending Hashtags (Google)", with: Self.hashtagSourceLabel)
             .replacingOccurrences(of: "\\u270F", with: "✏")
             .replacingOccurrences(of: "\\uFE0F", with: "\u{FE0F}")
             .replacingOccurrences(of: "\\u20E3", with: "\u{20E3}")
@@ -382,9 +389,19 @@ final class GenerateViewModel {
     /// Refresh headlines from local news feeds or bundled samples.
     /// If forceFresh is false, uses 24-hour cache when available.
     func refreshHeadlines(forceFresh: Bool = false) async {
+        if isHashtagSource {
+            if isLocalJSON { onHashtagChanged(selectedHashtag) }
+            else { await loadHashtagDetail() }
+            return
+        }
         isRefreshingHeadlines = true
         headlinesErrorMessage = nil
-        defer { isRefreshingHeadlines = false }
+        let requestID = UUID()
+        headlineRequestID = requestID
+        let source = selectedStorySource
+        let settings = config.newsDiscoveryCacheIdentifier
+        let localJSON = isLocalJSON
+        defer { if headlineRequestID == requestID { isRefreshingHeadlines = false } }
 
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
         let cacheKey = newsCacheKey(categoryParam)
@@ -404,6 +421,8 @@ final class GenerateViewModel {
             } else {
                 response = try await newsProvider.headlines(category: categoryParam, limit: pageSize, forceFresh: forceFresh)
             }
+            guard headlineRequestID == requestID, selectedStorySource == source,
+                  config.newsDiscoveryCacheIdentifier == settings, isLocalJSON == localJSON else { return }
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
                 config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
@@ -413,6 +432,8 @@ final class GenerateViewModel {
                 selectedHeadline = ""
             }
         } catch {
+            guard headlineRequestID == requestID, selectedStorySource == source,
+                  config.newsDiscoveryCacheIdentifier == settings, isLocalJSON == localJSON else { return }
             headlines = []
             selectedHeadline = ""
             if isLocalJSON {
@@ -452,6 +473,8 @@ final class GenerateViewModel {
     /// User selected a trending hashtag.
     func onHashtagChanged(_ tag: String) {
         selectedHashtag = tag
+        hashtagDetailError = nil
+        selectedHashtagDetails = hashtagItems.first { $0.tag == tag }
         if let match = hashtagItems.first(where: { $0.tag == tag }), let headline = match.headline, !headline.isEmpty {
             headlines = [headline]
             selectedHeadline = headline
@@ -468,6 +491,29 @@ final class GenerateViewModel {
         }
     }
 
+    func loadHashtagDetail() async {
+        guard !selectedHashtag.isEmpty, !isLoadingHashtagDetail, !isLocalJSON else { return }
+        let tag = selectedHashtag
+        let settings = config.trendingSettings
+        isLoadingHashtagDetail = true
+        hashtagDetailError = nil
+        defer { isLoadingHashtagDetail = false }
+        do {
+            let detail = try await newsProvider.hashtagDetail(for: tag)
+            guard isHashtagSource, selectedHashtag == tag, config.trendingSettings == settings else { return }
+            selectedHashtagDetails = detail
+            if let title = detail.headline, !title.isEmpty {
+                headlines = [title]
+                selectedHeadline = title
+                topic = title
+            }
+        } catch {
+            if isHashtagSource, selectedHashtag == tag, config.trendingSettings == settings {
+                hashtagDetailError = error.localizedDescription
+            }
+        }
+    }
+
     /// Handles story source selection change to load headlines or hashtags.
     func onStorySourceChanged() async {
         headlines = []
@@ -475,33 +521,46 @@ final class GenerateViewModel {
         topic = ""
         headlinesErrorMessage = nil
         hashtagsErrorMessage = nil
+        selectedHashtagDetails = nil
+        hashtagDetailError = nil
         saveStudioConfig()
         if isHashtagSource {
-            await refreshHashtags()
+            await refreshHashtags(forceFresh: false)
         } else if !isManualSource {
             await refreshHeadlines(forceFresh: false)
         }
     }
 
-    /// Refresh Google Trends topics formatted as tags.
-    func refreshHashtags() async {
+    /// Refresh the selected trending platform.
+    func refreshHashtags(forceFresh: Bool = true) async {
         isRefreshingHashtags = true
         hashtagsErrorMessage = nil
-        defer { isRefreshingHashtags = false }
+        let requestID = UUID()
+        hashtagRequestID = requestID
+        let source = selectedStorySource
+        let settings = config.trendingSettings
+        let localJSON = isLocalJSON
+        defer { if hashtagRequestID == requestID { isRefreshingHashtags = false } }
         do {
             let response: NewsHashtagsResponse
             if isLocalJSON {
-                response = try await api().fetchTrendingHashtags(n: 15)
+                response = try await api().fetchTrendingHashtags(n: config.trendingSettings.resultLimit)
             } else {
-                response = try await newsProvider.hashtags(limit: 15)
+                response = try await newsProvider.hashtags(limit: config.trendingSettings.resultLimit, forceFresh: forceFresh)
             }
+            guard hashtagRequestID == requestID, selectedStorySource == source,
+                  config.trendingSettings == settings, isLocalJSON == localJSON else { return }
             hashtagItems = response.hashtags
             trendingHashtags = response.hashtags.map(\.tag)
-            if let first = response.hashtags.first { onHashtagChanged(first.tag) }
+            onHashtagChanged(response.hashtags.first?.tag ?? "")
         } catch {
+            guard hashtagRequestID == requestID, selectedStorySource == source,
+                  config.trendingSettings == settings, isLocalJSON == localJSON else { return }
             hashtagItems = []
             trendingHashtags = []
             selectedHashtag = ""
+            selectedHashtagDetails = nil
+            hashtagDetailError = nil
             if isHashtagSource {
                 headlines = []
                 selectedHeadline = ""
@@ -531,8 +590,8 @@ final class GenerateViewModel {
                 for label in categoryLabels where !combined.contains(label) {
                     combined.append(label)
                 }
-                if !combined.contains("#️⃣ Trending Hashtags (Google)") {
-                    combined.insert("#️⃣ Trending Hashtags (Google)", at: min(3, combined.count))
+                if !combined.contains(Self.hashtagSourceLabel) {
+                    combined.insert(Self.hashtagSourceLabel, at: min(3, combined.count))
                 }
                 storySources = combined
                 if selectedStorySource.isEmpty || !storySources.contains(selectedStorySource) {
@@ -554,7 +613,7 @@ final class GenerateViewModel {
         if config.dataSource == .server {
             await loadNewsCategories()
             if isHashtagSource {
-                await refreshHashtags()
+                await refreshHashtags(forceFresh: false)
             } else if !isManualSource {
                 await refreshHeadlines(forceFresh: false)
             }

@@ -5,6 +5,14 @@
 	};
 	objectVersion = 56;
 	objects = {
+TD101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingDiscoverySettings.swift; sourceTree = "<group>"; };
+TD001 = {isa = PBXBuildFile; fileRef = TD101; };
+TD102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingClientProvider.swift; sourceTree = "<group>"; };
+TD002 = {isa = PBXBuildFile; fileRef = TD102; };
+TD103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingDiscoverySettingsView.swift; sourceTree = "<group>"; };
+TD003 = {isa = PBXBuildFile; fileRef = TD103; };
+TD104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingSettingsTests.swift; sourceTree = "<group>"; };
+TD004 = {isa = PBXBuildFile; fileRef = TD104; };
 ND101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoverySettings.swift; sourceTree = "<group>"; };
 ND001 = {isa = PBXBuildFile; fileRef = ND101; };
 ND102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoverySettingsView.swift; sourceTree = "<group>"; };
@@ -28,9 +36,9 @@ NS011 = {isa = PBXBuildFile; fileRef = NS001; };
 NS012 = {isa = PBXBuildFile; fileRef = NS002; };
 NS013 = {isa = PBXBuildFile; fileRef = NS003; };
 LP004 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/NewsSearch"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.0; }; };
-LP005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/GoogleTrends"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.1.0; }; };
+LP005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/TrendingHashtag"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.0; }; };
 LD004 = {isa = XCSwiftPackageProductDependency; package = LP004; productName = NewsSearch; };
-LD005 = {isa = XCSwiftPackageProductDependency; package = LP005; productName = GoogleTrends; };
+LD005 = {isa = XCSwiftPackageProductDependency; package = LP005; productName = TrendingHashtag; };
 LB006 = {isa = PBXBuildFile; productRef = LD004; };
 LB007 = {isa = PBXBuildFile; productRef = LD005; };
 LB008 = {isa = PBXBuildFile; productRef = LD004; };
@@ -270,6 +278,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				PL101 /* PipelineFlowModels.swift */,
+				TD101,
 				ND101,
 				L101 /* LocalAgentModels.swift */,
 				DY101 /* AgentInputSchema.swift */,
@@ -333,6 +342,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				PL103 /* LocalPipelineFlowResolver.swift */,
+				TD102,
 				L103 /* TerminalLocalAgentService.swift */,
 				LL11 /* LocalLibraryUpdateClient.swift */, NS002, SC102,
 				L107 /* StrictLocalAgentSession.swift */,
@@ -373,6 +383,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				PL105 /* PipelineTabView.swift */,
+				TD103,
 				ND102,
 				L105 /* LocalAgentView.swift */,
 				LL13 /* LibraryUploadSettingsView.swift */,
@@ -458,7 +469,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			children = (
 				PL106 /* PipelineFlowTests.swift */,
 				L106 /* LocalAgentTests.swift */,
-				LL14 /* LocalLibraryTests.swift */, NS003, SC105, M101 /* MainReleaseRegressionTests.swift */,
+				LL14 /* LocalLibraryTests.swift */, NS003, TD104, SC105, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -541,6 +552,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				PL003 /* LocalPipelineFlowResolver.swift in Sources */,
 				PL004 /* PipelineTabViewModel.swift in Sources */,
 				PL005 /* PipelineTabView.swift in Sources */,
+				TD001, TD002, TD003,
 				ND001, ND002,
 				L005 /* LocalAgentView.swift in Sources */,
 				LL03 /* LibraryUploadSettingsView.swift in Sources */,
@@ -621,7 +633,7 @@ P006 /* Build revision */ = {
 			files = (
 				PL006 /* PipelineFlowTests.swift in Sources */,
 				L006 /* LocalAgentTests.swift in Sources */,
-				LL04 /* LocalLibraryTests.swift in Sources */, NS013, SC005, M001 /* MainReleaseRegressionTests.swift in Sources */,
+				LL04 /* LocalLibraryTests.swift in Sources */, NS013, TD004, SC005, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,

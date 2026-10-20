@@ -61,6 +61,7 @@ struct PreferencesView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
 
                 NewsDiscoverySettingsView(viewModel: viewModel)
+                TrendingDiscoverySettingsView(viewModel: viewModel)
 
                 LibraryUploadSettingsView(viewModel: viewModel)
 
@@ -82,6 +83,7 @@ struct PreferencesView: View {
         .onAppear {
             viewModel.loadUploadSettings()
             viewModel.loadNewsSettings()
+            viewModel.loadTrendingSettings()
         }
     }
 }

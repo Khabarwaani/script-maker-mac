@@ -23,7 +23,10 @@ struct ConfigSidebarView: View {
             Task { await viewModel.initialLoad() }
         }
         .onChange(of: viewModel.appConfig.newsDiscoveryCacheIdentifier) { _, _ in
-            Task { await viewModel.initialLoad() }
+            if !viewModel.isHashtagSource { Task { await viewModel.initialLoad() } }
+        }
+        .onChange(of: viewModel.appConfig.trendingSettings) { _, _ in
+            if viewModel.isHashtagSource { Task { await viewModel.onStorySourceChanged() } }
         }
     }
 
@@ -80,6 +83,7 @@ struct ConfigSidebarView: View {
                     }
                 }
                 StudioRow("Custom hashtag") { TextField("e.g. #MakeInIndia", text: $viewModel.customHashtag) }
+                TrendingTagDetailsSection(viewModel: viewModel)
             }
             if !viewModel.isManualSource {
                 StudioRow("Headline", inset: 0) {
@@ -223,6 +227,28 @@ struct ConfigSidebarView: View {
                 .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
                 .help("Send current topic and launch multi-stage Pipeline")
             }
+        }
+    }
+}
+
+private struct TrendingTagDetailsSection: View {
+    @Bindable var viewModel: GenerateViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let detail = viewModel.selectedHashtagDetails {
+                if let title = detail.headline { Text(title).font(.callout.weight(.medium)) }
+                if let summary = detail.summary { Text(summary).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
+                if let source = detail.source { Text(source).font(.caption).foregroundStyle(AppTheme.secondaryInk) }
+            }
+            if !viewModel.isLocalJSON, !viewModel.selectedHashtag.isEmpty {
+                HStack {
+                    Button("Load full title and description") { Task { await viewModel.loadHashtagDetail() } }
+                        .disabled(viewModel.isLoadingHashtagDetail)
+                    if viewModel.isLoadingHashtagDetail { ProgressView().controlSize(.small) }
+                }
+            }
+            if let error = viewModel.hashtagDetailError { Text(error).font(.caption).foregroundStyle(AppTheme.danger) }
         }
     }
 }

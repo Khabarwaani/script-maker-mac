@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 import NewsSearch
-import GoogleTrends
+import TrendingHashtag
 @testable import ScriptMakerMac
 
 struct StubStudioNewsProvider: StudioNewsProviding {
@@ -13,9 +13,13 @@ struct StubStudioNewsProvider: StudioNewsProviding {
         if fails { throw APIError.transport("Feed unavailable") }
         return TopTitlesResponse(category: "india", label: "India", n: 1, mode: "local", titles: [NewsTitle(title: "Local headline", link: "https://example.com/news")])
     }
-    func hashtags(limit: Int) async throws -> NewsHashtagsResponse {
+    func hashtags(limit: Int, forceFresh: Bool) async throws -> NewsHashtagsResponse {
         if fails { throw APIError.transport("Trends unavailable") }
         return NewsHashtagsResponse(n: 1, mode: "local", hashtags: [NewsHashtag(tag: "#ISRO", headline: "Local trend")])
+    }
+    func hashtagDetail(for tag: String) async throws -> NewsHashtag {
+        if fails { throw APIError.transport("Detail unavailable") }
+        return NewsHashtag(tag: tag, headline: "Full trend title", source: "Fixture", summary: "Trend description")
     }
 }
 
@@ -79,7 +83,7 @@ final class StudioNewsTests: XCTestCase {
         let provider = LocalStudioNewsProvider(news: { fresh in
             probe.configurations.append(try config.newsSettings.frameworkConfiguration(forceFresh: fresh))
             return FixtureNewsSearch()
-        }, trends: FixtureTrendsSearch())
+        }, trends: { FixtureTrendsSearch() })
         _ = try await provider.headlines(category: "india", limit: 5)
         config.newsSettings = .init(searchDuration: 3600, cacheDuration: 7200, providerOrder: .bingOnly, region: "US", language: "hi")
         _ = try await provider.headlines(category: "india", limit: 5, forceFresh: true)
@@ -128,7 +132,7 @@ final class StudioNewsTests: XCTestCase {
         XCTAssertEqual(calls.hashtags, 0)
         XCTAssertEqual(vm.topic, "💻 Technology & AI headline")
         XCTAssertEqual(vm.storySources, sources)
-        vm.selectedStorySource = "#️⃣ Trending Hashtags (Google)"
+        vm.selectedStorySource = "#️⃣ Trending Hashtags"
         await vm.onStorySourceChanged()
         calls = await provider.calls
         XCTAssertEqual(calls.categories, 1)
@@ -180,7 +184,7 @@ final class StudioNewsTests: XCTestCase {
     }
 
     func testAdapterMapsCategoryLabelsAndTrendMetadata() async throws {
-        let provider = LocalStudioNewsProvider(news: { _ in FixtureNewsSearch() }, trends: FixtureTrendsSearch())
+        let provider = LocalStudioNewsProvider(news: { _ in FixtureNewsSearch() }, trends: { FixtureTrendsSearch() })
         let categories = try await provider.categories()
         XCTAssertEqual(categories.categories.count, 11)
         let headlines = try await provider.headlines(category: "🇮🇳 India Top Stories & Breaking", limit: 5)
@@ -218,10 +222,11 @@ private actor RecordingStudioNewsProvider: StudioNewsProviding {
         return TopTitlesResponse(category: category, label: category, n: 1, mode: "local",
                                  titles: [NewsTitle(title: "\(category) headline", link: "https://example.com/news")])
     }
-    func hashtags(limit: Int) async throws -> NewsHashtagsResponse {
+    func hashtags(limit: Int, forceFresh: Bool) async throws -> NewsHashtagsResponse {
         calls.hashtags += 1
         return NewsHashtagsResponse(n: 1, mode: "local", hashtags: [NewsHashtag(tag: "#ISRO", headline: "Local trend")])
     }
+    func hashtagDetail(for tag: String) async throws -> NewsHashtag { NewsHashtag(tag: tag, headline: "Full title") }
 }
 
 private struct FixtureNewsSearch: NewsSearching {
@@ -232,8 +237,13 @@ private struct FixtureNewsSearch: NewsSearching {
     func search(_ query: String, limit: Int) async throws -> [NewsArticle] { [] }
 }
 
-private struct FixtureTrendsSearch: TrendsSearching {
+private struct FixtureTrendsSearch: RefreshableTrendingSearching {
     func trendingTopics(limit: Int) async throws -> [TrendingTopic] {
         [TrendingTopic(topic: "ISRO", article: TrendArticle(title: "Rocket launch", url: URL(string: "https://example.com/space")!, source: "Space Desk"))]
+    }
+    func trendingHashtags(limit: Int) async throws -> [TrendingTopic] { try await trendingTopics(limit: limit) }
+    func trendingHashtags(limit: Int, forceRefresh: Bool) async throws -> [TrendingTopic] { try await trendingTopics(limit: limit) }
+    func tagDetail(for tagOrTopic: String) async throws -> TrendingHashtagDetail {
+        TrendingHashtagDetail(tag: tagOrTopic, title: "Full title", shortDescription: "Description")
     }
 }
