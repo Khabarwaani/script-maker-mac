@@ -101,7 +101,10 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         XCTAssertFalse(preferences.canSaveUploadSettings)
         let uploader = CapturingUploader()
         let vm = LibraryViewModel(config: config(), repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
-        await vm.upload(Story(title: "Blocked"), to: .telegram)
+        let story = Story(title: "Blocked")
+        vm.stories = [story]
+        vm.selectedStoryID = story.id
+        await vm.upload(story, to: .telegram)
         let received = await uploader.received
         XCTAssertTrue(received.isEmpty)
         XCTAssertTrue(vm.actionNotice?.contains("Settings locked") == true)
