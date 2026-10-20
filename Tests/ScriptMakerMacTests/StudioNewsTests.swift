@@ -21,6 +21,59 @@ struct StubStudioNewsProvider: StudioNewsProviding {
 
 final class StudioNewsTests: XCTestCase {
     @MainActor
+    func testLocalCategoryLoadingDoesNotFetchNewsAndKeepsSelection() async {
+        let config = AppConfig(defaults: UserDefaults(suiteName: "news.sources.\(UUID().uuidString)")!)
+        config.dataSource = .server
+        let provider = RecordingStudioNewsProvider()
+        let vm = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: provider)
+        vm.selectedStorySource = "💻 Technology & AI"
+        await vm.loadNewsCategories()
+        let sources = vm.storySources
+        await vm.loadNewsCategories()
+        vm.refreshModels()
+        let calls = await provider.calls
+        XCTAssertEqual(calls.categories, 1)
+        XCTAssertTrue(calls.headlines.isEmpty)
+        XCTAssertEqual(calls.hashtags, 0)
+        XCTAssertEqual(vm.storySources, sources)
+        XCTAssertEqual(vm.selectedStorySource, "💻 Technology & AI")
+    }
+
+    @MainActor
+    func testNewsRefreshOnlyFetchesSelectedSectionAndReusesLocalSources() async {
+        let config = AppConfig(defaults: UserDefaults(suiteName: "news.selected.\(UUID().uuidString)")!)
+        config.dataSource = .server
+        let provider = RecordingStudioNewsProvider()
+        let vm = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: provider)
+        await vm.initialLoad()
+        let sources = vm.storySources
+        vm.selectedStorySource = "💻 Technology & AI"
+        await vm.onStorySourceChanged()
+        await vm.refreshHeadlines(forceFresh: true)
+        await vm.initialLoad()
+        var calls = await provider.calls
+        XCTAssertEqual(calls.categories, 1)
+        XCTAssertEqual(calls.headlines, ["🇮🇳 India Top Stories & Breaking", "💻 Technology & AI", "💻 Technology & AI"])
+        XCTAssertEqual(calls.hashtags, 0)
+        XCTAssertEqual(vm.topic, "💻 Technology & AI headline")
+        XCTAssertEqual(vm.storySources, sources)
+        vm.selectedStorySource = "#️⃣ Trending Hashtags (Google)"
+        await vm.onStorySourceChanged()
+        calls = await provider.calls
+        XCTAssertEqual(calls.categories, 1)
+        XCTAssertEqual(calls.headlines.count, 3)
+        XCTAssertEqual(calls.hashtags, 1)
+        XCTAssertEqual(vm.storySources, sources)
+        vm.selectedStorySource = GenerateViewModel.manualSourceLabel
+        await vm.onStorySourceChanged()
+        await vm.initialLoad()
+        calls = await provider.calls
+        XCTAssertEqual(calls.categories, 1)
+        XCTAssertEqual(calls.headlines.count, 3)
+        XCTAssertEqual(calls.hashtags, 1)
+    }
+
+    @MainActor
     func testDiscoveryIgnoresInvalidServerAddress() async throws {
         let config = AppConfig(defaults: UserDefaults(suiteName: "news.\(UUID().uuidString)")!)
         config.dataSource = .server
@@ -64,6 +117,27 @@ final class StudioNewsTests: XCTestCase {
             _ = try await provider.headlines(category: "unknown", limit: 5)
             XCTFail("Unknown categories must throw")
         } catch is NewsSearchError { }
+    }
+}
+
+private actor RecordingStudioNewsProvider: StudioNewsProviding {
+    var calls = (categories: 0, headlines: [String](), hashtags: 0)
+    func categories() async throws -> NewsCategoriesResponse {
+        calls.categories += 1
+        return NewsCategoriesResponse(categories: [
+            NewsCategory(id: "india", label: "🇮🇳 India Top Stories & Breaking"),
+            NewsCategory(id: "tech", label: "💻 Technology & AI")
+        ], defaultCategory: "india")
+    }
+    func headlines(category: String?, limit: Int) async throws -> TopTitlesResponse {
+        let category = category ?? "default"
+        calls.headlines.append(category)
+        return TopTitlesResponse(category: category, label: category, n: 1, mode: "local",
+                                 titles: [NewsTitle(title: "\(category) headline", link: "https://example.com/news")])
+    }
+    func hashtags(limit: Int) async throws -> NewsHashtagsResponse {
+        calls.hashtags += 1
+        return NewsHashtagsResponse(n: 1, mode: "local", hashtags: [NewsHashtag(tag: "#ISRO", headline: "Local trend")])
     }
 }
 

@@ -13,6 +13,7 @@ final class GenerateViewModel {
     private let newsProvider: any StudioNewsProviding
     private let catalogProvider: any StudioCatalogProviding
     private var catalog: StudioCatalog?
+    private var localNewsCategories: NewsCategoriesResponse?
     private var eventTask: Task<Void, Never>?
 
     /// Config for child views that need it (e.g. thumbnails).
@@ -300,7 +301,7 @@ final class GenerateViewModel {
         do {
             let loaded = try catalogProvider.load()
             catalog = loaded
-            storySources = loaded.storySources
+            if isLocalJSON || localNewsCategories == nil { storySources = loaded.storySources }
             aiSources = loaded.aiSources
             emotions = loaded.emotions
             characterKinds = loaded.characterKinds
@@ -487,18 +488,20 @@ final class GenerateViewModel {
         }
     }
 
-    var isRefreshingCategories = false
-
     /// Load categories from the local package, or the bundled sample catalog.
     func loadNewsCategories() async {
-        isRefreshingCategories = true
-        defer { isRefreshingCategories = false }
         guard !isLocalJSON else {
             loadCatalog()
             return
         }
         do {
-            let response = try await newsProvider.categories()
+            let response: NewsCategoriesResponse
+            if let cached = localNewsCategories {
+                response = cached
+            } else {
+                response = try await newsProvider.categories()
+                if !response.categories.isEmpty { localNewsCategories = response }
+            }
             let categoryLabels = response.categories.map(\.label)
             if !categoryLabels.isEmpty {
                 var combined = [Self.manualSourceLabel]
@@ -516,9 +519,6 @@ final class GenerateViewModel {
                         selectedStorySource = first
                     }
                 }
-                if !isManualSource && !isHashtagSource {
-                    await refreshHeadlines(forceFresh: false)
-                }
             }
         } catch {
             setError(error)
@@ -532,6 +532,8 @@ final class GenerateViewModel {
             await loadNewsCategories()
             if isHashtagSource {
                 await refreshHashtags()
+            } else if !isManualSource {
+                await refreshHeadlines(forceFresh: false)
             }
         } else {
             loadCatalog()
