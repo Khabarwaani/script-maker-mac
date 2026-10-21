@@ -12,6 +12,14 @@ final class PipelineTabViewModel {
     var steps: [AgentPipelineStep] = []
     var activeStepIndex: Int = 0
 
+    private(set) var studioHeadlines: [String] = []
+    private(set) var studioCategories: [String] = []
+    var selectedCategory: String = "trending"
+    var selectedHeadline: String = ""
+    private(set) var isRefreshingHeadlines: Bool = false
+    private(set) var headlinesErrorMessage: String? = nil
+    var isShowingPresetCatalog: Bool = false
+
     private(set) var availableTransitions: [PipelineTransitionOption] = []
     private(set) var catalog: [LocalAgentDefinition] = []
     private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
@@ -28,16 +36,19 @@ final class PipelineTabViewModel {
     @ObservationIgnored private let service: any LocalAgentRunning
     @ObservationIgnored private let flowResolver: any PipelineFlowResolving
     @ObservationIgnored private let storyRepository: any StoryRepository
+    @ObservationIgnored private let newsProvider: any StudioNewsProviding
     @ObservationIgnored private var executionTask: Task<Void, Never>?
 
     init(
         service: any LocalAgentRunning,
         flowResolver: any PipelineFlowResolving,
-        storyRepository: any StoryRepository
+        storyRepository: any StoryRepository,
+        newsProvider: any StudioNewsProviding
     ) {
         self.service = service
         self.flowResolver = flowResolver
         self.storyRepository = storyRepository
+        self.newsProvider = newsProvider
         self.presets = flowResolver.availablePresets()
     }
 
@@ -104,10 +115,50 @@ final class PipelineTabViewModel {
                     startConfigurable(initialAgentID: firstAgent.agentID)
                 }
             }
+            await refreshStudioNews(forceFresh: false)
         } catch {
             guard !Task.isCancelled else { return }
             self.errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Studio News Selection (Phase 1)
+
+    func refreshStudioNews(forceFresh: Bool = false) async {
+        guard !isRefreshingHeadlines else { return }
+        isRefreshingHeadlines = true
+        headlinesErrorMessage = nil
+        defer { isRefreshingHeadlines = false }
+        do {
+            if studioCategories.isEmpty {
+                let catResp = try await newsProvider.categories()
+                studioCategories = catResp.categories.map(\.id)
+                if !studioCategories.contains(selectedCategory), let first = studioCategories.first {
+                    selectedCategory = first
+                }
+            }
+            let titlesResp = try await newsProvider.headlines(category: selectedCategory, limit: 15, forceFresh: forceFresh)
+            studioHeadlines = titlesResp.titles.map(\.title)
+            if selectedHeadline.isEmpty || !studioHeadlines.contains(selectedHeadline) {
+                if let first = studioHeadlines.first {
+                    selectHeadline(first)
+                }
+            }
+        } catch {
+            headlinesErrorMessage = error.localizedDescription
+        }
+    }
+
+    func selectHeadline(_ headline: String) {
+        selectedHeadline = headline
+        guard !steps.isEmpty, steps[0].agentID == "NewsResearcher" else { return }
+        steps[0].draft.fields["topic"]?.text = headline
+    }
+
+    func selectCategory(_ category: String) async {
+        guard category != selectedCategory else { return }
+        selectedCategory = category
+        await refreshStudioNews(forceFresh: false)
     }
 
     func selectMode(_ newMode: PipelineMode) {
@@ -123,13 +174,17 @@ final class PipelineTabViewModel {
         selectedPreset = preset
         savedStoryNotice = nil
         errorMessage = nil
+        isShowingPresetCatalog = false
 
         var newSteps: [AgentPipelineStep] = []
         for (index, agentID) in preset.stageAgentIDs.enumerated() {
             guard let def = catalog.first(where: { $0.agentID == agentID && $0.isExecutable }) ?? catalog.first(where: { $0.agentID == agentID }) else {
                 continue
             }
-            let draft = AgentInputDraft(schema: def.schema, required: true)
+            var draft = AgentInputDraft(schema: def.schema, required: true)
+            if index == 0, agentID == "NewsResearcher", !selectedHeadline.isEmpty {
+                draft.fields["topic"]?.text = selectedHeadline
+            }
             let step = AgentPipelineStep(
                 stepIndex: index,
                 agentID: def.agentID,

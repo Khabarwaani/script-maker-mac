@@ -120,18 +120,21 @@ struct PipelinePresetTemplate: Identifiable, Sendable, Equatable {
     let description: String
     let icon: String
     let stageAgentIDs: [String]
+    let supportsStudioNews: Bool
 
     init(
         id: String,
         name: String,
         description: String,
         icon: String,
-        stageAgentIDs: [String]
+        stageAgentIDs: [String],
+        supportsStudioNews: Bool = false
     ) {
         self.id = id
         self.name = name
         self.description = description
         self.icon = icon
         self.stageAgentIDs = stageAgentIDs
+        self.supportsStudioNews = supportsStudioNews
     }
 }

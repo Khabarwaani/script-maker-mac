@@ -53,10 +53,11 @@ struct PipelineTabView: View {
 
             if viewModel.isRunning {
                 ProgressView().controlSize(.small)
-                Text(viewModel.statusMessage).font(.caption).foregroundStyle(AppTheme.secondaryInk)
-            } else {
-                Text(viewModel.statusMessage).font(.caption).foregroundStyle(AppTheme.secondaryInk)
             }
+            Text(viewModel.statusMessage)
+                .font(.caption)
+                .foregroundStyle(AppTheme.secondaryInk)
+                .lineLimit(1)
 
             Spacer()
 
@@ -98,42 +99,210 @@ private struct PresetModeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Preset template picker bar
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(viewModel.presets) { preset in
-                        Button {
-                            viewModel.selectPreset(preset)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: preset.icon)
-                                    .foregroundStyle(viewModel.selectedPreset?.id == preset.id ? AppTheme.accent : AppTheme.ink)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(preset.name).font(.subheadline.weight(.semibold))
-                                    Text(preset.description).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            // Preset Banner / Active Preset Bar
+            presetBanner
+            Divider().overlay(AppTheme.line)
+
+            if viewModel.isShowingPresetCatalog {
+                presetCatalogView
+            } else {
+                // Phase 1: Studio News Selection (if preset supports it)
+                if let preset = viewModel.selectedPreset, preset.supportsStudioNews {
+                    StudioNewsSelectionCard(viewModel: viewModel)
+                    Divider().overlay(AppTheme.line)
+                }
+
+                // Step timeline strip
+                StepTimelineStrip(
+                    steps: viewModel.steps,
+                    activeIndex: viewModel.activeStepIndex,
+                    onSelectStep: { index in viewModel.selectStep(at: index) }
+                )
+                Divider().overlay(AppTheme.line)
+
+                // Step work area
+                StepWorkAreaView(viewModel: viewModel)
+            }
+        }
+    }
+
+    // MARK: - Active Preset Banner
+
+    private var presetBanner: some View {
+        HStack(spacing: 12) {
+            if let preset = viewModel.selectedPreset {
+                Image(systemName: preset.icon)
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text(preset.name).font(.subheadline.weight(.bold))
+                        Text("\(preset.stageAgentIDs.count) Stages")
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(AppTheme.sunken, in: Capsule())
+                    }
+                    Text(preset.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            } else {
+                Text("Choose a Workflow Preset").font(.subheadline.weight(.semibold))
+            }
+
+            Spacer()
+
+            Button(viewModel.isShowingPresetCatalog ? "Back to Workflow" : "Change Preset…") {
+                withAnimation { viewModel.isShowingPresetCatalog.toggle() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(viewModel.isRunning)
+        }
+        .padding(.horizontal, 24).padding(.vertical, 10)
+        .background(AppTheme.card)
+    }
+
+    // MARK: - Preset Catalog List View
+
+    private var presetCatalogView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Select a Workflow Preset")
+                    .font(.title3.bold())
+                Text("Choose from pre-configured production workflows. Each preset automatically maps outputs to the next stage:")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                ForEach(viewModel.presets) { preset in
+                    Button {
+                        viewModel.selectPreset(preset)
+                    } label: {
+                        HStack(alignment: .top, spacing: 14) {
+                            Image(systemName: preset.icon)
+                                .font(.title2)
+                                .foregroundStyle(viewModel.selectedPreset?.id == preset.id ? AppTheme.accent : AppTheme.ink)
+                                .frame(width: 36, height: 36)
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(preset.name).font(.headline)
+                                    if preset.supportsStudioNews {
+                                        Text("Phase 1: Studio News")
+                                            .font(.caption2.bold())
+                                            .padding(.horizontal, 6).padding(.vertical, 2)
+                                            .background(AppTheme.accentTint, in: Capsule())
+                                            .foregroundStyle(AppTheme.accent)
+                                    }
+                                    Spacer()
+                                    if viewModel.selectedPreset?.id == preset.id {
+                                        Text("Active")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(AppTheme.success)
+                                    }
+                                }
+
+                                Text(preset.description)
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.secondaryInk)
+
+                                HStack(spacing: 6) {
+                                    ForEach(preset.stageAgentIDs.indices, id: \.self) { i in
+                                        Text(preset.stageAgentIDs[i])
+                                            .font(.caption2.weight(.medium))
+                                            .padding(.horizontal, 6).padding(.vertical, 2)
+                                            .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 4))
+                                        if i < preset.stageAgentIDs.count - 1 {
+                                            Image(systemName: "arrow.right")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                 }
                             }
-                            .padding(.horizontal, 12).padding(.vertical, 8)
-                            .background(viewModel.selectedPreset?.id == preset.id ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(viewModel.selectedPreset?.id == preset.id ? AppTheme.accent : AppTheme.line, lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.isRunning)
+                        .padding(16)
+                        .background(viewModel.selectedPreset?.id == preset.id ? AppTheme.sunken : AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(viewModel.selectedPreset?.id == preset.id ? AppTheme.accent : AppTheme.line, lineWidth: 1.5))
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 24).padding(.vertical, 10)
             }
-            Divider().overlay(AppTheme.line)
-
-            // Step timeline strip
-            StepTimelineStrip(steps: viewModel.steps, activeIndex: viewModel.activeStepIndex, onSelectStep: { index in
-                viewModel.selectStep(at: index)
-            })
-            Divider().overlay(AppTheme.line)
-
-            // Step work area
-            StepWorkAreaView(viewModel: viewModel)
+            .padding(24)
         }
+    }
+}
+
+// MARK: - Phase 1: Studio News Selection Card
+
+private struct StudioNewsSelectionCard: View {
+    @Bindable var viewModel: PipelineTabViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Phase 1: Studio News Selection", systemImage: "newspaper.fill")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(AppTheme.ink)
+                Spacer()
+                if viewModel.isRefreshingHeadlines {
+                    ProgressView().controlSize(.small)
+                    Text("Fetching Studio headlines…").font(.caption).foregroundStyle(.secondary)
+                }
+                Button {
+                    Task { await viewModel.refreshStudioNews(forceFresh: true) }
+                } label: {
+                    Label("Refresh News", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
+            }
+
+            HStack(spacing: 12) {
+                // Category Picker
+                if !viewModel.studioCategories.isEmpty {
+                    Picker("Category", selection: Binding(
+                        get: { viewModel.selectedCategory },
+                        set: { cat in Task { await viewModel.selectCategory(cat) } }
+                    )) {
+                        ForEach(viewModel.studioCategories, id: \.self) { cat in
+                            Text(cat.capitalized).tag(cat)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 140)
+                    .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
+                }
+
+                // Headline Dropdown
+                if !viewModel.studioHeadlines.isEmpty {
+                    Picker("Headline", selection: Binding(
+                        get: { viewModel.selectedHeadline },
+                        set: { viewModel.selectHeadline($0) }
+                    )) {
+                        ForEach(viewModel.studioHeadlines, id: \.self) { headline in
+                            Text(headline).tag(headline)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
+                } else {
+                    TextField("Enter news topic or headline…", text: Binding(
+                        get: { viewModel.selectedHeadline },
+                        set: { viewModel.selectHeadline($0) }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+            }
+
+            if let err = viewModel.headlinesErrorMessage {
+                Text(err).font(.caption2).foregroundStyle(AppTheme.warning)
+            } else if !viewModel.selectedHeadline.isEmpty {
+                Text("✓ Selected news headline feeds into Step 1 (\(viewModel.steps.first?.agentName ?? "News Researcher"))")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.accent)
+            }
+        }
+        .padding(.horizontal, 24).padding(.vertical, 10)
+        .background(AppTheme.card)
     }
 }
 
@@ -144,7 +313,6 @@ private struct ConfigurableModeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // If starting fresh with 0 or 1 empty steps, provide starting agent picker
             if viewModel.steps.count <= 1 && viewModel.steps.first?.status == .pending && viewModel.steps.first?.result == nil {
                 HStack(spacing: 12) {
                     Text("Starting Agent:").font(.subheadline.weight(.medium))
@@ -165,13 +333,13 @@ private struct ConfigurableModeView: View {
                 Divider().overlay(AppTheme.line)
             }
 
-            // Step timeline strip
-            StepTimelineStrip(steps: viewModel.steps, activeIndex: viewModel.activeStepIndex, onSelectStep: { index in
-                viewModel.selectStep(at: index)
-            })
+            StepTimelineStrip(
+                steps: viewModel.steps,
+                activeIndex: viewModel.activeStepIndex,
+                onSelectStep: { index in viewModel.selectStep(at: index) }
+            )
             Divider().overlay(AppTheme.line)
 
-            // Step work area
             StepWorkAreaView(viewModel: viewModel)
         }
     }
@@ -240,12 +408,12 @@ private struct StepWorkAreaView: View {
             ScrollView {
                 stepInputSection.padding(24)
             }
-            .frame(minWidth: 350, idealWidth: 420, maxWidth: 500)
+            .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity)
 
             ScrollView {
                 stepOutputAndTransitionsSection.padding(24)
             }
-            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 350, idealWidth: 500, maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -267,7 +435,6 @@ private struct StepWorkAreaView: View {
                         .background(AppTheme.sunken, in: Capsule())
                 }
 
-                // Source indicator if mapped from prior step
                 if let sourceIdx = step.sourceStepIndex, sourceIdx < viewModel.steps.count {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.turn.down.right")
@@ -279,7 +446,6 @@ private struct StepWorkAreaView: View {
                     .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 6))
                 }
 
-                // Provider picker
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Execution Provider").font(.subheadline.weight(.semibold))
                     Picker("Provider", selection: Binding(
@@ -295,7 +461,6 @@ private struct StepWorkAreaView: View {
                     Text(viewModel.availabilityReason(step.provider)).font(.caption2).foregroundStyle(.secondary)
                 }
 
-                // Dynamic Input Form
                 if let def = viewModel.activeDefinition {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Input Parameters").font(.subheadline.weight(.semibold))
@@ -314,7 +479,6 @@ private struct StepWorkAreaView: View {
                     }
                 }
 
-                // Run / Cancel controls
                 HStack(spacing: 12) {
                     Button {
                         viewModel.runActiveStep()
@@ -372,13 +536,11 @@ private struct StepWorkAreaView: View {
                         }
                     }
 
-                    // MARK: - Dynamic Next Step Options (Configurable Mode)
                     if viewModel.mode == .configurable {
                         Divider().overlay(AppTheme.line)
                         configurableNextOptionsSection(step: step)
                     }
 
-                    // MARK: - Next Step in Preset Mode
                     if viewModel.mode == .preset, viewModel.activeStepIndex + 1 < viewModel.steps.count {
                         Divider().overlay(AppTheme.line)
                         presetNextStepSection
@@ -409,7 +571,6 @@ private struct StepWorkAreaView: View {
             Text("Flow to Next Step").font(.headline)
             Text("Select how you want to pipe this step's output into the next stage:").font(.caption).foregroundStyle(.secondary)
 
-            // Available compatible options
             ForEach(viewModel.availableTransitions) { option in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -433,7 +594,6 @@ private struct StepWorkAreaView: View {
                         .disabled(viewModel.isRunning)
                     }
 
-                    // Variation selector if multiple choices exist
                     if !option.variationSummaries.isEmpty {
                         Picker("Select variation to pipe", selection: Binding(
                             get: { viewModel.activeStep?.selectedVariationIndex ?? 0 },
@@ -452,7 +612,6 @@ private struct StepWorkAreaView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.line, lineWidth: 1))
             }
 
-            // Custom Agent option
             Menu {
                 ForEach(viewModel.catalog.filter(\.isExecutable)) { def in
                     Button(def.name) {
