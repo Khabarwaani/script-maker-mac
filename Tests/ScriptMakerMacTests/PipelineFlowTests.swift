@@ -418,8 +418,9 @@ final class PipelineFlowTests: XCTestCase {
     @MainActor
     func testGenerateViewModelStartInPipelineInvokesCallback() async throws {
         let news = PipelineStubNewsProvider()
+        let config = AppConfig(defaults: UserDefaults(suiteName: "pipeline.test.\(UUID().uuidString)")!)
         let genVM = GenerateViewModel(
-            config: AppConfig.default,
+            config: config,
             catalogProvider: BundledStudioCatalog(),
             repository: LocalStoryRepository(),
             newsProvider: news
