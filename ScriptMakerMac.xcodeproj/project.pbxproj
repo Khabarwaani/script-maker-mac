@@ -9,6 +9,8 @@ ND101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ne
 ND001 = {isa = PBXBuildFile; fileRef = ND101; };
 ND102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoverySettingsView.swift; sourceTree = "<group>"; };
 ND002 = {isa = PBXBuildFile; fileRef = ND102; };
+BT101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingButton.swift; sourceTree = "<group>"; };
+BT001 = {isa = PBXBuildFile; fileRef = BT101; };
 SC105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatTests.swift; sourceTree = "<group>"; };
 SC005 = {isa = PBXBuildFile; fileRef = SC105; };
 SC104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatView.swift; sourceTree = "<group>"; };
@@ -360,7 +362,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 				LL13 /* LibraryUploadSettingsView.swift */,
 				DY102 /* DynamicAgentInputForm.swift */,
 				R008 /* ContentView.swift */,
-				R049 /* AppTheme.swift */,
+				R049 /* AppTheme.swift */, BT101 /* LoadingButton.swift */,
 				R030 /* SceneThumbnail.swift */,
 				R043 /* ConfigSidebarView.swift */,
 				R044 /* StoryListView.swift */,
@@ -522,7 +524,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				DY002 /* DynamicAgentInputForm.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
-				LL01 /* LocalLibraryUpdateClient.swift in Sources */, NS011, NS012, SC001, SC002, SC003, SC004,
+				LL01 /* LocalLibraryUpdateClient.swift in Sources */, NS011, NS012, SC001, SC002, SC003, SC004, BT001,
 				L007 /* StrictLocalAgentSession.swift in Sources */,
 				LL02 /* LocalStoryUploadClient.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
