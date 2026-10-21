@@ -11,7 +11,10 @@ private struct PipelineStubNewsProvider: StudioNewsProviding {
         TopTitlesResponse(category: category ?? "trending", label: "Trending", n: 2, mode: "test", titles: [NewsTitle(title: "ISRO Gaganyaan Launch", link: "https://example.com/1"), NewsTitle(title: "New AI Framework Released", link: "https://example.com/2")])
     }
     func hashtags(limit: Int) async throws -> NewsHashtagsResponse {
-        NewsHashtagsResponse(n: 0, mode: "test", hashtags: [])
+        NewsHashtagsResponse(n: 2, mode: "test", hashtags: [
+            NewsHashtag(tag: "#Chandrayaan", headline: "India Space Mission Updates", link: "https://example.com/ch", source: "Google Trends"),
+            NewsHashtag(tag: "#AIRevolution", headline: "New AI Developments in 2026", link: "https://example.com/ai", source: "Google Trends")
+        ])
     }
 }
 
@@ -347,5 +350,94 @@ final class PipelineFlowTests: XCTestCase {
         vm.selectHeadline("New AI Framework Released")
         XCTAssertEqual(vm.selectedHeadline, "New AI Framework Released")
         XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "New AI Framework Released")
+    }
+
+    @MainActor
+    func testStudioSelectionTrendingHashtagsPopulateStep0() async throws {
+        let catalog = try makeSampleDefinitions()
+        let stubRunner = StubAgentService(catalogEntries: catalog)
+        let resolver = LocalPipelineFlowResolver()
+        let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
+        let news = PipelineStubNewsProvider()
+
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        await vm.refreshCatalogAndProviders()
+
+        vm.selectedStudioSource = .trendingHashtags
+        await vm.refreshTrendingHashtags()
+
+        XCTAssertEqual(vm.trendingHashtags.count, 2)
+        XCTAssertEqual(vm.selectedHashtag, "#Chandrayaan")
+        XCTAssertEqual(vm.studioTopic, "India Space Mission Updates")
+        XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "India Space Mission Updates")
+
+        // Switch hashtag
+        vm.selectHashtag("#AIRevolution")
+        XCTAssertEqual(vm.selectedHashtag, "#AIRevolution")
+        XCTAssertEqual(vm.studioTopic, "New AI Developments in 2026")
+        XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "New AI Developments in 2026")
+    }
+
+    @MainActor
+    func testConfigurableModeStudioTopicPrepopulation() async throws {
+        let catalog = try makeSampleDefinitions()
+        let stubRunner = StubAgentService(catalogEntries: catalog)
+        let resolver = LocalPipelineFlowResolver()
+        let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
+        let news = PipelineStubNewsProvider()
+
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        await vm.refreshCatalogAndProviders()
+
+        vm.selectMode(.configurable)
+        vm.startConfigurable(initialAgentID: "ThreeSceneStoryCreator")
+
+        // Active topic updates Step 0 'news' field for ThreeSceneStoryCreator
+        vm.updateStudioTopic("Global Quantum Computing Breakthrough")
+        XCTAssertEqual(vm.studioTopic, "Global Quantum Computing Breakthrough")
+        XCTAssertEqual(vm.steps[0].draft.fields["news"]?.text, "Global Quantum Computing Breakthrough")
+    }
+
+    @MainActor
+    func testApplyStudioTopicFromExternalStudioLaunch() async throws {
+        let catalog = try makeSampleDefinitions()
+        let stubRunner = StubAgentService(catalogEntries: catalog)
+        let resolver = LocalPipelineFlowResolver()
+        let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
+        let news = PipelineStubNewsProvider()
+
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        await vm.refreshCatalogAndProviders()
+
+        vm.applyStudioTopic("Breaking Cyber Security News")
+        XCTAssertEqual(vm.studioTopic, "Breaking Cyber Security News")
+        XCTAssertEqual(vm.selectedHeadline, "Breaking Cyber Security News")
+        XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "Breaking Cyber Security News")
+    }
+
+    @MainActor
+    func testGenerateViewModelStartInPipelineInvokesCallback() async throws {
+        let news = PipelineStubNewsProvider()
+        let genVM = GenerateViewModel(
+            config: AppConfig.default,
+            catalogProvider: BundledStudioCatalog(),
+            repository: LocalStoryRepository(),
+            newsProvider: news
+        )
+
+        var receivedTopic: String?
+        genVM.onNavigateToPipeline = { topic in
+            receivedTopic = topic
+        }
+
+        // When blank, should not invoke
+        genVM.topic = "   "
+        genVM.startInPipeline()
+        XCTAssertNil(receivedTopic)
+
+        // When filled, invokes callback
+        genVM.topic = "Autonomous EV Fleets in India"
+        genVM.startInPipeline()
+        XCTAssertEqual(receivedTopic, "Autonomous EV Fleets in India")
     }
 }

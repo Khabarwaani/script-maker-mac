@@ -32,7 +32,15 @@ struct PipelineTabView: View {
             }
             contentBody
         }
-        .task { await viewModel.refreshCatalogAndProviders() }
+        .task {
+            await viewModel.refreshCatalogAndProviders()
+            if viewModel.studioCategories.isEmpty {
+                await viewModel.refreshStudioNews()
+            }
+            if viewModel.trendingHashtags.isEmpty {
+                await viewModel.refreshTrendingHashtags()
+            }
+        }
     }
 
     // MARK: - Header & Controls
@@ -106,11 +114,8 @@ private struct PresetModeView: View {
             if viewModel.isShowingPresetCatalog {
                 presetCatalogView
             } else {
-                // Phase 1: Studio News Selection (if preset supports it)
-                if let preset = viewModel.selectedPreset, preset.supportsStudioNews {
-                    StudioNewsSelectionCard(viewModel: viewModel)
-                    Divider().overlay(AppTheme.line)
-                }
+                StudioNewsSelectionCard(viewModel: viewModel)
+                Divider().overlay(AppTheme.line)
 
                 // Step timeline strip
                 StepTimelineStrip(
@@ -230,75 +235,176 @@ private struct PresetModeView: View {
     }
 }
 
-// MARK: - Phase 1: Studio News Selection Card
+// MARK: - Studio Topic & News Selection View
 
 private struct StudioNewsSelectionCard: View {
     @Bindable var viewModel: PipelineTabViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Phase 1: Studio News Selection", systemImage: "newspaper.fill")
+            HStack(spacing: 8) {
+                Label("Studio Topic & News Selection", systemImage: "newspaper.fill")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(AppTheme.ink)
+
                 Spacer()
-                if viewModel.isRefreshingHeadlines {
+
+                if viewModel.isRefreshingHeadlines || viewModel.isRefreshingHashtags {
                     ProgressView().controlSize(.small)
-                    Text("Fetching Studio headlines…").font(.caption).foregroundStyle(.secondary)
+                    Text("Fetching studio news…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+
                 Button {
-                    Task { await viewModel.refreshStudioNews(forceFresh: true) }
+                    Task {
+                        if viewModel.selectedStudioSource == .trendingHashtags {
+                            await viewModel.refreshTrendingHashtags()
+                        } else {
+                            await viewModel.refreshStudioNews(forceFresh: true)
+                        }
+                    }
                 } label: {
-                    Label("Refresh News", systemImage: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.plain)
                 .font(.caption)
-                .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
+                .disabled(viewModel.isRefreshingHeadlines || viewModel.isRefreshingHashtags || viewModel.isRunning)
+
+                Button {
+                    withAnimation {
+                        viewModel.isStudioSelectionExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: viewModel.isStudioSelectionExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+                .buttonStyle(.plain)
+                .help(viewModel.isStudioSelectionExpanded ? "Collapse Studio Selection" : "Expand Studio Selection")
             }
 
-            HStack(spacing: 12) {
-                // Category Picker
-                if !viewModel.studioCategories.isEmpty {
-                    Picker("Category", selection: Binding(
-                        get: { viewModel.selectedCategory },
-                        set: { cat in Task { await viewModel.selectCategory(cat) } }
+            if viewModel.isStudioSelectionExpanded {
+                HStack(spacing: 12) {
+                    Picker("Source", selection: Binding(
+                        get: { viewModel.selectedStudioSource },
+                        set: { newSource in
+                            viewModel.selectedStudioSource = newSource
+                            if newSource == .trendingHashtags && viewModel.trendingHashtags.isEmpty {
+                                Task { await viewModel.refreshTrendingHashtags() }
+                            } else if newSource == .categories && viewModel.studioHeadlines.isEmpty {
+                                Task { await viewModel.refreshStudioNews() }
+                            }
+                        }
                     )) {
-                        ForEach(viewModel.studioCategories, id: \.self) { cat in
-                            Text(cat.capitalized).tag(cat)
+                        ForEach(PipelineTabViewModel.StudioSourceType.allCases) { src in
+                            Text(src.rawValue).tag(src)
                         }
                     }
-                    .pickerStyle(.menu)
-                    .frame(width: 140)
-                    .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 380)
+                    .disabled(viewModel.isRunning)
+
+                    Spacer()
                 }
 
-                // Headline Dropdown
-                if !viewModel.studioHeadlines.isEmpty {
-                    Picker("Headline", selection: Binding(
-                        get: { viewModel.selectedHeadline },
-                        set: { viewModel.selectHeadline($0) }
-                    )) {
-                        ForEach(viewModel.studioHeadlines, id: \.self) { headline in
-                            Text(headline).tag(headline)
+                switch viewModel.selectedStudioSource {
+                case .categories:
+                    HStack(spacing: 12) {
+                        if !viewModel.studioCategories.isEmpty {
+                            Picker("Category", selection: Binding(
+                                get: { viewModel.selectedCategory },
+                                set: { cat in Task { await viewModel.selectCategory(cat) } }
+                            )) {
+                                ForEach(viewModel.studioCategories, id: \.self) { cat in
+                                    Text(cat.capitalized).tag(cat)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 150)
+                            .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
+                        }
+
+                        if !viewModel.studioHeadlines.isEmpty {
+                            Picker("Headline", selection: Binding(
+                                get: { viewModel.selectedHeadline },
+                                set: { viewModel.selectHeadline($0) }
+                            )) {
+                                ForEach(viewModel.studioHeadlines, id: \.self) { headline in
+                                    Text(headline).tag(headline)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
                         }
                     }
-                    .pickerStyle(.menu)
-                    .disabled(viewModel.isRefreshingHeadlines || viewModel.isRunning)
-                } else {
-                    TextField("Enter news topic or headline…", text: Binding(
-                        get: { viewModel.selectedHeadline },
-                        set: { viewModel.selectHeadline($0) }
+
+                case .trendingHashtags:
+                    HStack(spacing: 12) {
+                        if !viewModel.trendingHashtags.isEmpty {
+                            Picker("Hashtag", selection: Binding(
+                                get: { viewModel.selectedHashtag },
+                                set: { viewModel.selectHashtag($0) }
+                            )) {
+                                ForEach(viewModel.trendingHashtags) { item in
+                                    Text("\(item.tag) — \(item.headline ?? "")").tag(item.tag)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .disabled(viewModel.isRefreshingHashtags || viewModel.isRunning)
+                        }
+
+                        TextField("Custom #hashtag…", text: Binding(
+                            get: { viewModel.customHashtag },
+                            set: { val in
+                                viewModel.customHashtag = val
+                                if !val.isEmpty {
+                                    viewModel.updateStudioTopic(val)
+                                }
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 240)
+                    }
+
+                case .manual:
+                    EmptyView()
+                }
+
+                // Active editable topic field
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Active Pipeline Topic:").font(.caption.weight(.semibold)).foregroundStyle(AppTheme.secondaryInk)
+                        Spacer()
+                        if !viewModel.studioTopic.isEmpty {
+                            Text("✓ Feeds Step 1 (\(viewModel.steps.first?.agentName ?? "Initial Agent"))")
+                                .font(.caption2)
+                                .foregroundStyle(AppTheme.accent)
+                        }
+                    }
+                    TextField("Enter or refine topic for pipeline…", text: Binding(
+                        get: { viewModel.studioTopic },
+                        set: { viewModel.updateStudioTopic($0) }
                     ))
                     .textFieldStyle(.roundedBorder)
                 }
-            }
 
-            if let err = viewModel.headlinesErrorMessage {
-                Text(err).font(.caption2).foregroundStyle(AppTheme.warning)
-            } else if !viewModel.selectedHeadline.isEmpty {
-                Text("✓ Selected news headline feeds into Step 1 (\(viewModel.steps.first?.agentName ?? "News Researcher"))")
-                    .font(.caption2)
-                    .foregroundStyle(AppTheme.accent)
+                if let err = viewModel.headlinesErrorMessage ?? viewModel.hashtagsErrorMessage {
+                    Text(err).font(.caption2).foregroundStyle(AppTheme.warning)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Text("Topic:").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                    Text(viewModel.studioTopic.isEmpty ? "No topic selected" : viewModel.studioTopic)
+                        .font(.caption.weight(.medium))
+                        .lineLimit(1)
+                    Spacer()
+                    if !viewModel.studioTopic.isEmpty {
+                        Text("✓ Feeds Step 1 (\(viewModel.steps.first?.agentName ?? "Initial Agent"))")
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                }
             }
         }
         .padding(.horizontal, 24).padding(.vertical, 10)
@@ -313,6 +419,9 @@ private struct ConfigurableModeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            StudioNewsSelectionCard(viewModel: viewModel)
+            Divider().overlay(AppTheme.line)
+
             if viewModel.steps.count <= 1 && viewModel.steps.first?.status == .pending && viewModel.steps.first?.result == nil {
                 HStack(spacing: 12) {
                     Text("Starting Agent:").font(.subheadline.weight(.medium))

@@ -49,6 +49,14 @@ final class GenerateViewModel {
     var isSavedToLibrary: Bool = false
     /// Callback triggered to navigate to the Library tab.
     var onNavigateToLibrary: (() -> Void)?
+    /// Callback triggered to navigate to the Pipeline tab with topic.
+    var onNavigateToPipeline: ((String) -> Void)?
+
+    func startInPipeline() {
+        let cleanTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTopic.isEmpty else { return }
+        onNavigateToPipeline?(cleanTopic)
+    }
 
     /// Total elapsed milliseconds across all completed phases or from the stream end event.
     var totalElapsedMs: Int? {
