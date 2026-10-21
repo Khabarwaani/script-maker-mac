@@ -3,6 +3,18 @@ import AgentAtom
 import KhabarwaaniAgent
 @testable import ScriptMakerMac
 
+private struct PipelineStubNewsProvider: StudioNewsProviding {
+    func categories() async throws -> NewsCategoriesResponse {
+        NewsCategoriesResponse(categories: [NewsCategory(id: "trending", label: "Trending"), NewsCategory(id: "technology", label: "Technology")], defaultCategory: "trending")
+    }
+    func headlines(category: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
+        TopTitlesResponse(category: category ?? "trending", label: "Trending", n: 2, mode: "test", titles: [NewsTitle(title: "ISRO Gaganyaan Launch", link: "https://example.com/1"), NewsTitle(title: "New AI Framework Released", link: "https://example.com/2")])
+    }
+    func hashtags(limit: Int) async throws -> NewsHashtagsResponse {
+        NewsHashtagsResponse(n: 0, mode: "test", hashtags: [])
+    }
+}
+
 private final class InMemoryStoryDataSource: StoryDataSourceProtocol, @unchecked Sendable {
     private var stories: [Story] = []
     func load() -> [Story] { stories }
@@ -47,10 +59,11 @@ final class PipelineFlowTests: XCTestCase {
     func testPresetsAreAvailableAndWellConfigured() {
         let resolver = LocalPipelineFlowResolver()
         let presets = resolver.availablePresets()
-        XCTAssertEqual(presets.count, 4)
+        XCTAssertEqual(presets.count, 5)
         XCTAssertTrue(presets.contains { $0.id == "full-viral-story" })
         XCTAssertTrue(presets.contains { $0.id == "news-to-story" })
         XCTAssertTrue(presets.contains { $0.id == "grounded-satire" })
+        XCTAssertTrue(presets.contains { $0.id == "joke-to-story" })
         XCTAssertTrue(presets.contains { $0.id == "script-refinement" })
     }
 
@@ -205,7 +218,7 @@ final class PipelineFlowTests: XCTestCase {
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo)
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
 
         XCTAssertEqual(vm.mode, .preset)
@@ -237,7 +250,7 @@ final class PipelineFlowTests: XCTestCase {
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo)
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
 
         vm.selectMode(.configurable)
@@ -293,7 +306,7 @@ final class PipelineFlowTests: XCTestCase {
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo)
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
         vm.selectMode(.configurable)
         vm.startConfigurable(initialAgentID: "ThreeSceneStoryCreator")
@@ -311,5 +324,28 @@ final class PipelineFlowTests: XCTestCase {
         let saved = await repo.all()
         XCTAssertTrue(saved.contains { $0.title == "Pipeline Success" })
         XCTAssertNotNil(vm.savedStoryNotice)
+    }
+
+    @MainActor
+    func testPhase1StudioNewsSelectionPrepopulatesStep0() async throws {
+        let catalog = try makeSampleDefinitions()
+        let stubRunner = StubAgentService(catalogEntries: catalog)
+        let resolver = LocalPipelineFlowResolver()
+        let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
+        let news = PipelineStubNewsProvider()
+
+        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        await vm.refreshCatalogAndProviders()
+
+        XCTAssertEqual(vm.studioCategories, ["trending", "technology"])
+        XCTAssertEqual(vm.studioHeadlines, ["ISRO Gaganyaan Launch", "New AI Framework Released"])
+        XCTAssertEqual(vm.selectedHeadline, "ISRO Gaganyaan Launch")
+        // Verify Step 0 topic was automatically prefilled with Studio headline
+        XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "ISRO Gaganyaan Launch")
+
+        // Switch headline
+        vm.selectHeadline("New AI Framework Released")
+        XCTAssertEqual(vm.selectedHeadline, "New AI Framework Released")
+        XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "New AI Framework Released")
     }
 }

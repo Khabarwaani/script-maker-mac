@@ -40,7 +40,8 @@ enum CompositionRoot {
         let makeNews: @MainActor @Sendable (Bool) throws -> any NewsSearching = { forceFresh in
             NewsSearchClient(configuration: try config.newsSettings.frameworkConfiguration(forceFresh: forceFresh))
         }
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: LocalStudioNewsProvider(news: makeNews, trends: GoogleTrendsClient()))
+        let newsProvider = LocalStudioNewsProvider(news: makeNews, trends: GoogleTrendsClient())
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: newsProvider)
         let files = FileStore()
         let agentService = TerminalLocalAgentService(
             makeSession: { request, workspace in
@@ -113,7 +114,7 @@ enum CompositionRoot {
         let localAgent = LocalAgentViewModel(service: agentService)
         let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (try makeNews(true), config.newsPageSize) }), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }), uploadSettings: uploadSettings, scriptChat: ScriptChatViewModel(service: LocalScriptChatService(runner: agentService)))
         let flowResolver = LocalPipelineFlowResolver()
-        let pipeline = PipelineTabViewModel(service: agentService, flowResolver: flowResolver, storyRepository: repository)
+        let pipeline = PipelineTabViewModel(service: agentService, flowResolver: flowResolver, storyRepository: repository, newsProvider: newsProvider)
         return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, localAgentViewModel: localAgent, pipelineViewModel: pipeline)
     }
 }

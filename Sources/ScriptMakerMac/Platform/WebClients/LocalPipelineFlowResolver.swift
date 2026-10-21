@@ -9,30 +9,42 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
             PipelinePresetTemplate(
                 id: "full-viral-story",
                 name: "Complete Viral Story Flow",
-                description: "News Researcher → Grounded Joke Generator → 3-Scene Story Creator → Script Chat refinement.",
+                description: "Studio News → News Researcher → Grounded Joke Generator → 3-Scene Story Creator → Script Chat refinement.",
                 icon: "sparkles.rectangle.stack",
-                stageAgentIDs: ["NewsResearcher", "GroundedJokeGenerator", "ThreeSceneStoryCreator", "ScriptChat"]
+                stageAgentIDs: ["NewsResearcher", "GroundedJokeGenerator", "ThreeSceneStoryCreator", "ScriptChat"],
+                supportsStudioNews: true
             ),
             PipelinePresetTemplate(
                 id: "news-to-story",
                 name: "Direct News to 3-Scene Script",
-                description: "Fact-check news with News Researcher → Generate 3-Scene viral story directly.",
+                description: "Studio News → Fact-check news with News Researcher → Generate 3-Scene viral story directly.",
                 icon: "newspaper",
-                stageAgentIDs: ["NewsResearcher", "ThreeSceneStoryCreator"]
+                stageAgentIDs: ["NewsResearcher", "ThreeSceneStoryCreator"],
+                supportsStudioNews: true
             ),
             PipelinePresetTemplate(
                 id: "grounded-satire",
                 name: "Grounded Satire Jokes Flow",
-                description: "Research news topic → Generate grounded satirical joke variations across durations.",
+                description: "Studio News → Research news topic → Generate grounded satirical joke variations across durations.",
                 icon: "quote.bubble",
-                stageAgentIDs: ["NewsResearcher", "GroundedJokeGenerator"]
+                stageAgentIDs: ["NewsResearcher", "GroundedJokeGenerator"],
+                supportsStudioNews: true
+            ),
+            PipelinePresetTemplate(
+                id: "joke-to-story",
+                name: "Quick Joke to 3-Scene Story",
+                description: "Generate grounded jokes across durations → Weave selected joke punchline into Scene 3.",
+                icon: "theatermasks",
+                stageAgentIDs: ["GroundedJokeGenerator", "ThreeSceneStoryCreator"],
+                supportsStudioNews: false
             ),
             PipelinePresetTemplate(
                 id: "script-refinement",
                 name: "Story & ScriptChat Polish",
                 description: "Generate 3-Scene story → Polish spoken dialogues and punchlines with ScriptChat.",
                 icon: "text.badge.checkmark",
-                stageAgentIDs: ["ThreeSceneStoryCreator", "ScriptChat"]
+                stageAgentIDs: ["ThreeSceneStoryCreator", "ScriptChat"],
+                supportsStudioNews: false
             )
         ]
     }
