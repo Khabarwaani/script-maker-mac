@@ -166,13 +166,13 @@ final class PipelineTabViewModel {
         }
     }
 
-    func refreshTrendingHashtags() async {
+    func refreshTrendingHashtags(forceFresh: Bool = false) async {
         guard !isRefreshingHashtags else { return }
         isRefreshingHashtags = true
         hashtagsErrorMessage = nil
         defer { isRefreshingHashtags = false }
         do {
-            let resp = try await newsProvider.hashtags(limit: 20)
+            let resp = try await newsProvider.hashtags(limit: 20, forceFresh: forceFresh)
             trendingHashtags = resp.hashtags
             if selectedHashtag.isEmpty || !trendingHashtags.contains(where: { $0.tag == selectedHashtag }) {
                 if let first = trendingHashtags.first {
