@@ -40,6 +40,21 @@ final class AppConfig {
 
     private let defaults: UserDefaults
 
+    var trendingSettings: TrendingDiscoverySettings {
+        didSet {
+            defaults.set(trendingSettings.timeWindowHours, forKey: "trending.timeWindowHours")
+            defaults.set(trendingSettings.cacheDuration, forKey: "trending.cacheDuration")
+            defaults.set(trendingSettings.languages.map(\.rawValue).sorted(), forKey: "trending.languages")
+            defaults.set(trendingSettings.region, forKey: "trending.region")
+            defaults.set(trendingSettings.feedLanguage, forKey: "trending.feedLanguage")
+            defaults.set(trendingSettings.platform.rawValue, forKey: "trending.platform")
+            defaults.set(trendingSettings.resultLimit, forKey: "trending.resultLimit")
+            defaults.set(trendingSettings.twitterEndpoint, forKey: "trending.twitterEndpoint")
+            defaults.set(trendingSettings.instagramEndpoint, forKey: "trending.instagramEndpoint")
+            defaults.set(trendingSettings.youtubeEndpoint, forKey: "trending.youtubeEndpoint")
+        }
+    }
+
     var newsSettings: NewsDiscoverySettings {
         didSet {
             defaults.set(newsSettings.searchDuration, forKey: "news.searchDuration")
@@ -129,6 +144,18 @@ final class AppConfig {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let trendingDefaults = TrendingDiscoverySettings()
+        self.trendingSettings = TrendingDiscoverySettings(
+            timeWindowHours: defaults.object(forKey: "trending.timeWindowHours") as? Int ?? trendingDefaults.timeWindowHours,
+            cacheDuration: defaults.object(forKey: "trending.cacheDuration") as? Double ?? trendingDefaults.cacheDuration,
+            languages: defaults.stringArray(forKey: "trending.languages").map { Set($0.compactMap(TrendLanguage.init(rawValue:))) } ?? trendingDefaults.languages,
+            region: defaults.string(forKey: "trending.region") ?? trendingDefaults.region,
+            feedLanguage: defaults.string(forKey: "trending.feedLanguage") ?? trendingDefaults.feedLanguage,
+            platform: defaults.string(forKey: "trending.platform").flatMap(TrendPlatform.init(rawValue:)) ?? trendingDefaults.platform,
+            resultLimit: defaults.object(forKey: "trending.resultLimit") as? Int ?? trendingDefaults.resultLimit,
+            twitterEndpoint: defaults.string(forKey: "trending.twitterEndpoint") ?? "",
+            instagramEndpoint: defaults.string(forKey: "trending.instagramEndpoint") ?? "",
+            youtubeEndpoint: defaults.string(forKey: "trending.youtubeEndpoint") ?? "")
         let newsDefaults = NewsDiscoverySettings()
         self.newsSettings = NewsDiscoverySettings(
             searchDuration: defaults.object(forKey: "news.searchDuration") as? Double ?? newsDefaults.searchDuration,
@@ -176,6 +203,7 @@ final class AppConfig {
         dataSource = .offline
         newsPageSize = Self.defaultNewsPageSize
         newsSettings = NewsDiscoverySettings()
+        trendingSettings = TrendingDiscoverySettings()
         aiSource = "Antigravity"
         aiModel = "Default"
         aiPower = "Default"

@@ -560,12 +560,14 @@ public struct NewsHashtag: Codable, Identifiable, Equatable, Hashable, Sendable 
     public let headline: String?
     public let link: String?
     public let source: String?
+    public let summary: String?
 
-    public init(tag: String, headline: String? = nil, link: String? = nil, source: String? = nil) {
+    public init(tag: String, headline: String? = nil, link: String? = nil, source: String? = nil, summary: String? = nil) {
         self.tag = tag
         self.headline = headline
         self.link = link
         self.source = source
+        self.summary = summary
     }
 }
 

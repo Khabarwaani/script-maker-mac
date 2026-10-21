@@ -10,11 +10,14 @@ private struct PipelineStubNewsProvider: StudioNewsProviding {
     func headlines(category: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
         TopTitlesResponse(category: category ?? "trending", label: "Trending", n: 2, mode: "test", titles: [NewsTitle(title: "ISRO Gaganyaan Launch", link: "https://example.com/1"), NewsTitle(title: "New AI Framework Released", link: "https://example.com/2")])
     }
-    func hashtags(limit: Int) async throws -> NewsHashtagsResponse {
+    func hashtags(limit: Int, forceFresh: Bool) async throws -> NewsHashtagsResponse {
         NewsHashtagsResponse(n: 2, mode: "test", hashtags: [
             NewsHashtag(tag: "#Chandrayaan", headline: "India Space Mission Updates", link: "https://example.com/ch", source: "Google Trends"),
             NewsHashtag(tag: "#AIRevolution", headline: "New AI Developments in 2026", link: "https://example.com/ai", source: "Google Trends")
         ])
+    }
+    func hashtagDetail(for tag: String) async throws -> NewsHashtag {
+        NewsHashtag(tag: tag, headline: "Detailed headline for \(tag)", link: "https://example.com", source: "Google Trends", summary: "Detailed summary for \(tag)")
     }
 }
 

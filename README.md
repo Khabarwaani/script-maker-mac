@@ -190,11 +190,16 @@ packaging/mac/build_dmg.sh 1.0
 
 Studio news discovery runs locally in Swift using the public personal packages
 [NewsSearch](https://github.com/abhi266raj/NewsSearch) and
-[GoogleTrends](https://github.com/abhi266raj/GoogleTrends). Headline/category refresh
-and Google Trends topics work without ScriptMakerServer; internet is required.
+[TrendingHashtag](https://github.com/abhi266raj/TrendingHashtag). Local categories
+remain fixed; only selected headlines or hashtag details refresh. Internet is required.
 Bundled sample mode remains available. Script generation still uses the configured
 pipeline server. Both packages offer source and XCFramework products at the same
 version; this app consumes the framework products.
+
+Settings contains app-wide News Discovery and Trending Hashtags options, initialized
+to the frameworks' defaults. Configure search/trend windows, cache durations,
+providers, region, language, and result limits there. Hashtag selection shows feed
+details; **Load full title and description** looks up additional topic context.
 
 In Library, open a story with a screenplay and choose **Refine with Script Chat**.
 Choose an available local provider, enter a refinement instruction, and review the

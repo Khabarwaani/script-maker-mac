@@ -18,6 +18,32 @@ final class PreferencesViewModel {
     private var draftNewsPageSize: Int
     var newsSettingsError: String?
     var newsSettingsNotice: String?
+    var draftTrendingSettings: TrendingDiscoverySettings
+    var trendingSettingsError: String?
+    var trendingSettingsNotice: String?
+
+    var trendingCacheHours: Double {
+        get { draftTrendingSettings.cacheDuration / 3600 }
+        set { draftTrendingSettings.cacheDuration = newValue * 3600 }
+    }
+
+    func loadTrendingSettings() { draftTrendingSettings = config.trendingSettings }
+
+    func setTrendLanguage(_ language: TrendLanguage, enabled: Bool) {
+        if enabled { draftTrendingSettings.languages.insert(language) }
+        else { draftTrendingSettings.languages.remove(language) }
+    }
+
+    func saveTrendingSettings() {
+        trendingSettingsError = nil
+        trendingSettingsNotice = nil
+        do {
+            let validated = try draftTrendingSettings.validated()
+            config.trendingSettings = validated
+            draftTrendingSettings = validated
+            trendingSettingsNotice = "Trending hashtag settings saved app-wide."
+        } catch { trendingSettingsError = error.localizedDescription }
+    }
 
     var newsSearchHours: Double {
         get { draftNewsSettings.searchDuration / 3600 }
@@ -151,6 +177,7 @@ final class PreferencesViewModel {
         self.modelCatalogProvider = modelCatalogProvider
         self.uploadSettings = uploadSettings
         self.draftNewsSettings = config.newsSettings
+        self.draftTrendingSettings = config.trendingSettings
         self.draftNewsPageSize = config.newsPageSize
         self.draftURL = config.serverURL
         self.dataSource = config.dataSource
