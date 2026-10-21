@@ -13,9 +13,6 @@ struct StoryDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             StoryDetailToolbar(story: story, viewModel: viewModel, onDelete: onDelete)
-            if viewModel.isUploading {
-                HStack { ProgressView().controlSize(.small); Text("Uploading…").font(.caption); Spacer() }.padding(12)
-            }
             Divider().overlay(AppTheme.line)
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -85,8 +82,12 @@ struct StoryDetailView: View {
                                         }.buttonStyle(.plain).help("Remove video").accessibilityLabel("Remove video").padding(8)
                                     }
                             }
-                            Button("Merge closing clip") { onMerge(story.id) }
-                                .buttonStyle(StudioButtonStyle())
+                            LoadingButton(isLoading: viewModel.isMerging) {
+                                onMerge(story.id)
+                            } label: {
+                                Text("Merge closing clip")
+                            }
+                            .buttonStyle(StudioButtonStyle())
                         }
                     }
                 }
@@ -139,7 +140,7 @@ private struct StoryDetailToolbar: View {
                 ShareLink(item: viewModel.shareText(for: story)) { Label("News Links + Hashtags", systemImage: "square.and.arrow.up") }
                 ShareLink(item: story.scriptText ?? "") { Label("Script", systemImage: "doc.text") }
                     .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
-            } label: { LibraryActionLabel(icon: "square.and.arrow.up") }
+            } label: { LibraryActionLabel(icon: "square.and.arrow.up", isLoading: viewModel.isUploading || viewModel.isSharing) }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Share story").accessibilityLabel("Share story")
                 .disabled(viewModel.isSharing || viewModel.isUploading)

@@ -16,6 +16,7 @@ final class LibraryViewModel {
     private let uploadSettings: (any UploadSettingsStoring)?
     var isSharing = false
     var isUploading = false
+    var isMerging = false
 
     func share(_ story: Story, to destination: StoryShareDestination) async {
         guard !isSharing else { return }
@@ -430,6 +431,8 @@ final class LibraryViewModel {
             notice = "Video merging needs a server connection."
             return
         }
+        isMerging = true
+        defer { isMerging = false }
         do {
             let api = try PipelineService(config: config)
             _ = try await api.select(sessionID: storyID, selection: ["action": "merge_clip"])

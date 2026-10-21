@@ -43,10 +43,18 @@ struct PreferencesView: View {
                     }
                     HStack {
                         if viewModel.dataSource == .server {
-                            Button("Test connection") { Task { await viewModel.testConnection() } }
+                            LoadingButton(isLoading: viewModel.isTesting) {
+                                Task { await viewModel.testConnection() }
+                            } label: {
+                                Text("Test connection")
+                            }
                         }
-                        Button("Apply") { Task { await viewModel.save() } }
-                    }.disabled(viewModel.isTesting)
+                        LoadingButton(isLoading: viewModel.isTesting) {
+                            Task { await viewModel.save() }
+                        } label: {
+                            Text("Apply")
+                        }
+                    }
                 }
                 .padding(18).frame(maxWidth: .infinity, alignment: .leading)
                 .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))

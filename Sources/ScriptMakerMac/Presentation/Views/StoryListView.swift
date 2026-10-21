@@ -162,9 +162,10 @@ private struct AddLibraryStoryView: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                     .buttonStyle(StudioButtonStyle())
                     .disabled(viewModel.isAddingStory)
-                if viewModel.isAddingStory { ProgressView().controlSize(.small); Text("Fetching related news…").font(.caption) }
-                Button("Add story") {
+                LoadingButton(isLoading: viewModel.isAddingStory) {
                     Task { if await viewModel.addStory() { dismiss() } }
+                } label: {
+                    Text("Add story")
                 }
                 .buttonStyle(StudioPrimaryButtonStyle()).keyboardShortcut(.defaultAction)
                 .disabled(!viewModel.canAddStory)
