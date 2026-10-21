@@ -247,3 +247,27 @@ private struct FixtureTrendsSearch: RefreshableTrendingSearching {
         TrendingHashtagDetail(tag: tagOrTopic, title: "Full title", shortDescription: "Description")
     }
 }
+
+extension StudioNewsTests {
+    func testLocalStudioNewsProviderFiltersAudioBriefingsAndDigests() async throws {
+        struct BriefingsNewsSearch: NewsSearching {
+            func headlines(category: NewsSearch.NewsCategory, limit: Int) async throws -> [NewsArticle] {
+                [
+                    NewsArticle(title: "Top News Audio Briefing - 21 Oct 2026, 6 AM - The Times of India", url: URL(string: "https://example.com/1")!, source: "TOI"),
+                    NewsArticle(title: "Morning Briefing: Highlights of the day", url: URL(string: "https://example.com/2")!, source: "HT"),
+                    NewsArticle(title: "ISRO Gaganyaan Mission Astronauts Complete Final Tests", url: URL(string: "https://example.com/3")!, source: "ISRO")
+                ]
+            }
+            func search(_ query: String, limit: Int) async throws -> [NewsArticle] { [] }
+        }
+
+        let provider = LocalStudioNewsProvider(
+            news: { _ in BriefingsNewsSearch() },
+            trends: { FixtureTrendsSearch() }
+        )
+
+        let response = try await provider.headlines(category: "trending", limit: 10, forceFresh: false)
+        XCTAssertEqual(response.titles.count, 1)
+        XCTAssertEqual(response.titles.first?.title, "ISRO Gaganyaan Mission Astronauts Complete Final Tests")
+    }
+}

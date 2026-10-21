@@ -35,7 +35,7 @@ NS003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = St
 NS011 = {isa = PBXBuildFile; fileRef = NS001; };
 NS012 = {isa = PBXBuildFile; fileRef = NS002; };
 NS013 = {isa = PBXBuildFile; fileRef = NS003; };
-LP004 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/NewsSearch"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.0; }; };
+LP004 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/NewsSearch"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.1; }; };
 LP005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/TrendingHashtag"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.0; }; };
 LD004 = {isa = XCSwiftPackageProductDependency; package = LP004; productName = NewsSearch; };
 LD005 = {isa = XCSwiftPackageProductDependency; package = LP005; productName = TrendingHashtag; };

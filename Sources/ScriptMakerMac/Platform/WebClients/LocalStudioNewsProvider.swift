@@ -34,7 +34,8 @@ struct LocalStudioNewsProvider: StudioNewsProviding {
         }
         let client = try await news(forceFresh)
         let articles = try await client.headlines(category: selected, limit: limit)
-        return TopTitlesResponse(category: selected.rawValue, label: selected.label, n: articles.count, mode: "local", titles: articles.map {
+        let filteredArticles = articles.filter { !NewsSearchClient.isEditorialDigestOrAudioBriefing($0.title) }
+        return TopTitlesResponse(category: selected.rawValue, label: selected.label, n: filteredArticles.count, mode: "local", titles: filteredArticles.map {
             NewsTitle(title: $0.title, link: $0.url.absoluteString)
         })
     }
