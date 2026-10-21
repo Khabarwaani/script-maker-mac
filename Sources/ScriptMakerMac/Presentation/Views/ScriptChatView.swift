@@ -47,21 +47,26 @@ struct ScriptChatView: View {
                     .lineLimit(2...4).textFieldStyle(.roundedBorder).disabled(viewModel.isRefining || isSaving)
             }
             HStack {
+                LoadingButton(isLoading: viewModel.isRefining) {
+                    Task { await viewModel.refine() }
+                } label: {
+                    Text("Refine")
+                }
+                .disabled(!viewModel.canRefine || isSaving)
                 if viewModel.isRefining {
-                    ProgressView().controlSize(.small)
-                    Text("Refining…").foregroundStyle(.secondary)
                     Button("Cancel") { viewModel.cancel() }
-                } else {
-                    Button("Refine") { Task { await viewModel.refine() } }.disabled(!viewModel.canRefine || isSaving)
                 }
                 Spacer()
-                Button("Save as new script") {
+                LoadingButton(isLoading: isSaving) {
                     isSaving = true
                     Task {
                         if await onSave() { dismiss() }
                         isSaving = false
                     }
-                }.buttonStyle(.borderedProminent).disabled(!viewModel.canSave || isSaving)
+                } label: {
+                    Text("Save as new script")
+                }
+                .buttonStyle(.borderedProminent).disabled(!viewModel.canSave)
             }
         }
         .padding(20).frame(minWidth: 880, idealWidth: 1040, minHeight: 700, idealHeight: 800)
@@ -97,8 +102,12 @@ private struct ScriptChatHistory: View {
                 if viewModel.hasHistoryEdits {
                     Button("Discard history edits") { viewModel.discardHistoryEdits() }.disabled(viewModel.isRefining)
                 }
-                Button("Apply history edits") { Task { await viewModel.applyHistoryEdits() } }
-                    .disabled(!viewModel.canApplyHistoryEdits)
+                LoadingButton(isLoading: viewModel.isRefining) {
+                    Task { await viewModel.applyHistoryEdits() }
+                } label: {
+                    Text("Apply history edits")
+                }
+                .disabled(!viewModel.canApplyHistoryEdits)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {

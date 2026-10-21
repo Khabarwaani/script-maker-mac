@@ -203,12 +203,13 @@ struct ConfigSidebarView: View {
         } content: {
             StudioChoiceGroup(title: "Generation mode", selection: $viewModel.workflowMode, options: GenerateViewModel.WorkflowMode.allCases, label: { $0.rawValue })
             if let notice = viewModel.setupNotice { Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
-            Button { Task { await viewModel.start() } } label: {
-                HStack {
-                    Text(viewModel.isRunning ? "Generating…" : "Generate")
-                }.frame(maxWidth: .infinity)
+            LoadingButton(isLoading: viewModel.isRunning) {
+                Task { await viewModel.start() }
+            } label: {
+                Text(viewModel.isRunning ? "Generating…" : "Generate")
+                    .frame(maxWidth: .infinity)
             }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)
-                .disabled(!viewModel.isCatalogReady || StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
+                .disabled(!viewModel.isCatalogReady || StringFormatting.isBlank(viewModel.topic))
         }
     }
 }
@@ -341,23 +342,14 @@ struct StudioRefreshButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                if isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.callout)
-                        .foregroundStyle(AppTheme.ink)
-                }
-            }
-            .frame(width: 20, height: 20)
+        LoadingButton(isLoading: isRefreshing, spinnerReplacesLabel: true, action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(.callout)
+                .foregroundStyle(AppTheme.ink)
         }
+        .frame(width: 20, height: 20)
         .buttonStyle(RefreshButtonStyle())
         .help(helpText)
-        .disabled(isRefreshing)
     }
 }
 
