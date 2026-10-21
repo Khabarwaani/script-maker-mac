@@ -66,6 +66,18 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		LL13 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryUploadSettingsView.swift; sourceTree = "<group>"; };
 		LL04 = {isa = PBXBuildFile; fileRef = LL14; };
 		LL14 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
+		PL001 = {isa = PBXBuildFile; fileRef = PL101; };
+		PL101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowModels.swift; sourceTree = "<group>"; };
+		PL002 = {isa = PBXBuildFile; fileRef = PL102; };
+		PL102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowResolving.swift; sourceTree = "<group>"; };
+		PL003 = {isa = PBXBuildFile; fileRef = PL103; };
+		PL103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPipelineFlowResolver.swift; sourceTree = "<group>"; };
+		PL004 = {isa = PBXBuildFile; fileRef = PL104; };
+		PL104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTabViewModel.swift; sourceTree = "<group>"; };
+		PL005 = {isa = PBXBuildFile; fileRef = PL105; };
+		PL105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTabView.swift; sourceTree = "<group>"; };
+		PL006 = {isa = PBXBuildFile; fileRef = PL106; };
+		PL106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowTests.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -257,6 +269,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
+				PL101 /* PipelineFlowModels.swift */,
 				ND101,
 				L101 /* LocalAgentModels.swift */,
 				DY101 /* AgentInputSchema.swift */,
@@ -271,6 +284,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				PL102 /* PipelineFlowResolving.swift */,
 				L102 /* LocalAgentRunning.swift */,
 				R028 /* PipelineService.swift */,
 				R034 /* ImageService.swift */,
@@ -318,6 +332,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G018 /* WebClients */ = {
 			isa = PBXGroup;
 			children = (
+				PL103 /* LocalPipelineFlowResolver.swift */,
 				L103 /* TerminalLocalAgentService.swift */,
 				LL11 /* LocalLibraryUpdateClient.swift */, NS002, SC102,
 				L107 /* StrictLocalAgentSession.swift */,
@@ -357,6 +372,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				PL105 /* PipelineTabView.swift */,
 				ND102,
 				L105 /* LocalAgentView.swift */,
 				LL13 /* LibraryUploadSettingsView.swift */,
@@ -385,6 +401,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				PL104 /* PipelineTabViewModel.swift */,
 				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
@@ -439,6 +456,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				PL106 /* PipelineFlowTests.swift */,
 				L106 /* LocalAgentTests.swift */,
 				LL14 /* LocalLibraryTests.swift */, NS003, SC105, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
@@ -518,6 +536,11 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PL001 /* PipelineFlowModels.swift in Sources */,
+				PL002 /* PipelineFlowResolving.swift in Sources */,
+				PL003 /* LocalPipelineFlowResolver.swift in Sources */,
+				PL004 /* PipelineTabViewModel.swift in Sources */,
+				PL005 /* PipelineTabView.swift in Sources */,
 				ND001, ND002,
 				L005 /* LocalAgentView.swift in Sources */,
 				LL03 /* LibraryUploadSettingsView.swift in Sources */,
@@ -596,6 +619,7 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PL006 /* PipelineFlowTests.swift in Sources */,
 				L006 /* LocalAgentTests.swift in Sources */,
 				LL04 /* LocalLibraryTests.swift in Sources */, NS013, SC005, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
