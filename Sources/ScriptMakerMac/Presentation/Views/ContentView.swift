@@ -20,6 +20,10 @@ struct ContentView: View {
                 await viewModel?.libraryViewModel.refresh()
             }
         }
+        genVM.onNavigateToPipeline = { [weak viewModel] topic in
+            viewModel?.selectedTab = .pipeline
+            viewModel?.pipelineViewModel.applyStudioTopic(topic)
+        }
         _generateViewModel = State(
             wrappedValue: genVM
         )

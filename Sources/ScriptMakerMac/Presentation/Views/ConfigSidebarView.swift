@@ -203,13 +203,26 @@ struct ConfigSidebarView: View {
         } content: {
             StudioChoiceGroup(title: "Generation mode", selection: $viewModel.workflowMode, options: GenerateViewModel.WorkflowMode.allCases, label: { $0.rawValue })
             if let notice = viewModel.setupNotice { Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
-            LoadingButton(isLoading: viewModel.isRunning) {
-                Task { await viewModel.start() }
-            } label: {
-                Text(viewModel.isRunning ? "Generating…" : "Generate")
-                    .frame(maxWidth: .infinity)
-            }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)
-                .disabled(!viewModel.isCatalogReady || StringFormatting.isBlank(viewModel.topic))
+            HStack(spacing: 12) {
+                LoadingButton(isLoading: viewModel.isRunning) {
+                    Task { await viewModel.start() }
+                } label: {
+                    Text(viewModel.isRunning ? "Generating…" : "Generate")
+                        .frame(maxWidth: .infinity)
+                }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)
+                    .disabled(!viewModel.isCatalogReady || StringFormatting.isBlank(viewModel.topic))
+
+                Button {
+                    viewModel.startInPipeline()
+                } label: {
+                    Label("Start in Pipeline", systemImage: "arrow.triangle.branch")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
+                .help("Send current topic and launch multi-stage Pipeline")
+            }
         }
     }
 }

@@ -12,13 +12,30 @@ final class PipelineTabViewModel {
     var steps: [AgentPipelineStep] = []
     var activeStepIndex: Int = 0
 
+    // Studio News & Topic Selection
+    enum StudioSourceType: String, CaseIterable, Identifiable {
+        case categories = "News Categories"
+        case trendingHashtags = "Trending Hashtags"
+        case manual = "Manual Topic"
+
+        var id: String { rawValue }
+    }
+
+    var selectedStudioSource: StudioSourceType = .categories
     private(set) var studioHeadlines: [String] = []
     private(set) var studioCategories: [String] = []
     var selectedCategory: String = "trending"
     var selectedHeadline: String = ""
+    private(set) var trendingHashtags: [NewsHashtag] = []
+    var selectedHashtag: String = ""
+    var customHashtag: String = ""
+    var studioTopic: String = ""
     private(set) var isRefreshingHeadlines: Bool = false
+    private(set) var isRefreshingHashtags: Bool = false
     private(set) var headlinesErrorMessage: String? = nil
+    private(set) var hashtagsErrorMessage: String? = nil
     var isShowingPresetCatalog: Bool = false
+    var isStudioSelectionExpanded: Bool = true
 
     private(set) var availableTransitions: [PipelineTransitionOption] = []
     private(set) var catalog: [LocalAgentDefinition] = []
@@ -122,7 +139,7 @@ final class PipelineTabViewModel {
         }
     }
 
-    // MARK: - Studio News Selection (Phase 1)
+    // MARK: - Studio News & Topic Selection
 
     func refreshStudioNews(forceFresh: Bool = false) async {
         guard !isRefreshingHeadlines else { return }
@@ -149,16 +166,93 @@ final class PipelineTabViewModel {
         }
     }
 
-    func selectHeadline(_ headline: String) {
-        selectedHeadline = headline
-        guard !steps.isEmpty, steps[0].agentID == "NewsResearcher" else { return }
-        steps[0].draft.fields["topic"]?.text = headline
+    func refreshTrendingHashtags() async {
+        guard !isRefreshingHashtags else { return }
+        isRefreshingHashtags = true
+        hashtagsErrorMessage = nil
+        defer { isRefreshingHashtags = false }
+        do {
+            let resp = try await newsProvider.hashtags(limit: 20)
+            trendingHashtags = resp.hashtags
+            if selectedHashtag.isEmpty || !trendingHashtags.contains(where: { $0.tag == selectedHashtag }) {
+                if let first = trendingHashtags.first {
+                    selectHashtag(first.tag)
+                }
+            }
+        } catch {
+            hashtagsErrorMessage = error.localizedDescription
+        }
     }
 
     func selectCategory(_ category: String) async {
         guard category != selectedCategory else { return }
         selectedCategory = category
         await refreshStudioNews(forceFresh: false)
+    }
+
+    func selectHeadline(_ headline: String) {
+        selectedHeadline = headline
+        studioTopic = headline
+        applyTopicToFirstStep(headline)
+    }
+
+    func selectHashtag(_ tag: String) {
+        selectedHashtag = tag
+        if let match = trendingHashtags.first(where: { $0.tag == tag }) {
+            let topicText = match.headline ?? match.tag
+            studioTopic = topicText
+            applyTopicToFirstStep(topicText)
+        } else if !tag.isEmpty {
+            studioTopic = tag
+            applyTopicToFirstStep(tag)
+        }
+    }
+
+    func updateStudioTopic(_ topic: String) {
+        studioTopic = topic
+        applyTopicToFirstStep(topic)
+    }
+
+    func applyStudioTopic(_ topic: String) {
+        studioTopic = topic
+        selectedHeadline = topic
+        selectedStudioSource = .manual
+
+        if steps.isEmpty {
+            if mode == .preset {
+                if let preset = selectedPreset ?? presets.first {
+                    selectPreset(preset)
+                }
+            } else {
+                if let first = catalog.first(where: { $0.isExecutable }) {
+                    startConfigurable(initialAgentID: first.agentID)
+                }
+            }
+        } else {
+            applyTopicToFirstStep(topic)
+            activeStepIndex = 0
+        }
+    }
+
+    private func applyTopicToFirstStep(_ topic: String) {
+        guard !steps.isEmpty else { return }
+        var matched = false
+        if steps[0].draft.fields["topic"] != nil {
+            steps[0].draft.fields["topic"]?.text = topic
+            matched = true
+        }
+        if steps[0].draft.fields["news"] != nil && !matched {
+            steps[0].draft.fields["news"]?.text = topic
+            matched = true
+        }
+        if steps[0].draft.fields["searchQuery"] != nil && !matched {
+            steps[0].draft.fields["searchQuery"]?.text = topic
+            matched = true
+        }
+        if steps[0].draft.fields["input"] != nil && !matched {
+            steps[0].draft.fields["input"]?.text = topic
+            matched = true
+        }
     }
 
     func selectMode(_ newMode: PipelineMode) {
@@ -182,8 +276,16 @@ final class PipelineTabViewModel {
                 continue
             }
             var draft = AgentInputDraft(schema: def.schema, required: true)
-            if index == 0, agentID == "NewsResearcher", !selectedHeadline.isEmpty {
-                draft.fields["topic"]?.text = selectedHeadline
+            if index == 0, !studioTopic.isEmpty {
+                if draft.fields["topic"] != nil {
+                    draft.fields["topic"]?.text = studioTopic
+                } else if draft.fields["news"] != nil {
+                    draft.fields["news"]?.text = studioTopic
+                } else if draft.fields["searchQuery"] != nil {
+                    draft.fields["searchQuery"]?.text = studioTopic
+                } else if draft.fields["input"] != nil {
+                    draft.fields["input"]?.text = studioTopic
+                }
             }
             let step = AgentPipelineStep(
                 stepIndex: index,
@@ -211,7 +313,18 @@ final class PipelineTabViewModel {
         }
         savedStoryNotice = nil
         errorMessage = nil
-        let draft = AgentInputDraft(schema: def.schema, required: true)
+        var draft = AgentInputDraft(schema: def.schema, required: true)
+        if !studioTopic.isEmpty {
+            if draft.fields["topic"] != nil {
+                draft.fields["topic"]?.text = studioTopic
+            } else if draft.fields["news"] != nil {
+                draft.fields["news"]?.text = studioTopic
+            } else if draft.fields["searchQuery"] != nil {
+                draft.fields["searchQuery"]?.text = studioTopic
+            } else if draft.fields["input"] != nil {
+                draft.fields["input"]?.text = studioTopic
+            }
+        }
         let step = AgentPipelineStep(
             stepIndex: 0,
             agentID: def.agentID,
