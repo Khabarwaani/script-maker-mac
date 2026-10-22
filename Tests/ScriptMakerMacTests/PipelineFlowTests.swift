@@ -57,6 +57,7 @@ private func makeSampleDefinitions() throws -> [LocalAgentDefinition] {
         LocalAgentDefinition(agentID: "NewsResearcher", name: "News Researcher", version: "1.1.0", schema: newsSchema, requiresWebResearch: true, isExecutable: true),
         LocalAgentDefinition(agentID: "GroundedJokeGenerator", name: "Grounded Joke Generator", version: "1.2.0", schema: jokeSchema, requiresWebResearch: false, isExecutable: true),
         LocalAgentDefinition(agentID: "ThreeSceneStoryCreator", name: "3-Scene Story Creator", version: "2.1.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
+        LocalAgentDefinition(agentID: "TwoSceneStoryCreator", name: "2-Scene Story Creator", version: "1.0.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
         LocalAgentDefinition(agentID: "ScriptChat", name: "Script Chat", version: "1.0.0", schema: chatSchema, requiresWebResearch: false, isExecutable: true)
     ]
 }
@@ -65,11 +66,14 @@ final class PipelineFlowTests: XCTestCase {
     func testPresetsAreAvailableAndWellConfigured() {
         let resolver = LocalPipelineFlowResolver()
         let presets = resolver.availablePresets()
-        XCTAssertEqual(presets.count, 5)
+        XCTAssertEqual(presets.count, 8)
         XCTAssertTrue(presets.contains { $0.id == "full-viral-story" })
+        XCTAssertTrue(presets.contains { $0.id == "fast-two-scene-story" })
         XCTAssertTrue(presets.contains { $0.id == "news-to-story" })
+        XCTAssertTrue(presets.contains { $0.id == "news-to-two-scene-story" })
         XCTAssertTrue(presets.contains { $0.id == "grounded-satire" })
         XCTAssertTrue(presets.contains { $0.id == "joke-to-story" })
+        XCTAssertTrue(presets.contains { $0.id == "joke-to-two-scene-story" })
         XCTAssertTrue(presets.contains { $0.id == "script-refinement" })
     }
 
@@ -105,7 +109,7 @@ final class PipelineFlowTests: XCTestCase {
         )
 
         let transitions = await resolver.compatibleTransitions(from: step, catalog: catalog)
-        XCTAssertEqual(transitions.count, 2)
+        XCTAssertEqual(transitions.count, 3)
 
         // 1. GroundedJokeGenerator
         let jokeTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "GroundedJokeGenerator" })
@@ -120,6 +124,11 @@ final class PipelineFlowTests: XCTestCase {
         let storyTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "ThreeSceneStoryCreator" })
         XCTAssertTrue(storyTransition.mappedDraft.fields["news"]?.text.contains("ISRO Gaganyaan mission") == true)
         XCTAssertTrue(storyTransition.mappedDraft.fields["news"]?.text.contains("Launch successful") == true)
+
+        // 3. TwoSceneStoryCreator
+        let twoSceneTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "TwoSceneStoryCreator" })
+        XCTAssertTrue(twoSceneTransition.mappedDraft.fields["news"]?.text.contains("ISRO Gaganyaan mission") == true)
+        XCTAssertTrue(twoSceneTransition.mappedDraft.fields["news"]?.text.contains("Launch successful") == true)
     }
 
     func testGroundedJokeOutputResolvesStoryCreatorWithJokeSelection() async throws {
@@ -157,14 +166,19 @@ final class PipelineFlowTests: XCTestCase {
         )
 
         let transitions = await resolver.compatibleTransitions(from: step, catalog: catalog)
-        XCTAssertEqual(transitions.count, 1)
+        XCTAssertEqual(transitions.count, 2)
 
-        let storyTransition = try XCTUnwrap(transitions.first)
+        let storyTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "ThreeSceneStoryCreator" })
         XCTAssertEqual(storyTransition.targetAgentID, "ThreeSceneStoryCreator")
         XCTAssertTrue(storyTransition.mappedDraft.fields["news"]?.text.contains("New watch tracks sleep") == true)
         // With selectedVariationIndex = 1, it should choose the 20s punchline
         XCTAssertTrue(storyTransition.mappedDraft.fields["user_joke"]?.text.contains("zero sleep discipline") == true)
         XCTAssertEqual(storyTransition.variationSummaries.count, 2)
+
+        let twoSceneTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "TwoSceneStoryCreator" })
+        XCTAssertEqual(twoSceneTransition.targetAgentID, "TwoSceneStoryCreator")
+        XCTAssertTrue(twoSceneTransition.mappedDraft.fields["news"]?.text.contains("New watch tracks sleep") == true)
+        XCTAssertTrue(twoSceneTransition.mappedDraft.fields["user_joke"]?.text.contains("zero sleep discipline") == true)
     }
 
     func testThreeSceneStoryCreatorOutputResolvesScriptChat() async throws {
@@ -215,6 +229,69 @@ final class PipelineFlowTests: XCTestCase {
         XCTAssertEqual(chatTransition.targetAgentID, "ScriptChat")
         XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Why is this watch beeping at 4 AM?") == true)
         XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Title: Smart Watch Confusion") == true)
+    }
+
+    func testTwoSceneStoryCreatorOutputResolvesScriptChat() async throws {
+        let resolver = LocalPipelineFlowResolver()
+        let catalog = try makeSampleDefinitions()
+
+        let storyOutputJSON = """
+        {
+            "items": [
+                {
+                    "title": "4-Day Work Week Shock",
+                    "scenes": [
+                        {
+                            "title": "Empty Office",
+                            "goal": "Witty Curiosity",
+                            "location": "Pantry",
+                            "dialogues": [
+                                { "speaker": "Rohan (Senior Dev)", "dialogue": "Where did everyone vanish on Friday morning?!" },
+                                { "speaker": "Neha (Tech Lead)", "dialogue": "Did HR declare a silent holiday without telling engineering?!" }
+                            ],
+                            "words_count": 28,
+                            "verification": {
+                                "passed": true, "dialogue_sensible": true, "cause_and_effect": true, "role_authentic": true, "different_concepts": true, "freshness_maintained": true, "notes": "ok"
+                            }
+                        },
+                        {
+                            "title": "The Headline Revelation",
+                            "goal": "Full News",
+                            "location": "Metro",
+                            "dialogues": [
+                                { "speaker": "Kabir (Commuter)", "dialogue": "Government rolled out the official four-day week policy today." }
+                            ],
+                            "words_count": 27,
+                            "verification": {
+                                "passed": true, "dialogue_sensible": true, "cause_and_effect": true, "role_authentic": true, "different_concepts": true, "freshness_maintained": true, "notes": "ok"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+        """
+
+        let storyDef = catalog.first { $0.agentID == "TwoSceneStoryCreator" }!
+        let draft = AgentInputDraft(schema: storyDef.schema, required: true)
+        let step = AgentPipelineStep(
+            stepIndex: 2,
+            agentID: "TwoSceneStoryCreator",
+            agentName: "2-Scene Story Creator",
+            version: "1.0.0",
+            provider: .codex,
+            draft: draft,
+            status: .completed,
+            result: LocalAgentResult(text: storyOutputJSON, rawOutput: storyOutputJSON)
+        )
+
+        let transitions = await resolver.compatibleTransitions(from: step, catalog: catalog)
+        XCTAssertEqual(transitions.count, 1)
+
+        let chatTransition = try XCTUnwrap(transitions.first)
+        XCTAssertEqual(chatTransition.targetAgentID, "ScriptChat")
+        XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Where did everyone vanish on Friday morning?!") == true)
+        XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Title: 4-Day Work Week Shock") == true)
     }
 
     @MainActor
@@ -269,7 +346,7 @@ final class PipelineFlowTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         XCTAssertEqual(vm.steps[0].status, .completed)
-        XCTAssertEqual(vm.availableTransitions.count, 2)
+        XCTAssertEqual(vm.availableTransitions.count, 3)
 
         // Select GroundedJokeGenerator option
         let jokeOption = try XCTUnwrap(vm.availableTransitions.first { $0.targetAgentID == "GroundedJokeGenerator" })
@@ -487,7 +564,7 @@ private actor ExecutionModeRunner: LocalAgentRunning {
         switch request.agentID {
         case "NewsResearcher": output = #"{"verified":true,"notes":["Verified fact"],"topic":"Launch"}"#
         case "GroundedJokeGenerator": output = #"{"topic":"Launch","news_content":"Verified fact","jokes":[{"variations":[{"duration":10,"content":"A punchline"}]}]}"#
-        case "ThreeSceneStoryCreator": output = #"{"items":[{"title":"Launch story","scenes":[{"title":"Launch","goal":"Curiosity","location":"Studio","dialogues":[{"speaker":"Host","dialogue":"Verified fact"}]}]}]}"#
+        case "ThreeSceneStoryCreator", "TwoSceneStoryCreator": output = #"{"items":[{"title":"Launch story","scenes":[{"title":"Launch","goal":"Curiosity","location":"Studio","dialogues":[{"speaker":"Host","dialogue":"Verified fact"}]}]}]}"#
         default: output = #"{"latestScript":"Polished script","instruction":"Preserve facts"}"#
         }
         return LocalAgentResult(text: output, rawOutput: output)
@@ -648,5 +725,35 @@ extension PipelineFlowTests {
         XCTAssertEqual(requests.count, 2)
         XCTAssertEqual(requests.last?.agentID, "NewsResearcher")
         XCTAssertTrue(requests.last?.inputJSON.contains("Changed topic") == true)
+    }
+
+    @MainActor
+    func testFastTwoSceneStoryPresetContinuousExecution() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let resolver = LocalPipelineFlowResolver()
+        let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
+        let vm = PipelineTabViewModel(service: runner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
+        await vm.refreshCatalogAndProviders()
+
+        let twoScenePreset = try XCTUnwrap(resolver.availablePresets().first { $0.id == "fast-two-scene-story" })
+        vm.selectPreset(twoScenePreset)
+        XCTAssertEqual(vm.steps.count, 4)
+        XCTAssertEqual(vm.steps.map(\.agentID), ["NewsResearcher", "GroundedJokeGenerator", "TwoSceneStoryCreator", "ScriptChat"])
+
+        vm.updateStudioTopic("Gold prices drop")
+        vm.executionMode = .continuous
+        vm.runPipeline()
+        await vm.waitForExecution()
+
+        let requests = await runner.requests
+        XCTAssertEqual(requests.map(\.agentID), ["NewsResearcher", "GroundedJokeGenerator", "TwoSceneStoryCreator", "ScriptChat"])
+        XCTAssertTrue(vm.steps.allSatisfy { $0.status == .completed })
+        XCTAssertTrue(vm.isStorySavable)
+
+        vm.saveStoryToLibrary()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertNotNil(vm.savedStoryNotice)
+        let savedStories = await repo.all()
+        XCTAssertEqual(savedStories.count, 1)
     }
 }
