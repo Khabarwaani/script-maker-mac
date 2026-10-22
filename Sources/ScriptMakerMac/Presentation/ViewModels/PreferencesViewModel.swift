@@ -231,6 +231,10 @@ final class PreferencesViewModel {
         get { config.appearance }
         set { config.appearance = newValue }
     }
+    var scriptRefinementMode: ScriptRefinementExecutionMode {
+        get { config.scriptRefinementMode }
+        set { config.scriptRefinementMode = newValue }
+    }
 
     /// Save all staged changes to config.
     func save() async {
