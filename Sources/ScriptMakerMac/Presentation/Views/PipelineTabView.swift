@@ -59,6 +59,13 @@ struct PipelineTabView: View {
             .frame(width: 220)
             .disabled(viewModel.isRunning)
 
+            Picker("Execution", selection: $viewModel.executionMode) {
+                ForEach(PipelineExecutionMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
+            .disabled(viewModel.isRunning)
+
             if viewModel.isRunning {
                 ProgressView().controlSize(.small)
             }
@@ -114,7 +121,7 @@ private struct PresetModeView: View {
             if viewModel.isShowingPresetCatalog {
                 presetCatalogView
             } else {
-                StudioNewsSelectionCard(viewModel: viewModel)
+                StudioNewsSelectionCard(viewModel: viewModel).disabled(viewModel.isRunning)
                 Divider().overlay(AppTheme.line)
 
                 // Step timeline strip
@@ -419,7 +426,7 @@ private struct ConfigurableModeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            StudioNewsSelectionCard(viewModel: viewModel)
+            StudioNewsSelectionCard(viewModel: viewModel).disabled(viewModel.isRunning)
             Divider().overlay(AppTheme.line)
 
             if viewModel.steps.count <= 1 && viewModel.steps.first?.status == .pending && viewModel.steps.first?.result == nil {
@@ -513,16 +520,42 @@ private struct StepWorkAreaView: View {
     @Bindable var viewModel: PipelineTabViewModel
 
     var body: some View {
-        HSplitView {
-            ScrollView {
-                stepInputSection.padding(24)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                if viewModel.canContinue {
+                    Button("Continue", systemImage: "play.fill") { viewModel.continuePipeline() }
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    LoadingButton(isLoading: viewModel.isRunning) { viewModel.runPipeline() } label: {
+                        Text(viewModel.runTitle)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!viewModel.canRunActiveStep || viewModel.hasOutputEdits)
+                }
+                if viewModel.isRunning {
+                    if viewModel.executionMode == .continuous {
+                        Button(viewModel.isPauseRequested ? "Pausing…" : "Pause after stage") { viewModel.pauseAfterStage() }
+                            .disabled(viewModel.isPauseRequested || viewModel.isCancelling)
+                    }
+                    Button("Cancel") { viewModel.cancelActiveStep() }.disabled(viewModel.isCancelling)
+                }
+                Text(viewModel.executionMode == .continuous
+                     ? "Runs stages automatically. Configurable follows recommended stages."
+                     : "Stops after each stage so you can review and edit.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }.padding(.horizontal, 24).padding(.vertical, 10)
+            Divider()
+            if viewModel.executionMode == .continuous && (viewModel.isRunning || viewModel.activeStep?.result != nil) {
+                ScrollView { stepOutputAndTransitionsSection.padding(24) }
+            } else {
+                HSplitView {
+                    ScrollView { stepInputSection.padding(24) }
+                        .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity)
+                    ScrollView { stepOutputAndTransitionsSection.padding(24) }
+                        .frame(minWidth: 350, idealWidth: 500, maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
-            .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity)
-
-            ScrollView {
-                stepOutputAndTransitionsSection.padding(24)
-            }
-            .frame(minWidth: 350, idealWidth: 500, maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -559,7 +592,7 @@ private struct StepWorkAreaView: View {
                     Text("Execution Provider").font(.subheadline.weight(.semibold))
                     Picker("Provider", selection: Binding(
                         get: { viewModel.steps[viewModel.activeStepIndex].provider },
-                        set: { viewModel.steps[viewModel.activeStepIndex].provider = $0 }
+                        set: { viewModel.selectProvider($0) }
                     )) {
                         ForEach(LocalAgentProvider.allCases) { prov in
                             Text(prov.title).tag(prov)
@@ -585,24 +618,14 @@ private struct StepWorkAreaView: View {
                             removeItem: { viewModel.removeArrayItem(parentID: $0, itemID: $1) }
                         )
                         .id(step.id)
+                        .disabled(viewModel.isRunning)
                     }
                 }
 
-                HStack(spacing: 12) {
-                    Button {
-                        viewModel.runActiveStep()
-                    } label: {
-                        Text(step.status == .completed ? "Re-run Step" : "Run Step")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!viewModel.canRunActiveStep)
-
-                    if viewModel.isRunning {
-                        Button("Cancel") {
-                            viewModel.cancelActiveStep()
-                        }
-                        .disabled(viewModel.isCancelling)
-                    }
+                if viewModel.executionMode == .continuous {
+                    TextField("Script polish instruction", text: $viewModel.refinementInstruction, axis: .vertical)
+                        .lineLimit(2...4).textFieldStyle(.roundedBorder)
+                        .disabled(viewModel.isRunning)
                 }
             } else {
                 ContentUnavailableView("Select a step", systemImage: "arrow.triangle.branch")
@@ -624,33 +647,32 @@ private struct StepWorkAreaView: View {
                 }
 
                 if let result = step.result {
-                    Text(result.text)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .padding(14)
-                        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
-
-                    if !step.rawOutput.isEmpty {
-                        DisclosureGroup("Raw Output JSON") {
-                            Text(step.rawOutput)
-                                .font(.callout.monospaced())
-                                .textSelection(.enabled)
-                        }
+                    ForEach(viewModel.outputBlocks) { block in
+                        VStack(alignment: .leading, spacing: 6) {
+                            if !block.title.isEmpty { Text(block.title).font(.headline) }
+                            if !block.text.isEmpty { Text(block.text).font(.body).lineSpacing(5).textSelection(.enabled) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    if let meta = result.metadata {
-                        DisclosureGroup("Execution Metadata") {
+                    DisclosureGroup("Details") {
+                        Text(step.rawOutput).font(.callout.monospaced()).textSelection(.enabled)
+                        if !viewModel.isRunning {
+                            TextEditor(text: $viewModel.editedOutput).font(.callout.monospaced()).frame(minHeight: 160)
+                                .accessibilityLabel("Edit stage output JSON")
+                            Button("Apply output changes") { Task { await viewModel.applyOutputEdits() } }
+                                .disabled(!viewModel.hasOutputEdits)
+                        }
+                        if let meta = result.metadata {
                             Text(meta).font(.callout.monospaced()).textSelection(.enabled)
                         }
                     }
 
-                    if viewModel.mode == .configurable {
+                    if viewModel.mode == .configurable && !viewModel.isRunning {
                         Divider().overlay(AppTheme.line)
                         configurableNextOptionsSection(step: step)
                     }
 
-                    if viewModel.mode == .preset, viewModel.activeStepIndex + 1 < viewModel.steps.count {
+                    if viewModel.mode == .preset, !viewModel.isRunning, viewModel.activeStepIndex + 1 < viewModel.steps.count {
                         Divider().overlay(AppTheme.line)
                         presetNextStepSection
                     }
@@ -665,7 +687,7 @@ private struct StepWorkAreaView: View {
                     ContentUnavailableView(
                         "Ready to Execute",
                         systemImage: "play.circle",
-                        description: Text("Review inputs on the left and click 'Run Step' to generate output.")
+                        description: Text("Review the inputs, then run the pipeline.")
                     )
                 }
             }

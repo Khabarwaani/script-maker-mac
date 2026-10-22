@@ -445,3 +445,202 @@ final class PipelineFlowTests: XCTestCase {
         XCTAssertEqual(receivedTopic, "Autonomous EV Fleets in India")
     }
 }
+
+private actor ExecutionModeRunner: LocalAgentRunning {
+    let definitions: [LocalAgentDefinition]
+    var requests: [LocalAgentRequest] = []
+    var failAgent: String?
+    var blockAgent: String?
+    private var pending: CheckedContinuation<Void, Never>?
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    init(definitions: [LocalAgentDefinition], failAgent: String? = nil, blockAgent: String? = nil) {
+        self.definitions = definitions
+        self.failAgent = failAgent
+        self.blockAgent = blockAgent
+    }
+    func catalog() async throws -> [LocalAgentDefinition] { definitions }
+    func availability() async -> [LocalAgentProvider: LocalAgentAvailability] {
+        [.codex: .init(isAvailable: true, reason: "Ready")]
+    }
+    func waitUntilBlocked() async {
+        if pending != nil { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+    func release() { pending?.resume(); pending = nil }
+    func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
+        requests.append(request)
+        if request.agentID == blockAgent {
+            await withCheckedContinuation {
+                pending = $0
+                waiter?.resume()
+                waiter = nil
+            }
+        }
+        if request.agentID == failAgent { throw LocalAgentError.invalidInput("Fixture stage failed") }
+        let output: String
+        switch request.agentID {
+        case "NewsResearcher": output = #"{"verified":true,"notes":["Verified fact"],"topic":"Launch"}"#
+        case "GroundedJokeGenerator": output = #"{"topic":"Launch","news_content":"Verified fact","jokes":[{"variations":[{"duration":10,"content":"A punchline"}]}]}"#
+        case "ThreeSceneStoryCreator": output = #"{"items":[{"title":"Launch story","scenes":[{"title":"Launch","goal":"Curiosity","location":"Studio","dialogues":[{"speaker":"Host","dialogue":"Verified fact"}]}]}]}"#
+        default: output = #"{"latestScript":"Polished script","instruction":"Preserve facts"}"#
+        }
+        return LocalAgentResult(text: output, rawOutput: output)
+    }
+}
+
+extension PipelineFlowTests {
+    @MainActor
+    private func executionVM(_ runner: ExecutionModeRunner, mode: PipelineMode) async -> PipelineTabViewModel {
+        let vm = PipelineTabViewModel(service: runner, flowResolver: LocalPipelineFlowResolver(),
+            storyRepository: LocalStoryRepository(dataSource: InMemoryStoryDataSource()), newsProvider: PipelineStubNewsProvider())
+        await vm.refreshCatalogAndProviders()
+        vm.selectMode(mode)
+        vm.updateStudioTopic("Launch")
+        return vm
+    }
+
+    @MainActor
+    func testContinuousFinishesBothWorkflowModesWithoutRefinementLoop() async throws {
+        for mode in PipelineMode.allCases {
+            let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+            let vm = await executionVM(runner, mode: mode)
+            vm.executionMode = .continuous
+            vm.runPipeline()
+            await vm.waitForExecution()
+            let requests = await runner.requests
+            XCTAssertEqual(requests.map(\.agentID), ["NewsResearcher", "GroundedJokeGenerator", "ThreeSceneStoryCreator", "ScriptChat"])
+            XCTAssertTrue(vm.steps.allSatisfy { $0.status == .completed })
+            XCTAssertEqual(vm.activeStep?.agentID, "ScriptChat")
+            XCTAssertEqual(vm.statusMessage, "Pipeline completed")
+            XCTAssertFalse(vm.isRunning)
+            let input = try JSONDecoder().decode(AgentJSON.self, from: Data(try XCTUnwrap(requests.last).inputJSON.utf8))
+            XCTAssertFalse(input.object["userInstruction"]?.string?.isEmpty ?? true)
+        }
+    }
+
+    @MainActor
+    func testStepWiseStopsAndUsesEditedOutputOnContinuationInBothModes() async throws {
+        for mode in PipelineMode.allCases {
+            let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+            let vm = await executionVM(runner, mode: mode)
+            vm.executionMode = .stepWise
+            vm.runPipeline()
+            await vm.waitForExecution()
+            var requests = await runner.requests
+            XCTAssertEqual(requests.count, 1)
+            XCTAssertEqual(vm.activeStepIndex, 0)
+            XCTAssertTrue(vm.canContinue)
+            vm.editedOutput = #"{"verified":true,"notes":["Edited fact"],"topic":"Launch"}"#
+            XCTAssertFalse(vm.canContinue)
+            await vm.applyOutputEdits()
+            XCTAssertTrue(vm.canContinue)
+            vm.continuePipeline()
+            await vm.waitForExecution()
+            requests = await runner.requests
+            XCTAssertEqual(requests.count, 2)
+            XCTAssertTrue(requests[1].inputJSON.contains("Edited fact"))
+            XCTAssertEqual(vm.activeStepIndex, 1)
+            XCTAssertFalse(vm.isRunning)
+        }
+    }
+
+    @MainActor
+    func testPauseCompletesOnlyCurrentStageAndContinueResumes() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions(), blockAgent: "NewsResearcher")
+        let vm = await executionVM(runner, mode: .preset)
+        vm.runPipeline()
+        await runner.waitUntilBlocked()
+        vm.pauseAfterStage()
+        await runner.release()
+        await vm.waitForExecution()
+        let pausedRequests = await runner.requests
+        XCTAssertEqual(pausedRequests.count, 1)
+        XCTAssertEqual(vm.steps[0].status, .completed)
+        XCTAssertEqual(vm.steps[1].status, .pending)
+        XCTAssertTrue(vm.canContinue)
+        vm.continuePipeline()
+        await vm.waitForExecution()
+        let requests = await runner.requests
+        XCTAssertEqual(requests.count, 4)
+    }
+
+    @MainActor
+    func testCancellationDiscardsLateResultAndFailureStopsFollowingStages() async throws {
+        let definitions = try makeSampleDefinitions()
+        let runner = ExecutionModeRunner(definitions: definitions, blockAgent: "NewsResearcher")
+        let vm = await executionVM(runner, mode: .configurable)
+        vm.runPipeline()
+        await runner.waitUntilBlocked()
+        vm.cancelActiveStep()
+        await runner.release()
+        await vm.waitForExecution()
+        XCTAssertEqual(vm.steps[0].status, .cancelled)
+        XCTAssertNil(vm.steps[0].result)
+        let requests = await runner.requests
+        XCTAssertEqual(requests.count, 1)
+        let failing = ExecutionModeRunner(definitions: definitions, failAgent: "GroundedJokeGenerator")
+        let failedVM = await executionVM(failing, mode: .preset)
+        failedVM.runPipeline()
+        await failedVM.waitForExecution()
+        let failedRequests = await failing.requests
+        XCTAssertEqual(failedRequests.count, 2)
+        XCTAssertEqual(failedVM.steps[1].status, .failed)
+        XCTAssertEqual(failedVM.steps[2].status, .pending)
+        XCTAssertNotNil(failedVM.errorMessage)
+    }
+
+    @MainActor
+    func testEditingEarlierOutputInvalidatesDownstreamResultsAndRejectsInvalidJSON() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        vm.runPipeline()
+        await vm.waitForExecution()
+        vm.selectStep(at: 0)
+        let original = vm.activeStep?.result
+        vm.editedOutput = "invalid"
+        await vm.applyOutputEdits()
+        XCTAssertEqual(vm.activeStep?.result, original)
+        XCTAssertNotNil(vm.errorMessage)
+        vm.editedOutput = #"{"notes":["Corrected fact"]}"#
+        await vm.applyOutputEdits()
+        XCTAssertTrue(vm.steps.dropFirst().allSatisfy { $0.status == .pending && $0.result == nil })
+        XCTAssertTrue(vm.steps[1].draft.fields["notes"]?.text.contains("Corrected fact") == true)
+        XCTAssertFalse(vm.isStorySavable)
+    }
+
+    func testStageOutputPresentsScenesDialogueAndUnknownFieldsWithoutJSON() {
+        let raw = #"{"items":[{"title":"Launch","scenes":[{"title":"A scene","dialogues":[{"speaker":"Host","dialogue":"Hello"}]}]}],"custom_field":"Extra information"}"#
+        let blocks = PipelineOutputBlock.sections(from: raw)
+        XCTAssertTrue(blocks.contains { $0.title == "Launch" })
+        XCTAssertTrue(blocks.contains { $0.title == "A scene" })
+        XCTAssertTrue(blocks.contains { $0.text == "Host: Hello" })
+        XCTAssertTrue(blocks.contains { $0.title == "Custom Field" && $0.text == "Extra information" })
+        XCTAssertFalse(blocks.contains { $0.text.contains("{\"") })
+        XCTAssertEqual(PipelineOutputBlock.sections(from: "Plain output").first?.text, "Plain output")
+    }
+}
+
+extension PipelineFlowTests {
+    @MainActor
+    func testEditedInputsRequireRerunningStageBeforeContinuing() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        vm.executionMode = .stepWise
+        vm.runPipeline()
+        await vm.waitForExecution()
+        XCTAssertTrue(vm.canContinue)
+        var draft = try XCTUnwrap(vm.activeStep?.draft)
+        draft.fields["topic"]?.text = "Changed topic"
+        vm.updateActiveDraft(draft)
+        XCTAssertEqual(vm.activeStep?.status, .pending)
+        XCTAssertNil(vm.activeStep?.result)
+        XCTAssertFalse(vm.canContinue)
+        vm.runPipeline()
+        await vm.waitForExecution()
+        let requests = await runner.requests
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.last?.agentID, "NewsResearcher")
+        XCTAssertTrue(requests.last?.inputJSON.contains("Changed topic") == true)
+    }
+}
