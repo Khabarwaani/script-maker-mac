@@ -336,4 +336,5 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
         await recorder.record(input); return response
     }
     func purgeMemory() {}
+    func clearMemory() {}
 }
