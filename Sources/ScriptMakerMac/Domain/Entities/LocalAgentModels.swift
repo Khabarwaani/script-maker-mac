@@ -45,6 +45,7 @@ struct LocalAgentRequest: Sendable {
     let executable: String
     var model: String? = nil
     var session = LocalAgentSessionSettings()
+    var responseInstructions = ""
 
     func validate() throws {
         guard !agentID.isEmpty, !version.isEmpty else { throw LocalAgentError.invalidInput("Select an agent and version.") }

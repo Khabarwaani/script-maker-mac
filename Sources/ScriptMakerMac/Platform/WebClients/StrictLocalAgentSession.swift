@@ -13,18 +13,21 @@ final class StrictLocalAgentSession: ManagedLocalAgentSession, Sendable {
     let underlying: any AgenticSessionProtocol
     let requiresStrictSchema: Bool
     let purge: @Sendable () -> Void
+    let responseInstructions: String
     var executionMetadata: [AgenticExecutionMetadata] { underlying.executionMetadata }
 
-    init(underlying: any AgenticSessionProtocol, requiresStrictSchema: Bool = true, purge: @escaping @Sendable () -> Void = {}) {
+    init(underlying: any AgenticSessionProtocol, requiresStrictSchema: Bool = true, responseInstructions: String = "", purge: @escaping @Sendable () -> Void = {}) {
         self.underlying = underlying
         self.requiresStrictSchema = requiresStrictSchema
         self.purge = purge
+        self.responseInstructions = responseInstructions
     }
     func purgeMemory() { purge() }
 
     func respond(to input: String, instructions: String, schema: JSONString, for operation: ObjectIdentifier) async -> Result<String, AgenticError> {
         do {
-            return await underlying.respond(to: input, instructions: instructions, schema: requiresStrictSchema ? try Self.strictSchema(schema) : schema, for: operation)
+            let combined = responseInstructions.isEmpty ? instructions : instructions + "\n\n" + responseInstructions
+            return await underlying.respond(to: input, instructions: combined, schema: requiresStrictSchema ? try Self.strictSchema(schema) : schema, for: operation)
         } catch { return .failure(.operationFailed(reason: error.localizedDescription)) }
     }
 

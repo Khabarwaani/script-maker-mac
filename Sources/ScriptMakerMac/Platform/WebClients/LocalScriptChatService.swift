@@ -21,7 +21,8 @@ struct LocalScriptChatService: ScriptChatRefining {
         let result = try await runner.run(LocalAgentRequest(
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
             inputJSON: json, provider: request.provider, executable: request.provider.executable,
-            model: model.isEmpty ? nil : model, session: settings))
+            model: model.isEmpty ? nil : model, session: settings,
+            responseInstructions: "Write the consolidated instruction field in English only, translating any previous instructions into English. Keep latestScript in the original script's language unless the user explicitly requests a different script language. This language rule applies to instruction metadata, not to the script dialogue."))
         try Task.checkCancellation()
         let output: ScriptChat.Output
         do { output = try JSONDecoder().decode(ScriptChat.Output.self, from: Data(result.rawOutput.utf8)) }
