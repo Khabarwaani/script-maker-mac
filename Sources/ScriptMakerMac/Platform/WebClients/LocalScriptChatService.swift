@@ -19,7 +19,7 @@ struct LocalScriptChatService: ScriptChatRefining {
         var settings = LocalAgentSessionSettings()
         settings.model = trimmed
         settings.persistence = .persistentStdio
-        settings.keepMemory = true
+        settings.keepMemory = false
         let dummy = ScriptChat.Input(originalScript: "warmup", latestScript: "warmup", userInstruction: "warmup", instruction: "")
         let json = (try? String(decoding: JSONEncoder().encode(dummy), as: UTF8.self)) ?? "{}"
         let request = LocalAgentRequest(
@@ -45,7 +45,7 @@ struct LocalScriptChatService: ScriptChatRefining {
         var settings = LocalAgentSessionSettings()
         settings.model = model
         settings.persistence = .persistentStdio
-        settings.keepMemory = true
+        settings.keepMemory = false
         let resolvedSessionID = request.sessionID ?? defaultSessionID
         let result = try await runner.run(LocalAgentRequest(
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,

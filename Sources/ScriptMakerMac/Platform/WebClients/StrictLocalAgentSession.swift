@@ -4,6 +4,11 @@ import TerminalAgentSession
 
 protocol ManagedLocalAgentSession: AgenticSessionProtocol {
     func purgeMemory()
+    func clearMemory()
+}
+
+extension ManagedLocalAgentSession {
+    func clearMemory() {}
 }
 
 /// Converts derived object schemas to the strict CLI response contract.
@@ -23,6 +28,11 @@ final class StrictLocalAgentSession: ManagedLocalAgentSession, Sendable {
         self.responseInstructions = responseInstructions
     }
     func purgeMemory() { purge() }
+    func clearMemory() {
+        if let session = underlying as? TerminalSessionProtocol {
+            session.clearMemory()
+        }
+    }
 
     func respond(to input: String, instructions: String, schema: JSONString, for operation: ObjectIdentifier) async -> Result<String, AgenticError> {
         do {

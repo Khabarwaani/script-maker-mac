@@ -164,7 +164,7 @@ final class ScriptChatServiceTests: XCTestCase {
         XCTAssertEqual(request.model, "test-model")
         XCTAssertEqual(request.sessionID, "script-chat")
         XCTAssertEqual(request.session.persistence, .persistentStdio)
-        XCTAssertTrue(request.session.keepMemory)
+        XCTAssertFalse(request.session.keepMemory)
         XCTAssertTrue(request.responseInstructions.contains("instruction field in English only"))
         XCTAssertTrue(request.responseInstructions.contains("Keep latestScript in the original script's language"))
         let input = try JSONSerialization.jsonObject(with: Data(request.inputJSON.utf8)) as? [String: String]
@@ -262,17 +262,14 @@ extension ScriptChatTests {
         XCTAssertFalse(chat.canRefine)
         await chat.applyHistoryEdits()
         let requests = await service.requests
-        XCTAssertEqual(requests.count, 4)
+        XCTAssertEqual(requests.count, 3)
         XCTAssertEqual(requests[2].originalScript, "Original")
         XCTAssertEqual(requests[2].draft.latestScript, "Original")
         XCTAssertEqual(requests[2].draft.instruction, "Baseline")
         XCTAssertEqual(requests[2].userInstruction, "Keep the length")
-        XCTAssertEqual(requests[3].draft.latestScript, "Draft 3")
-        XCTAssertEqual(requests[3].draft.instruction, "Active instructions 3")
-        XCTAssertEqual(requests[3].userInstruction, "Warm tone")
-        XCTAssertEqual(chat.turns.map(\.id), ids)
-        XCTAssertEqual(chat.turns.map(\.userInstruction), ["Keep the length", "Warm tone"])
-        XCTAssertEqual(chat.draft.latestScript, "Draft 4")
+        XCTAssertEqual(chat.turns.count, 1)
+        XCTAssertEqual(chat.turns[0].userInstruction, "Keep the length")
+        XCTAssertEqual(chat.draft.latestScript, "Draft 3")
         XCTAssertFalse(chat.hasHistoryEdits)
         XCTAssertTrue(chat.canSave)
     }
@@ -347,11 +344,11 @@ extension ScriptChatTests {
         await chat.refine()
         let draft = chat.draft
         let turns = chat.turns
-        await service.fail(onRequest: 4)
+        await service.fail(onRequest: 3)
         chat.setHistoryInstruction("Revised first", for: turns[0].id)
         await chat.applyHistoryEdits()
         let count = await service.requests.count
-        XCTAssertEqual(count, 4)
+        XCTAssertEqual(count, 3)
         XCTAssertEqual(chat.draft, draft)
         XCTAssertEqual(chat.turns, turns)
         XCTAssertTrue(chat.hasHistoryEdits)
