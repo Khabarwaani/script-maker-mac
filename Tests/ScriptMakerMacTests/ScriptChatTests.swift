@@ -199,28 +199,32 @@ final class ScriptChatServiceTests: XCTestCase {
 
         // Fast & Clean
         _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .fastClean))
-        var req = try XCTUnwrap(await runner.lastRequest)
+        var last = await runner.lastRequest
+        var req = try XCTUnwrap(last)
         XCTAssertEqual(req.sessionID, "custom-session")
         XCTAssertEqual(req.session.persistence, .persistentStdio)
         XCTAssertFalse(req.session.keepMemory)
 
         // Strict Ephemeral
         _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .strictEphemeral))
-        req = try XCTUnwrap(await runner.lastRequest)
+        last = await runner.lastRequest
+        req = try XCTUnwrap(last)
         XCTAssertNil(req.sessionID)
         XCTAssertEqual(req.session.persistence, .ephemeral)
         XCTAssertFalse(req.session.keepMemory)
 
         // Retained Memory
         _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .retainedMemory))
-        req = try XCTUnwrap(await runner.lastRequest)
+        last = await runner.lastRequest
+        req = try XCTUnwrap(last)
         XCTAssertEqual(req.sessionID, "custom-session")
         XCTAssertEqual(req.session.persistence, .persistentStdio)
         XCTAssertTrue(req.session.keepMemory)
 
         // Daemon
         _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .daemon))
-        req = try XCTUnwrap(await runner.lastRequest)
+        last = await runner.lastRequest
+        req = try XCTUnwrap(last)
         XCTAssertEqual(req.sessionID, "custom-session")
         XCTAssertEqual(req.session.persistence, .daemon)
         XCTAssertFalse(req.session.keepMemory)
