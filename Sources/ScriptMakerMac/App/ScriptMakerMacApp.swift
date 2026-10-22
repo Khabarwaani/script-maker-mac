@@ -55,7 +55,7 @@ enum CompositionRoot {
                         metadata: .init(rawValue: metadata), temperature: settings.temperature)) else {
                         throw LocalAgentError.invalidInput("Apple Intelligence is unavailable. Enable it in System Settings and wait for its on-device model to be ready.")
                     }
-                    return StrictLocalAgentSession(underlying: session, requiresStrictSchema: false)
+                    return StrictLocalAgentSession(underlying: session, requiresStrictSchema: false, responseInstructions: request.responseInstructions)
                 }
                 guard let provider = TerminalAgentSession.standardProviders.first(where: { $0.name == request.provider.rawValue }) else {
                     throw LocalAgentError.unavailable(request.executable)
@@ -92,7 +92,7 @@ enum CompositionRoot {
                 guard let session = TerminalAgentSession(provider: provider, configuration: config) else {
                     throw LocalAgentError.unavailable(request.executable)
                 }
-                return StrictLocalAgentSession(underlying: session, purge: { session.purgeMemory() })
+                return StrictLocalAgentSession(underlying: session, responseInstructions: request.responseInstructions, purge: { session.purgeMemory() })
             },
             makeWorkspace: { try files.makeTemporaryDirectory() },
             removeWorkspace: { try files.removeDirectory(at: $0) },

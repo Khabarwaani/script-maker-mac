@@ -154,6 +154,8 @@ final class ScriptChatServiceTests: XCTestCase {
         XCTAssertEqual(request.agentID, "ScriptChat")
         XCTAssertEqual(request.version, "1.0.0")
         XCTAssertEqual(request.model, "test-model")
+        XCTAssertTrue(request.responseInstructions.contains("instruction field in English only"))
+        XCTAssertTrue(request.responseInstructions.contains("Keep latestScript in the original script's language"))
         let input = try JSONSerialization.jsonObject(with: Data(request.inputJSON.utf8)) as? [String: String]
         XCTAssertEqual(input?["originalScript"], "Original")
         XCTAssertEqual(input?["latestScript"], "Working")
