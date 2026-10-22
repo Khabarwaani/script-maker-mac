@@ -29,15 +29,35 @@ struct ScriptChatView: View {
             if let reason = viewModel.providers[viewModel.provider], !reason.isAvailable {
                 Text(reason.reason).font(.callout).foregroundStyle(.secondary)
             }
-            HSplitView {
-                ScriptChatScriptPanel(title: "Original script", icon: "lock", script: viewModel.originalScript)
-                VStack(alignment: .leading, spacing: 8) {
-                    ScriptChatScriptPanel(title: "Current script", icon: "doc.text", script: viewModel.draft.latestScript)
-                    ScriptChatInstructions(viewModel: viewModel).disabled(isSaving)
-                }.frame(minWidth: 320)
-            }.frame(minHeight: 230)
-            ScriptChatHistory(viewModel: viewModel).frame(minHeight: 100, maxHeight: 170)
-                .disabled(isSaving || viewModel.hasConsolidatedInstructionEdits)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top, spacing: 16) {
+                            ScriptChatScriptPanel(title: "Original script", icon: "lock", script: viewModel.originalScript, scrollable: true)
+                                .frame(width: 280, height: 300)
+                            VStack(alignment: .leading, spacing: 8) {
+                                if !viewModel.turns.isEmpty {
+                                    Text(viewModel.draft.latestScript == viewModel.originalScript
+                                         ? "The provider returned the original script unchanged. Try a more specific instruction."
+                                         : "Refinement \(viewModel.turns.count) completed · script updated")
+                                        .font(.callout).foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("script-refinement-result")
+                                }
+                                ScriptChatScriptPanel(title: viewModel.turns.isEmpty ? "Current script" : "Refined script", icon: "doc.text", script: viewModel.draft.latestScript)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id("refined-script")
+                        }
+                        ScriptChatInstructions(viewModel: viewModel).disabled(isSaving)
+                        ScriptChatHistory(viewModel: viewModel).frame(height: 150)
+                            .disabled(isSaving || viewModel.hasConsolidatedInstructionEdits)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: viewModel.draft) { _, _ in
+                    guard !viewModel.turns.isEmpty else { return }
+                    withAnimation { scroll.scrollTo("refined-script", anchor: .top) }
+                }
+            }.frame(minHeight: 300)
             if let error = viewModel.errorMessage {
                 Text(error).font(.callout).foregroundStyle(AppTheme.danger).textSelection(.enabled)
             }
@@ -79,15 +99,22 @@ private struct ScriptChatScriptPanel: View {
     let title: String
     let icon: String
     let script: String
+    var scrollable = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: icon).font(.headline)
-            ScrollView {
+            if scrollable {
+                ScrollView {
+                    Text(script).font(.body).lineSpacing(5).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
                 Text(script).font(.body).lineSpacing(5).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(minHeight: 100)
-        }.padding(12).frame(minWidth: 320, maxWidth: .infinity)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
