@@ -51,13 +51,13 @@ final class GenerateViewModel {
     var isSavedToLibrary: Bool = false
     /// Callback triggered to navigate to the Library tab.
     var onNavigateToLibrary: (() -> Void)?
-    /// Callback triggered to navigate to the Pipeline tab with topic.
-    var onNavigateToPipeline: ((String) -> Void)?
+    /// Callback triggered to navigate to the Pipeline tab with topic and location.
+    var onNavigateToPipeline: ((String, String) -> Void)?
 
     func startInPipeline() {
         let cleanTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanTopic.isEmpty else { return }
-        onNavigateToPipeline?(cleanTopic)
+        onNavigateToPipeline?(cleanTopic, location)
     }
 
     /// Total elapsed milliseconds across all completed phases or from the stream end event.
@@ -150,6 +150,7 @@ final class GenerateViewModel {
     var headlines: [String] = []
     var selectedHeadline: String = ""
     var headlinesErrorMessage: String?
+    var location: String { config.newsSettings.location }
 
     // Story & Topic — verified against Streamlit (ai-script-maker) 2026-10-11.
     // Order: STORY_SECTION_ORDER; labels: SECTION_LABELS.
@@ -419,7 +420,7 @@ final class GenerateViewModel {
             if isLocalJSON {
                 response = try await api().fetchTopTitles(category: categoryParam, n: pageSize)
             } else {
-                response = try await newsProvider.headlines(category: categoryParam, limit: pageSize, forceFresh: forceFresh)
+                response = try await newsProvider.headlines(category: categoryParam, location: location, limit: pageSize, forceFresh: forceFresh)
             }
             guard headlineRequestID == requestID, selectedStorySource == source,
                   config.newsDiscoveryCacheIdentifier == settings, isLocalJSON == localJSON else { return }
@@ -447,7 +448,7 @@ final class GenerateViewModel {
     private func newsCacheKey(_ category: String?) -> String {
         let source = category ?? "default"
         if isLocalJSON { return "sample:" + source }
-        return "local-news:\(config.newsDiscoveryCacheIdentifier)|\(source)"
+        return "local-news:\(config.newsDiscoveryCacheIdentifier)|\(location.lowercased())|\(source)"
     }
 
     private func applyHeadlines(_ loadedHeadlines: [String], forSource cacheKey: String) {
@@ -581,7 +582,7 @@ final class GenerateViewModel {
             if let cached = localNewsCategories {
                 response = cached
             } else {
-                response = try await newsProvider.categories()
+                response = try await newsProvider.categories(location: location)
                 if !response.categories.isEmpty { localNewsCategories = response }
             }
             let categoryLabels = response.categories.map(\.label)

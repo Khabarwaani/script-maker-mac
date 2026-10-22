@@ -41,4 +41,5 @@ struct StudioConfig: Codable {
     var storySource: String
     var topic: String
     var sampleStory: String
+    var location: String? = nil
 }
