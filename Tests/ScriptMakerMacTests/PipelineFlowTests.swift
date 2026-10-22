@@ -66,7 +66,7 @@ final class PipelineFlowTests: XCTestCase {
     func testPresetsAreAvailableAndWellConfigured() {
         let resolver = LocalPipelineFlowResolver()
         let presets = resolver.availablePresets()
-        XCTAssertEqual(presets.count, 8)
+        XCTAssertEqual(presets.count, 9)
         XCTAssertTrue(presets.contains { $0.id == "full-viral-story" })
         XCTAssertTrue(presets.contains { $0.id == "fast-two-scene-story" })
         XCTAssertTrue(presets.contains { $0.id == "news-to-story" })
@@ -75,6 +75,7 @@ final class PipelineFlowTests: XCTestCase {
         XCTAssertTrue(presets.contains { $0.id == "joke-to-story" })
         XCTAssertTrue(presets.contains { $0.id == "joke-to-two-scene-story" })
         XCTAssertTrue(presets.contains { $0.id == "script-refinement" })
+        XCTAssertTrue(presets.contains { $0.id == "two-scene-script-refinement" })
     }
 
     func testNewsResearcherOutputResolvesGroundedJokeAndStoryCreator() async throws {

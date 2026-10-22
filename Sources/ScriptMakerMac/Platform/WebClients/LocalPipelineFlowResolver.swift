@@ -69,6 +69,14 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
                 icon: "text.badge.checkmark",
                 stageAgentIDs: ["ThreeSceneStoryCreator", "ScriptChat"],
                 supportsStudioNews: false
+            ),
+            PipelinePresetTemplate(
+                id: "two-scene-script-refinement",
+                name: "2-Scene Story & ScriptChat Polish",
+                description: "Generate 2-Scene story → Polish spoken dialogues and punchlines with ScriptChat.",
+                icon: "text.badge.checkmark",
+                stageAgentIDs: ["TwoSceneStoryCreator", "ScriptChat"],
+                supportsStudioNews: false
             )
         ]
     }
