@@ -14,6 +14,10 @@ struct ScriptChatView: View {
                     Text(viewModel.source?.title ?? "Script refinement").foregroundStyle(.secondary)
                 }
                 Spacer()
+                if !viewModel.turns.isEmpty {
+                    Button("Reset") { Task { await viewModel.reset() } }
+                        .disabled(viewModel.isRefining || isSaving)
+                }
                 Button("Close") { viewModel.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
             }
             HStack {
@@ -22,6 +26,9 @@ struct ScriptChatView: View {
                         Text(provider.title).tag(provider)
                             .disabled(viewModel.providers[provider]?.isAvailable != true)
                     }
+                }
+                .onChange(of: viewModel.provider) { _, _ in
+                    Task { await viewModel.prewarm() }
                 }
                 TextField("Model (provider default if empty)", text: $viewModel.model)
             }
@@ -94,7 +101,10 @@ struct ScriptChatView: View {
             }
         }
         .padding(20).frame(minWidth: 880, idealWidth: 1040, minHeight: 700, idealHeight: 800)
-        .task { await viewModel.refreshProviders() }
+        .task {
+            await viewModel.refreshProviders()
+            await viewModel.prewarm()
+        }
         .onDisappear { viewModel.cancel() }
     }
 }

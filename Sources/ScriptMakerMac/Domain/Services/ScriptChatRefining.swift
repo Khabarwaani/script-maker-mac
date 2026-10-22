@@ -11,11 +11,19 @@ struct ScriptChatRequest: Sendable {
     let userInstruction: String
     let provider: LocalAgentProvider
     let model: String
+    var sessionID: String? = nil
 }
 
 protocol ScriptChatRefining: Sendable {
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability]
+    func prewarm(for provider: LocalAgentProvider, model: String) async
+    func closeSession() async
+}
+
+extension ScriptChatRefining {
+    func prewarm(for provider: LocalAgentProvider, model: String) async {}
+    func closeSession() async {}
 }
 
 struct ScriptChatTurn: Identifiable, Equatable, Sendable {

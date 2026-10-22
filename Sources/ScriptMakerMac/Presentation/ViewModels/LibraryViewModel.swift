@@ -195,6 +195,7 @@ final class LibraryViewModel {
         refined.videoURL = nil
         await saveEditedCopy(refined, originalID: original.id)
         chat.markSaved()
+        await chat.closeSession()
         actionNotice = "Refined script saved as a new story"
         return true
     }

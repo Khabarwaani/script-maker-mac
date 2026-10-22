@@ -3,12 +3,16 @@ import XCTest
 
 private actor ChatRefinerStub: ScriptChatRefining {
     var requests: [ScriptChatRequest] = []
+    var prewarmCount = 0
+    var closeSessionCount = 0
     var shouldFail = false
     var shouldReturnBlank = false
     var failOnRequest: Int?
     func configure(fail: Bool = false, blank: Bool = false) { shouldFail = fail; shouldReturnBlank = blank }
     func fail(onRequest number: Int) { failOnRequest = number }
     func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [.codex: .init(isAvailable: true, reason: "Ready")] }
+    func prewarm(for provider: LocalAgentProvider, model: String) { prewarmCount += 1 }
+    func closeSession() { closeSessionCount += 1 }
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft {
         requests.append(request)
         if shouldFail || requests.count == failOnRequest { throw APIError.transport("Provider unavailable") }
@@ -133,6 +137,8 @@ final class ScriptChatTests: XCTestCase {
 
 private actor ChatRunnerStub: LocalAgentRunning {
     var lastRequest: LocalAgentRequest?
+    var prewarmedSessionID: String?
+    var closedSessionID: String?
     var output = #"{"latestScript":"Refined","instruction":"Keep it concise"}"#
     func catalog() -> [LocalAgentDefinition] { [] }
     func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [:] }
@@ -140,6 +146,8 @@ private actor ChatRunnerStub: LocalAgentRunning {
         lastRequest = request
         return .init(text: output, rawOutput: output)
     }
+    func prewarm(sessionID: String, request: LocalAgentRequest) { prewarmedSessionID = sessionID }
+    func closeSession(id: String) { closedSessionID = id }
     func setOutput(_ value: String) { output = value }
 }
 
@@ -154,6 +162,9 @@ final class ScriptChatServiceTests: XCTestCase {
         XCTAssertEqual(request.agentID, "ScriptChat")
         XCTAssertEqual(request.version, "1.0.0")
         XCTAssertEqual(request.model, "test-model")
+        XCTAssertEqual(request.sessionID, "script-chat")
+        XCTAssertEqual(request.session.persistence, .persistentStdio)
+        XCTAssertFalse(request.session.keepMemory)
         XCTAssertTrue(request.responseInstructions.contains("instruction field in English only"))
         XCTAssertTrue(request.responseInstructions.contains("Keep latestScript in the original script's language"))
         let input = try JSONSerialization.jsonObject(with: Data(request.inputJSON.utf8)) as? [String: String]
@@ -165,6 +176,17 @@ final class ScriptChatServiceTests: XCTestCase {
             _ = try await service.refine(.init(originalScript: "Original", draft: output, userInstruction: "Shorten", provider: .codex, model: ""))
             XCTFail("Empty output must fail")
         } catch is LocalAgentError { }
+    }
+
+    func testPrewarmAndCloseSessionPassSessionID() async throws {
+        let runner = ChatRunnerStub()
+        let service = LocalScriptChatService(runner: runner, sessionID: "test-session")
+        await service.prewarm(for: .codex, model: "test-model")
+        let prewarmed = await runner.prewarmedSessionID
+        XCTAssertEqual(prewarmed, "test-session")
+        await service.closeSession()
+        let closed = await runner.closedSessionID
+        XCTAssertEqual(closed, "test-session")
     }
 }
 
@@ -240,17 +262,14 @@ extension ScriptChatTests {
         XCTAssertFalse(chat.canRefine)
         await chat.applyHistoryEdits()
         let requests = await service.requests
-        XCTAssertEqual(requests.count, 4)
+        XCTAssertEqual(requests.count, 3)
         XCTAssertEqual(requests[2].originalScript, "Original")
         XCTAssertEqual(requests[2].draft.latestScript, "Original")
         XCTAssertEqual(requests[2].draft.instruction, "Baseline")
         XCTAssertEqual(requests[2].userInstruction, "Keep the length")
-        XCTAssertEqual(requests[3].draft.latestScript, "Draft 3")
-        XCTAssertEqual(requests[3].draft.instruction, "Active instructions 3")
-        XCTAssertEqual(requests[3].userInstruction, "Warm tone")
-        XCTAssertEqual(chat.turns.map(\.id), ids)
-        XCTAssertEqual(chat.turns.map(\.userInstruction), ["Keep the length", "Warm tone"])
-        XCTAssertEqual(chat.draft.latestScript, "Draft 4")
+        XCTAssertEqual(chat.turns.count, 1)
+        XCTAssertEqual(chat.turns[0].userInstruction, "Keep the length")
+        XCTAssertEqual(chat.draft.latestScript, "Draft 3")
         XCTAssertFalse(chat.hasHistoryEdits)
         XCTAssertTrue(chat.canSave)
     }
@@ -325,11 +344,11 @@ extension ScriptChatTests {
         await chat.refine()
         let draft = chat.draft
         let turns = chat.turns
-        await service.fail(onRequest: 4)
+        await service.fail(onRequest: 3)
         chat.setHistoryInstruction("Revised first", for: turns[0].id)
         await chat.applyHistoryEdits()
         let count = await service.requests.count
-        XCTAssertEqual(count, 4)
+        XCTAssertEqual(count, 3)
         XCTAssertEqual(chat.draft, draft)
         XCTAssertEqual(chat.turns, turns)
         XCTAssertTrue(chat.hasHistoryEdits)
@@ -446,5 +465,61 @@ extension ScriptChatTests {
         XCTAssertEqual(requests[1].userInstruction, "Expand")
         XCTAssertEqual(chat.turns.first?.instructionOverride, "Manually chosen context")
         XCTAssertEqual(chat.originalInstruction, "Baseline")
+    }
+}
+
+extension ScriptChatTests {
+    func testReopeningSameStoryReusesDraftTurnsAndSession() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let story = Story(scriptText: "Baseline story script")
+        chat.begin(story)
+        await chat.refreshProviders()
+        chat.userInstruction = "Make dialogue snappy"
+        await chat.refine()
+        XCTAssertEqual(chat.turns.count, 1)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+
+        chat.begin(story)
+        XCTAssertEqual(chat.turns.count, 1)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+    }
+
+    func testResetClearsTurnsAndDraftAndClosesSession() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let story = Story(scriptText: "Baseline story script")
+        chat.begin(story)
+        await chat.refreshProviders()
+        chat.userInstruction = "Make dialogue snappy"
+        await chat.refine()
+        XCTAssertEqual(chat.turns.count, 1)
+
+        await chat.reset()
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertEqual(chat.draft.latestScript, "Baseline story script")
+        let closed = await service.closeSessionCount
+        XCTAssertEqual(closed, 1)
+    }
+
+    func testPrewarmInvokesServicePrewarm() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Script text"))
+        await chat.prewarm()
+        let prewarmed = await service.prewarmCount
+        XCTAssertEqual(prewarmed, 1)
+    }
+
+    func testRefineRequestPassesSessionID() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let story = Story(scriptText: "Script text")
+        chat.begin(story)
+        await chat.refreshProviders()
+        chat.userInstruction = "Shorten"
+        await chat.refine()
+        let requests = await service.requests
+        XCTAssertEqual(requests.last?.sessionID, "script-chat-\(story.id)")
     }
 }

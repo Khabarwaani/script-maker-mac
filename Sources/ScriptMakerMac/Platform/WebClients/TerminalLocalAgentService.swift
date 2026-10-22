@@ -11,6 +11,7 @@ struct TerminalLocalAgentService: LocalAgentRunning {
     private let removeWorkspace: @Sendable (URL) throws -> Void
     private let readDiagnostics: @Sendable (URL) -> String?
     private let providerAvailability: @Sendable () -> [LocalAgentProvider: LocalAgentAvailability]
+    private let launchWorkspace = AppLaunchWorkspace()
 
     init(entries: [AgentCatalogEntry]? = nil,
          makeSession: @escaping SessionFactory,
@@ -26,6 +27,20 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         self.providerAvailability = providerAvailability
     }
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { providerAvailability() }
+    func prewarm(sessionID: String, request: LocalAgentRequest) async {
+        do {
+            let workspace = try launchWorkspace.getOrCreateWorkspace(make: makeWorkspace)
+            if launchWorkspace.session(for: request.provider, model: request.model) == nil {
+                let session = try makeSession(request, workspace)
+                launchWorkspace.setSession(session, for: request.provider, model: request.model)
+            }
+        } catch {
+            AppLog.debug("LocalAgent prewarm: \(error.localizedDescription)")
+        }
+    }
+    func closeSession(id: String) async {
+        launchWorkspace.clearMemory()
+    }
     private func entries() throws -> [AgentCatalogEntry] {
         if let registeredEntries { return registeredEntries }
         return try KhabarwaaniAgent.executableCatalog()
@@ -52,15 +67,35 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         try schema.validate(JSONDecoder().decode(AgentJSON.self, from: data))
         try entry.validateInput(data)
         try Task.checkCancellation()
-        let workspace = try makeWorkspace()
+        let isPersistent = request.sessionID != nil
+        let workspace: URL
+        let session: any ManagedLocalAgentSession
+        if isPersistent {
+            workspace = try launchWorkspace.getOrCreateWorkspace(make: makeWorkspace)
+            if let cached = launchWorkspace.session(for: request.provider, model: request.model) {
+                session = cached
+            } else {
+                session = try makeSession(request, workspace)
+                launchWorkspace.setSession(session, for: request.provider, model: request.model)
+            }
+        } else {
+            workspace = try makeWorkspace()
+            session = try makeSession(request, workspace)
+        }
+        session.clearMemory()
+        defer {
+            session.clearMemory()
+            if !isPersistent {
+                session.purgeMemory()
+                do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+            }
+        }
         var result: LocalAgentResult
         do {
-            let session = try makeSession(request, workspace)
-            defer { session.purgeMemory() }
             let raw = try await withTaskCancellationHandler {
                 do { return try await entry.execute(input: data, session: session) }
                 catch AgentCatalogError.invalidOutput(let raw, let reason) { throw LocalAgentError.invalidOutput(raw: raw, reason: reason) }
-            } onCancel: { session.purgeMemory() }
+            } onCancel: { session.clearMemory() }
             try Task.checkCancellation()
             let value = try JSONSerialization.jsonObject(with: Data(raw.utf8), options: [.fragmentsAllowed])
             let pretty = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed])
@@ -71,8 +106,8 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             }.filter { !$0.isEmpty }
             result.metadata = (["Agent: \(entry.identity.name)\nVersion: \(entry.identity.version)\nExecution: this Mac"] + records).joined(separator: "\n\n")
         } catch {
+            session.clearMemory()
             let diagnostics = readDiagnostics(workspace)
-            do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
             if !Task.isCancelled, let diagnostics, !diagnostics.isEmpty {
                 if case LocalAgentError.invalidOutput = error { throw error }
                 let message = Self.failureMessage(in: diagnostics)
@@ -81,7 +116,6 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             }
             throw error
         }
-        try removeWorkspace(workspace)
         return result
     }
     private static func failureMessage(in diagnostics: String) -> String? {
@@ -92,5 +126,45 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             if object["type"] as? String == "error", let message = object["message"] as? String { return message }
         }
         return nil
+    }
+}
+
+private final class AppLaunchWorkspace: @unchecked Sendable {
+    struct CachedSession {
+        let session: any ManagedLocalAgentSession
+        let model: String?
+    }
+    private let lock = NSLock()
+    private var workspaceURL: URL?
+    private var sessions: [LocalAgentProvider: CachedSession] = [:]
+
+    func getOrCreateWorkspace(make: () throws -> URL) throws -> URL {
+        lock.lock()
+        defer { lock.unlock() }
+        if let existing = workspaceURL { return existing }
+        let url = try make()
+        workspaceURL = url
+        return url
+    }
+
+    func session(for provider: LocalAgentProvider, model: String?) -> (any ManagedLocalAgentSession)? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let cached = sessions[provider], cached.model == model else { return nil }
+        return cached.session
+    }
+
+    func setSession(_ session: any ManagedLocalAgentSession, for provider: LocalAgentProvider, model: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        sessions[provider] = CachedSession(session: session, model: model)
+    }
+
+    func clearMemory() {
+        lock.lock()
+        defer { lock.unlock() }
+        for cached in sessions.values {
+            cached.session.clearMemory()
+        }
     }
 }
