@@ -100,12 +100,15 @@ final class PipelineTabViewModel {
     }
     var canContinue: Bool {
         guard !isRunning, !hasOutputEdits, activeStep?.status == .completed else { return false }
-        return mode == .preset ? activeStepIndex + 1 < steps.count : !availableTransitions.isEmpty
+        if mode == .preset { return activeStepIndex + 1 < steps.count }
+        let visited = Set(steps.prefix(activeStepIndex + 1).map(\.agentID))
+        return availableTransitions.contains { !visited.contains($0.targetAgentID) }
     }
 
     var runTitle: String {
+        if activeStep?.status == .completed { return "Re-run Stage" }
         if executionMode == .continuous { return "Run Pipeline" }
-        return activeStep?.status == .completed ? "Re-run Stage" : "Run Stage"
+        return "Run Stage"
     }
 
     var isStorySavable: Bool {
@@ -151,7 +154,7 @@ final class PipelineTabViewModel {
                     startConfigurable(initialAgentID: firstAgent.agentID)
                 }
             }
-            await refreshStudioNews(forceFresh: false)
+            if studioCategories.isEmpty { await refreshStudioNews(forceFresh: false) }
         } catch {
             guard !Task.isCancelled else { return }
             self.errorMessage = error.localizedDescription
