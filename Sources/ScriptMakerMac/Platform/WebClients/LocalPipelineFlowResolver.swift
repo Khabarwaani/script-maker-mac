@@ -204,6 +204,8 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
             if !parts.isEmpty { fields["location"] = .string(parts.joined(separator: ", ")) }
         } else if let locStr = parsed["location"] as? String, !locStr.isEmpty {
             fields["location"] = .string(locStr)
+        } else if let fallbackLoc = sourceStep.draft.fields["location"]?.text, !fallbackLoc.isEmpty {
+            fields["location"] = .string(fallbackLoc)
         }
 
         // People

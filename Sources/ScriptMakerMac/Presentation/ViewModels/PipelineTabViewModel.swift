@@ -34,6 +34,7 @@ final class PipelineTabViewModel {
     var selectedHashtag: String = ""
     var customHashtag: String = ""
     var studioTopic: String = ""
+    var location: String = "India"
     private(set) var isRefreshingHeadlines: Bool = false
     private(set) var isRefreshingHashtags: Bool = false
     private(set) var headlinesErrorMessage: String? = nil
@@ -64,13 +65,15 @@ final class PipelineTabViewModel {
         service: any LocalAgentRunning,
         flowResolver: any PipelineFlowResolving,
         storyRepository: any StoryRepository,
-        newsProvider: any StudioNewsProviding
+        newsProvider: any StudioNewsProviding,
+        defaultLocation: String = "India"
     ) {
         self.service = service
         self.flowResolver = flowResolver
         self.storyRepository = storyRepository
         self.newsProvider = newsProvider
         self.presets = flowResolver.availablePresets()
+        self.location = defaultLocation
     }
 
     // MARK: - Computed Properties
@@ -170,13 +173,13 @@ final class PipelineTabViewModel {
         defer { isRefreshingHeadlines = false }
         do {
             if studioCategories.isEmpty {
-                let catResp = try await newsProvider.categories()
+                let catResp = try await newsProvider.categories(location: location)
                 studioCategories = catResp.categories.map(\.id)
                 if !studioCategories.contains(selectedCategory), let first = studioCategories.first {
                     selectedCategory = first
                 }
             }
-            let titlesResp = try await newsProvider.headlines(category: selectedCategory, limit: 15, forceFresh: forceFresh)
+            let titlesResp = try await newsProvider.headlines(category: selectedCategory, location: location, limit: 15, forceFresh: forceFresh)
             studioHeadlines = titlesResp.titles.map(\.title)
             if selectedHeadline.isEmpty || !studioHeadlines.contains(selectedHeadline) {
                 if let first = studioHeadlines.first {
@@ -235,11 +238,14 @@ final class PipelineTabViewModel {
         applyTopicToFirstStep(topic)
     }
 
-    func applyStudioTopic(_ topic: String) {
+    func applyStudioTopic(_ topic: String, location: String? = nil) {
         guard !isRunning else { return }
         studioTopic = topic
         selectedHeadline = topic
         selectedStudioSource = .manual
+        if let location, !location.isEmpty {
+            self.location = location
+        }
 
         if steps.isEmpty {
             if mode == .preset {
@@ -253,7 +259,18 @@ final class PipelineTabViewModel {
             }
         } else {
             applyTopicToFirstStep(topic)
+            if let location, !location.isEmpty {
+                applyLocationToFirstStep(location)
+            }
             activeStepIndex = 0
+        }
+    }
+
+    private func applyLocationToFirstStep(_ loc: String) {
+        guard !isRunning, !steps.isEmpty else { return }
+        if steps[0].draft.fields["location"] != nil {
+            steps[0].draft.fields["location"]?.text = loc
+            invalidateStage(at: 0)
         }
     }
 

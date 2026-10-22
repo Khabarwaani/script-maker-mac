@@ -22,12 +22,45 @@ final class PreferencesViewModel {
     var trendingSettingsError: String?
     var trendingSettingsNotice: String?
 
+    var newsRegionGeoText: String {
+        get {
+            if let geo = RegionGeo.resolve(draftNewsSettings.location) ?? RegionGeo.resolve(draftNewsSettings.region) {
+                return geo.name
+            }
+            return !draftNewsSettings.location.isEmpty ? draftNewsSettings.location : draftNewsSettings.region
+        }
+        set {
+            draftNewsSettings.location = newValue
+            if let geo = RegionGeo.resolve(newValue) {
+                draftNewsSettings.region = geo.code
+            }
+        }
+    }
+
+    var trendingRegionGeoText: String {
+        get {
+            if let geo = RegionGeo.resolve(draftTrendingSettings.region) {
+                return geo.name
+            }
+            return draftTrendingSettings.region
+        }
+        set {
+            if let geo = RegionGeo.resolve(newValue) {
+                draftTrendingSettings.region = geo.code
+            } else {
+                draftTrendingSettings.region = newValue
+            }
+        }
+    }
+
     var trendingCacheHours: Double {
         get { draftTrendingSettings.cacheDuration / 3600 }
         set { draftTrendingSettings.cacheDuration = newValue * 3600 }
     }
 
-    func loadTrendingSettings() { draftTrendingSettings = config.trendingSettings }
+    func loadTrendingSettings() {
+        draftTrendingSettings = config.trendingSettings
+    }
 
     func setTrendLanguage(_ language: TrendLanguage, enabled: Bool) {
         if enabled { draftTrendingSettings.languages.insert(language) }

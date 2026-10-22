@@ -416,6 +416,7 @@ final class PipelineFlowTests: XCTestCase {
         XCTAssertEqual(vm.studioTopic, "Breaking Cyber Security News")
         XCTAssertEqual(vm.selectedHeadline, "Breaking Cyber Security News")
         XCTAssertEqual(vm.steps[0].draft.fields["topic"]?.text, "Breaking Cyber Security News")
+        XCTAssertEqual(vm.location, "India")
     }
 
     @MainActor
@@ -430,19 +431,23 @@ final class PipelineFlowTests: XCTestCase {
         )
 
         var receivedTopic: String?
-        genVM.onNavigateToPipeline = { topic in
+        var receivedLocation: String?
+        genVM.onNavigateToPipeline = { topic, location in
             receivedTopic = topic
+            receivedLocation = location
         }
 
         // When blank, should not invoke
         genVM.topic = "   "
         genVM.startInPipeline()
         XCTAssertNil(receivedTopic)
+        XCTAssertNil(receivedLocation)
 
-        // When filled, invokes callback
+        // When filled, invokes callback with topic and location from app config
         genVM.topic = "Autonomous EV Fleets in India"
         genVM.startInPipeline()
         XCTAssertEqual(receivedTopic, "Autonomous EV Fleets in India")
+        XCTAssertEqual(receivedLocation, "India")
     }
 }
 

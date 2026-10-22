@@ -270,4 +270,47 @@ extension StudioNewsTests {
         XCTAssertEqual(response.titles.count, 1)
         XCTAssertEqual(response.titles.first?.title, "ISRO Gaganyaan Mission Astronauts Complete Final Tests")
     }
+
+    @MainActor
+    func testAppLevelLocationConfigurationAcrossStudioAndPipeline() async throws {
+        let config = AppConfig(defaults: UserDefaults(suiteName: "news.location.\(UUID().uuidString)")!)
+        config.dataSource = .server
+        XCTAssertEqual(config.newsSettings.location, "India")
+        XCTAssertEqual(config.newsSettings.region, "IN")
+
+        let provider = RecordingStudioNewsProvider()
+        let vm = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: provider)
+        XCTAssertEqual(vm.location, "India")
+
+        // Changing app-level news settings updates Studio location dynamically
+        var updatedSettings = config.newsSettings
+        try updatedSettings.setRegionGeo("United States")
+        config.newsSettings = try updatedSettings.validated()
+        XCTAssertEqual(config.newsSettings.location, "United States")
+        XCTAssertEqual(config.newsSettings.region, "US")
+        XCTAssertEqual(vm.location, "United States")
+
+        // PipelineTabViewModel takes app-level location and feeds Step 1
+        let service = StubAgentRunner()
+        let pipeline = PipelineTabViewModel(
+            service: service,
+            flowResolver: LocalPipelineFlowResolver(),
+            storyRepository: LocalStoryRepository(),
+            newsProvider: provider,
+            defaultLocation: config.newsSettings.location
+        )
+        XCTAssertEqual(pipeline.location, "United States")
+
+        pipeline.applyStudioTopic("AI Breakthroughs", location: config.newsSettings.location)
+        XCTAssertEqual(pipeline.studioTopic, "AI Breakthroughs")
+        XCTAssertEqual(pipeline.location, "United States")
+    }
+}
+
+private struct StubAgentRunner: LocalAgentRunning {
+    func catalog() async throws -> [LocalAgentDefinition] { [] }
+    func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
+        throw LocalAgentError.invalidInput("Stub")
+    }
+    func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { [:] }
 }

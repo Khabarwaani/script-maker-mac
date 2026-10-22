@@ -22,7 +22,21 @@ struct TrendingDiscoverySettingsView: View {
                 Text("Cache duration (hours)")
                 TextField("Hours", value: $viewModel.trendingCacheHours, format: .number)
             }
-            TextField("Region code, e.g. IN", text: $viewModel.draftTrendingSettings.region)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Region / Geo")
+                    TextField("Country or code (e.g. India, IN, United States, US)", text: $viewModel.trendingRegionGeoText)
+                }
+                if let geo = RegionGeo.resolve(viewModel.trendingRegionGeoText) {
+                    Text("\(geo.flag) \(geo.name) · Geo Code: \(geo.code)")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.accent)
+                } else if !viewModel.trendingRegionGeoText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("⚠️ Not a recognized country or region geo. Cities and states are not supported.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.warning)
+                }
+            }
             TextField("Feed language code, e.g. en", text: $viewModel.draftTrendingSettings.feedLanguage)
             Text("Include languages").font(.callout.weight(.medium))
             ForEach(TrendLanguage.allCases, id: \.self) { language in

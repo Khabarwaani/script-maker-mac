@@ -62,6 +62,7 @@ final class AppConfig {
             defaults.set(newsSettings.providerOrder.rawValue, forKey: "news.providerOrder")
             defaults.set(newsSettings.region, forKey: "news.region")
             defaults.set(newsSettings.language, forKey: "news.language")
+            defaults.set(newsSettings.location, forKey: "news.location")
         }
     }
 
@@ -162,7 +163,8 @@ final class AppConfig {
             cacheDuration: defaults.object(forKey: "news.cacheDuration") as? Double ?? newsDefaults.cacheDuration,
             providerOrder: defaults.string(forKey: "news.providerOrder").flatMap(NewsFeedOrder.init(rawValue:)) ?? newsDefaults.providerOrder,
             region: defaults.string(forKey: "news.region") ?? newsDefaults.region,
-            language: defaults.string(forKey: "news.language") ?? newsDefaults.language)
+            language: defaults.string(forKey: "news.language") ?? newsDefaults.language,
+            location: defaults.string(forKey: "news.location") ?? newsDefaults.location)
         self.localJSONDelay = defaults.object(forKey: "localJSONDelay") as? Double ?? 1
         let savedPageSize = defaults.integer(forKey: Self.newsPageSizeKey)
         self.newsPageSize = savedPageSize > 0 ? savedPageSize : Self.defaultNewsPageSize

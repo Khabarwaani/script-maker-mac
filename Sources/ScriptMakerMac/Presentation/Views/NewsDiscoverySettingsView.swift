@@ -23,9 +23,23 @@ struct NewsDiscoverySettingsView: View {
             Picker("RSS providers", selection: $viewModel.draftNewsSettings.providerOrder) {
                 ForEach(NewsFeedOrder.allCases, id: \.self) { order in Text(order.rawValue).tag(order) }
             }
-            TextField("Region code, e.g. IN", text: $viewModel.draftNewsSettings.region)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Region / Geo")
+                    TextField("Country or code (e.g. India, IN, United States, US)", text: $viewModel.newsRegionGeoText)
+                }
+                if let geo = RegionGeo.resolve(viewModel.newsRegionGeoText) {
+                    Text("\(geo.flag) \(geo.name) · Geo Code: \(geo.code)")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.accent)
+                } else if !viewModel.newsRegionGeoText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("⚠️ Not a recognized country or region geo. Cities and states are not supported.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.warning)
+                }
+            }
             TextField("Language code, e.g. en", text: $viewModel.draftNewsSettings.language)
-            Text("Defaults: 20 results, 24-hour search window, 6-hour cache, Google then Bing, IN/en. Set a duration to 0 to disable its filter or cache. Refresh always fetches fresh news.")
+            Text("Defaults: India (IN), 20 results, 24-hour search window, 6-hour cache, Google then Bing, en. Set a duration to 0 to disable its filter or cache. Refresh always fetches fresh news.")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Button("Save news settings") { viewModel.saveNewsSettings() }
             if let error = viewModel.newsSettingsError { Text(error).foregroundStyle(AppTheme.danger) }

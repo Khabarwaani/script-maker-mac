@@ -8,7 +8,7 @@ extension NewsDiscoverySettings {
         return NewsSearchConfiguration(
             rssProviders: settings.providerOrder.providers.compactMap(NewsRSSProvider.init(rawValue:)),
             searchDuration: settings.searchDuration, cacheDuration: forceFresh ? 0 : settings.cacheDuration,
-            region: settings.region, language: settings.language)
+            region: settings.region, language: settings.language, location: settings.location)
     }
 }
 
@@ -17,15 +17,28 @@ struct LocalStudioNewsProvider: StudioNewsProviding {
     let trends: @MainActor @Sendable () throws -> any RefreshableTrendingSearching
 
     func categories() async throws -> NewsCategoriesResponse {
-        NewsCategoriesResponse(categories: NewsSearch.NewsCategory.allCases.map {
-            NewsCategory(id: $0.rawValue, label: $0.label)
+        try await categories(location: nil)
+    }
+
+    func categories(location: String? = nil) async throws -> NewsCategoriesResponse {
+        let effectiveLocation = location?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedLocation = (effectiveLocation?.isEmpty ?? true) ? "India" : effectiveLocation!
+        return NewsCategoriesResponse(categories: NewsSearch.NewsCategory.allCases.map {
+            NewsCategory(id: $0.rawValue, label: $0.label(location: resolvedLocation))
         }, defaultCategory: NewsSearch.NewsCategory.trending.rawValue)
     }
 
     func headlines(category: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
+        try await headlines(category: category, location: nil, limit: limit, forceFresh: forceFresh)
+    }
+
+    func headlines(category: String?, location: String? = nil, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
+        let effectiveLoc = (location?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? "India" : location!.trimmingCharacters(in: .whitespacesAndNewlines)
         let selected: NewsSearch.NewsCategory
         if let category, !category.isEmpty {
-            guard let match = NewsSearch.NewsCategory.allCases.first(where: { $0.rawValue == category || $0.label == category }) else {
+            guard let match = NewsSearch.NewsCategory.allCases.first(where: {
+                $0.rawValue == category || $0.label == category || $0.label(location: effectiveLoc) == category
+            }) else {
                 throw NewsSearchError.invalidInput("Unknown news category: \(category)")
             }
             selected = match
@@ -33,9 +46,10 @@ struct LocalStudioNewsProvider: StudioNewsProviding {
             selected = .trending
         }
         let client = try await news(forceFresh)
-        let articles = try await client.headlines(category: selected, limit: limit)
+        let articles = try await client.headlines(category: selected, location: effectiveLoc, limit: limit)
         let filteredArticles = articles.filter { !NewsSearchClient.isEditorialDigestOrAudioBriefing($0.title) }
-        return TopTitlesResponse(category: selected.rawValue, label: selected.label, n: filteredArticles.count, mode: "local", titles: filteredArticles.map {
+        let resolvedLabel = selected.label(location: effectiveLoc)
+        return TopTitlesResponse(category: selected.rawValue, label: resolvedLabel, n: filteredArticles.count, mode: "local", titles: filteredArticles.map {
             NewsTitle(title: $0.title, link: $0.url.absoluteString)
         })
     }
