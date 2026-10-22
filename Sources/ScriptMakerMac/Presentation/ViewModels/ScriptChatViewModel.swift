@@ -89,14 +89,14 @@ final class ScriptChatViewModel {
         instructionDraft = draft.instruction
     }
 
-    func reset() {
+    func reset() async {
         guard let story = source else { return }
         cancel()
         turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         let script = story.scriptText ?? ""
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
         instructionDraft = draft.instruction
-        Task { [service] in await service.closeSession() }
+        await service.closeSession()
     }
 
     func closeSession() async {

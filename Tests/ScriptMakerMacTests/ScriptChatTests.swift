@@ -495,7 +495,7 @@ extension ScriptChatTests {
         await chat.refine()
         XCTAssertEqual(chat.turns.count, 1)
 
-        chat.reset()
+        await chat.reset()
         XCTAssertTrue(chat.turns.isEmpty)
         XCTAssertEqual(chat.draft.latestScript, "Baseline story script")
         let closed = await service.closeSessionCount

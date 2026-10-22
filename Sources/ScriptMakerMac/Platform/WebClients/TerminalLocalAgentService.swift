@@ -67,16 +67,29 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         try schema.validate(JSONDecoder().decode(AgentJSON.self, from: data))
         try entry.validateInput(data)
         try Task.checkCancellation()
-        let workspace = try launchWorkspace.getOrCreateWorkspace(make: makeWorkspace)
+        let isPersistent = request.sessionID != nil
+        let workspace: URL
         let session: any ManagedLocalAgentSession
-        if let cached = launchWorkspace.session(for: request.provider, model: request.model) {
-            session = cached
+        if isPersistent {
+            workspace = try launchWorkspace.getOrCreateWorkspace(make: makeWorkspace)
+            if let cached = launchWorkspace.session(for: request.provider, model: request.model) {
+                session = cached
+            } else {
+                session = try makeSession(request, workspace)
+                launchWorkspace.setSession(session, for: request.provider, model: request.model)
+            }
         } else {
+            workspace = try makeWorkspace()
             session = try makeSession(request, workspace)
-            launchWorkspace.setSession(session, for: request.provider, model: request.model)
         }
         session.clearMemory()
-        defer { session.clearMemory() }
+        defer {
+            session.clearMemory()
+            if !isPersistent {
+                session.purgeMemory()
+                do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+            }
+        }
         var result: LocalAgentResult
         do {
             let raw = try await withTaskCancellationHandler {

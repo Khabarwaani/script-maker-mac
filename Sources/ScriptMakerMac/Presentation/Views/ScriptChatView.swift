@@ -15,7 +15,7 @@ struct ScriptChatView: View {
                 }
                 Spacer()
                 if !viewModel.turns.isEmpty {
-                    Button("Reset") { viewModel.reset() }
+                    Button("Reset") { Task { await viewModel.reset() } }
                         .disabled(viewModel.isRefining || isSaving)
                 }
                 Button("Close") { viewModel.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
