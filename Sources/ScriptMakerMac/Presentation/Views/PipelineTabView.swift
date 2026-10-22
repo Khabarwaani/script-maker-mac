@@ -56,6 +56,7 @@ struct PipelineTabView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .frame(width: 220)
             .disabled(viewModel.isRunning)
 
@@ -63,6 +64,7 @@ struct PipelineTabView: View {
                 ForEach(PipelineExecutionMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .frame(width: 220)
             .disabled(viewModel.isRunning)
 
@@ -309,6 +311,7 @@ private struct StudioNewsSelectionCard: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .labelsHidden()
                     .frame(maxWidth: 380)
                     .disabled(viewModel.isRunning)
 

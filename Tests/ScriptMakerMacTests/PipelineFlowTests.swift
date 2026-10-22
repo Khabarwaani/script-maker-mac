@@ -610,13 +610,14 @@ extension PipelineFlowTests {
     }
 
     func testStageOutputPresentsScenesDialogueAndUnknownFieldsWithoutJSON() {
-        let raw = #"{"items":[{"title":"Launch","scenes":[{"title":"A scene","dialogues":[{"speaker":"Host","dialogue":"Hello"}]}]}],"custom_field":"Extra information"}"#
+        let raw = #"{"items":[{"title":"Launch","scenes":[{"title":"A scene","dialogues":[{"speaker":"Host","dialogue":"Hello"}],"words_count":1,"verification":{"passed":true}}]}],"custom_field":"Extra information"}"#
         let blocks = PipelineOutputBlock.sections(from: raw)
         XCTAssertTrue(blocks.contains { $0.title == "Launch" })
         XCTAssertTrue(blocks.contains { $0.title == "A scene" })
         XCTAssertTrue(blocks.contains { $0.text == "Host: Hello" })
         XCTAssertTrue(blocks.contains { $0.title == "Custom Field" && $0.text == "Extra information" })
         XCTAssertFalse(blocks.contains { $0.text.contains("{\"") })
+        XCTAssertFalse(blocks.contains { $0.title == "Verification" || $0.title == "Words Count" || $0.title == "Passed" })
         XCTAssertEqual(PipelineOutputBlock.sections(from: "Plain output").first?.text, "Plain output")
     }
 }

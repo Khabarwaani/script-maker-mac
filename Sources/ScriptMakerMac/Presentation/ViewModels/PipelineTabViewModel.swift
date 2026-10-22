@@ -467,6 +467,7 @@ final class PipelineTabViewModel {
         isPauseRequested = false
         errorMessage = nil
         savedStoryNotice = nil
+        isStudioSelectionExpanded = false
         executionTask = Task { [weak self] in
             guard let self else { return }
             defer {
