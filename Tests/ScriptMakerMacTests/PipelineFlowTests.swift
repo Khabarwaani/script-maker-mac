@@ -620,3 +620,27 @@ extension PipelineFlowTests {
         XCTAssertEqual(PipelineOutputBlock.sections(from: "Plain output").first?.text, "Plain output")
     }
 }
+
+extension PipelineFlowTests {
+    @MainActor
+    func testEditedInputsRequireRerunningStageBeforeContinuing() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        vm.executionMode = .stepWise
+        vm.runPipeline()
+        await vm.waitForExecution()
+        XCTAssertTrue(vm.canContinue)
+        var draft = try XCTUnwrap(vm.activeStep?.draft)
+        draft.fields["topic"]?.text = "Changed topic"
+        vm.updateActiveDraft(draft)
+        XCTAssertEqual(vm.activeStep?.status, .pending)
+        XCTAssertNil(vm.activeStep?.result)
+        XCTAssertFalse(vm.canContinue)
+        vm.runPipeline()
+        await vm.waitForExecution()
+        let requests = await runner.requests
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.last?.agentID, "NewsResearcher")
+        XCTAssertTrue(requests.last?.inputJSON.contains("Changed topic") == true)
+    }
+}

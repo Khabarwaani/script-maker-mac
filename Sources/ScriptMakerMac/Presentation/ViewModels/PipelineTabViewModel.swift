@@ -255,24 +255,11 @@ final class PipelineTabViewModel {
     }
 
     private func applyTopicToFirstStep(_ topic: String) {
-        guard !steps.isEmpty else { return }
-        var matched = false
-        if steps[0].draft.fields["topic"] != nil {
-            steps[0].draft.fields["topic"]?.text = topic
-            matched = true
-        }
-        if steps[0].draft.fields["news"] != nil && !matched {
-            steps[0].draft.fields["news"]?.text = topic
-            matched = true
-        }
-        if steps[0].draft.fields["searchQuery"] != nil && !matched {
-            steps[0].draft.fields["searchQuery"]?.text = topic
-            matched = true
-        }
-        if steps[0].draft.fields["input"] != nil && !matched {
-            steps[0].draft.fields["input"]?.text = topic
-            matched = true
-        }
+        guard !isRunning, !steps.isEmpty,
+              let key = ["topic", "news", "searchQuery", "input"].first(where: { steps[0].draft.fields[$0] != nil }),
+              steps[0].draft.fields[key]?.text != topic else { return }
+        steps[0].draft.fields[key]?.text = topic
+        invalidateStage(at: 0)
     }
 
     func selectMode(_ newMode: PipelineMode) {
@@ -366,6 +353,7 @@ final class PipelineTabViewModel {
         guard !isRunning, !hasOutputEdits else { return }
         guard let def = catalog.first(where: { $0.agentID == option.targetAgentID && $0.isExecutable }) else { return }
 
+        invalidateFollowingStages()
         let nextIndex = steps.count
         let newStep = AgentPipelineStep(
             stepIndex: nextIndex,
@@ -739,18 +727,34 @@ final class PipelineTabViewModel {
     func updateActiveDraft(_ newDraft: AgentInputDraft) {
         guard !isRunning, activeStepIndex < steps.count else { return }
         steps[activeStepIndex].draft = newDraft
+        invalidateStage(at: activeStepIndex)
     }
 
     func addArrayItem(id: UUID, schema: AgentInputSchema) {
         guard !isRunning, let items = schema.items, var root = activeStep?.draft else { return }
         _ = root.change(id: id) { $0.items.append(.init(schema: items, required: true)) }
-        steps[activeStepIndex].draft = root
+        updateActiveDraft(root)
     }
 
     func removeArrayItem(parentID: UUID, itemID: UUID) {
         guard !isRunning, var root = activeStep?.draft else { return }
         _ = root.change(id: parentID) { $0.items.removeAll { $0.id == itemID } }
-        steps[activeStepIndex].draft = root
+        updateActiveDraft(root)
+    }
+
+    private func invalidateStage(at index: Int) {
+        activeStepIndex = index
+        steps[index].status = .pending
+        steps[index].result = nil
+        steps[index].rawOutput = ""
+        steps[index].errorMessage = nil
+        steps[index].startedAt = nil
+        steps[index].completedAt = nil
+        invalidateFollowingStages()
+        availableTransitions = []
+        editedOutput = ""
+        savedStoryNotice = nil
+        statusMessage = "Inputs updated · ready to run"
     }
 
     // MARK: - Private Helpers
