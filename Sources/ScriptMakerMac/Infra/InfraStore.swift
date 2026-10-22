@@ -1,6 +1,46 @@
 import Foundation
 import AppKit
 import UniformTypeIdentifiers
+import Security
+
+struct CredentialStore {
+    let service: String
+    let account: String
+
+    func read() throws -> Data? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrService as String: service, kSecAttrAccount as String: account,
+                                   kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = result as? Data else { throw CredentialStoreError.operationFailed(status) }
+        return data
+    }
+
+    func write(_ data: Data) throws {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrService as String: service, kSecAttrAccount as String: account]
+        let attributes: [String: Any] = [kSecValueData as String: data]
+        var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            var item = query
+            item[kSecValueData as String] = data
+            item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            status = SecItemAdd(item as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { throw CredentialStoreError.operationFailed(status) }
+    }
+}
+
+enum CredentialStoreError: LocalizedError {
+    case operationFailed(OSStatus)
+    var errorDescription: String? {
+        switch self {
+        case .operationFailed(let status): return "Could not access saved upload settings in Keychain (\(status)). Open Settings and try again."
+        }
+    }
+}
 
 /// Infra layer: dumb framework wrappers.
 /// No business logic, no app-specific types. Just thin adapters.
@@ -132,6 +172,12 @@ struct FileStore: Sendable {
 
 @MainActor
 struct PasteboardStore {
+    func writeImage(_ data: Data) -> Bool {
+        guard let image = NSImage(data: data), image.isValid else { return false }
+        NSPasteboard.general.clearContents()
+        return NSPasteboard.general.writeObjects([image])
+    }
+
     func write(_ text: String) -> Bool {
         NSPasteboard.general.clearContents()
         return NSPasteboard.general.setString(text, forType: .string)
@@ -161,5 +207,25 @@ struct SharingStore {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         try text.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+}
+
+private final class NoHTTPRedirects: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? { nil }
+}
+
+extension HTTPClient {
+    static func withoutRedirects() -> HTTPClient {
+        HTTPClient(session: URLSession(configuration: .ephemeral, delegate: NoHTTPRedirects(), delegateQueue: nil))
+    }
+}
+
+extension FileStore {
+    var homeDirectory: URL { fileManager.homeDirectoryForCurrentUser }
+    func environmentValue(_ key: String) -> String? { ProcessInfo.processInfo.environment[key] }
+    func writeCreatingDirectory(_ data: Data, to url: URL) throws {
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
     }
 }

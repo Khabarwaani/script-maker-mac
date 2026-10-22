@@ -3,8 +3,8 @@
 Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
 MVVM, async/await throughout.
 
-Requires **macOS 27+ and Xcode 27+**. Studio and Library use the
-pipeline server configured in Preferences (Cmd+,). The **LocalAgent** tab runs
+Requires **macOS 27+ and Xcode 27+**. Studio uses the pipeline server configured in Preferences (Cmd+,).
+Library saves and enriches stories locally with direct HTTP requests. The **LocalAgent** tab runs
 KhabarwaaniAgent through an installed terminal AI provider.
 
 - **Server URL** defaults to `http://localhost:8000`.
@@ -59,6 +59,32 @@ This integration currently uses the package discovery-hook branch in CI, pending
 its dependency PR. Production release checkouts continue to use package main.
 CI needs the existing read-only `KHABARWAANI_AGENT_READ_KEY` for that private
 checkout. The xcode-27 runner supplies macOS/Xcode 27.
+
+## Library
+
+Use **Add** with just a title/headline. Script, generation metadata and media are
+optional. The Mac searches news feeds (Bing, then Google News), reads publisher
+Open Graph / Twitter images and checks image availability. Hashtags are derived
+from the title locally. No AI, Python or ScriptMakerServer is used. Internet is
+needed for search and uploads. Search failures keep the saved story and show the
+cause; refresh related content to retry. Editing a title saves a new copy and
+refreshes its related content while preserving the original and imported images.
+
+**Share → Upload to Telegram** sends the title/hashtags, optional local video,
+then source links. It reads the same `~/Documents/telegrambot/bot_token.txt` and
+`~/.cache/telegram_bot_chat_id.json` as ScriptMaker. Enter a chat ID or tap Start
+in the bot to establish your destination. Group sending is opt-in and uses
+`~/Documents/telegrambot/group_ids.txt` plus discovered groups. The sheet also
+accepts a temporary token/chat override. Upload errors report partial delivery;
+retrying may resend messages that already arrived.
+
+**Share → Upload to Google Drive / Sheets** ports ScriptMaker’s Kops reel upload.
+Attach a local MP4, MOV or WebM video first; only this upload endpoint requires
+video. Authentication uses `GOOGLE_ACCESS_TOKEN`, then `~/.clasprc.json` (run
+`npx clasp login`), then an optional temporary access token. The default Apps
+Script deployment matches ScriptMaker and can be overridden in the upload sheet.
+The returned Drive preview, sheet row and timestamp are saved with the story.
+The existing Drive text export remains available separately.
 
 ## Architecture
 
@@ -155,9 +181,39 @@ Open `ScriptMakerMac.xcworkspace` (or `ScriptMakerMac.xcodeproj`) at the repo ro
 ## Build the DMG (on a Mac)
 
 ```bash
-packaging/mac/build_dmg.sh 1.0
+packaging/mac/build_dmg.sh 1.1.0
 ```
 
 ## CI
 
 `.github/workflows/ci.yml` — `xcodebuild` Debug build on every push/PR (public repo: free).
+
+Studio news discovery runs locally in Swift using the public personal packages
+[NewsSearch](https://github.com/abhi266raj/NewsSearch) and
+[TrendingHashtag](https://github.com/abhi266raj/TrendingHashtag). Local categories
+remain fixed; only selected headlines or hashtag details refresh. Internet is required.
+Bundled sample mode remains available. Script generation still uses the configured
+pipeline server. Both packages offer source and XCFramework products at the same
+version; this app consumes the framework products.
+
+Settings contains app-wide News Discovery and Trending Hashtags options, initialized
+to the frameworks' defaults. Configure search/trend windows, cache durations,
+providers, region, language, and result limits there. Hashtag selection shows feed
+details; **Load full title and description** looks up additional topic context.
+
+In Library, open a story with a screenplay and choose **Refine with Script Chat**.
+Choose an available local provider, enter a refinement instruction, and review the
+updated draft. Each turn keeps the original script and carries the latest draft
+and consolidated instructions forward. **Save as new script** creates a separate
+Library entry with version history and a link to the source story. Closing or
+cancelling does not save or change the original. This uses KhabarwaaniAgent 1.3.0;
+installed CLI providers require their existing sign-in, or use available Apple
+Intelligence. Generated video and upload receipts are cleared on the refined copy.
+
+Script Chat shows the read-only original script beside the current script and
+editable consolidated instructions. Original instructions are kept internally as
+conversation context. Refine applies consolidated-instruction edits; discard them
+to restore the last successful instructions before saving. Refinement history instructions are
+editable: **Apply history edits** regenerates from the first changed turn through
+later turns. A failed or cancelled replay preserves the last successful draft.
+Apply or discard history edits before refining again or saving a new entry.

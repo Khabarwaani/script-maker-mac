@@ -1,4 +1,6 @@
 import SwiftUI
+import NewsSearch
+import TrendingHashtag
 import AgentAtom
 import TerminalAgentSession
 
@@ -32,12 +34,19 @@ enum CompositionRoot {
     static func makeContentViewModel() -> ContentViewModel {
         let config = AppConfig()
         let checker = ServerConnectionChecker(httpClient: HTTPClient())
-        let preferences = PreferencesViewModel(config: config, connectionChecker: checker, modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()))
+        let uploadSettings = MacUploadSettingsStore(credentials: CredentialStore(service: "ScriptMakerMac", account: "upload-settings"))
+        let preferences = PreferencesViewModel(config: config, connectionChecker: checker, modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()), uploadSettings: uploadSettings)
         let repository = LocalStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
-        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LibraryUpdateClient(httpClient: HTTPClient()), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()))
+        let makeNews: @MainActor @Sendable (Bool) throws -> any NewsSearching = { forceFresh in
+            NewsSearchClient(configuration: try config.newsSettings.frameworkConfiguration(forceFresh: forceFresh))
+        }
+        let trendClients = TrendingClientProvider(settings: { config.trendingSettings }, makeClient: { settings in
+            TrendingHashtagClient(provider: try settings.frameworkProvider(), configuration: try settings.frameworkConfiguration())
+        })
+        let newsProvider = LocalStudioNewsProvider(news: makeNews, trends: { try trendClients.client() })
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: newsProvider)
         let files = FileStore()
-        let localAgent = LocalAgentViewModel(service: TerminalLocalAgentService(
+        let agentService = TerminalLocalAgentService(
             makeSession: { request, workspace in
                 let settings = request.session
                 let metadata = (settings.recordModel ? 1 : 0) | (settings.recordDuration ? 2 : 0) | (settings.recordTokens ? 4 : 0)
@@ -46,7 +55,7 @@ enum CompositionRoot {
                         metadata: .init(rawValue: metadata), temperature: settings.temperature)) else {
                         throw LocalAgentError.invalidInput("Apple Intelligence is unavailable. Enable it in System Settings and wait for its on-device model to be ready.")
                     }
-                    return StrictLocalAgentSession(underlying: session, requiresStrictSchema: false)
+                    return StrictLocalAgentSession(underlying: session, requiresStrictSchema: false, responseInstructions: request.responseInstructions)
                 }
                 guard let provider = TerminalAgentSession.standardProviders.first(where: { $0.name == request.provider.rawValue }) else {
                     throw LocalAgentError.unavailable(request.executable)
@@ -83,7 +92,7 @@ enum CompositionRoot {
                 guard let session = TerminalAgentSession(provider: provider, configuration: config) else {
                     throw LocalAgentError.unavailable(request.executable)
                 }
-                return StrictLocalAgentSession(underlying: session, purge: { session.purgeMemory() })
+                return StrictLocalAgentSession(underlying: session, responseInstructions: request.responseInstructions, purge: { session.purgeMemory() })
             },
             makeWorkspace: { try files.makeTemporaryDirectory() },
             removeWorkspace: { try files.removeDirectory(at: $0) },
@@ -104,7 +113,11 @@ enum CompositionRoot {
                     }
                     return (provider, LocalAgentAvailability(isAvailable: available, reason: reason))
                 })
-            }))
-        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, localAgentViewModel: localAgent)
+            })
+        let localAgent = LocalAgentViewModel(service: agentService)
+        let library = LibraryViewModel(config: config, repository: repository, clipboard: MacClipboardWriter(store: PasteboardStore()), updater: LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (try makeNews(true), config.newsPageSize) }), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }), uploadSettings: uploadSettings, scriptChat: ScriptChatViewModel(service: LocalScriptChatService(runner: agentService)))
+        let flowResolver = LocalPipelineFlowResolver()
+        let pipeline = PipelineTabViewModel(service: agentService, flowResolver: flowResolver, storyRepository: repository, newsProvider: newsProvider, defaultLocation: config.newsSettings.location)
+        return ContentViewModel(config: config, preferencesViewModel: preferences, generateViewModel: generator, libraryViewModel: library, localAgentViewModel: localAgent, pipelineViewModel: pipeline)
     }
 }

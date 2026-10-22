@@ -27,7 +27,7 @@ struct StoryListView: View {
                     showingAddStory = true
                 } label: { LibraryActionLabel(icon: "plus") }
                 .buttonStyle(.plain)
-                .help("Add story from a script").accessibilityLabel("Add story")
+                .help("Add story from a title").accessibilityLabel("Add story")
                 Button { Task { await viewModel.refresh() } } label: {
                     LibraryActionLabel(icon: "arrow.clockwise", isLoading: viewModel.isLoading)
                 }.buttonStyle(.plain).help("Refresh library").disabled(viewModel.isLoading)
@@ -88,7 +88,7 @@ struct StoryListView: View {
                 ForEach(viewModel.stories) { story in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(story.title).font(.body.weight(.medium)).lineLimit(2)
-                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? "Generated" : "Edited") \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? (story.stageOutputs?.isEmpty == false ? "Generated" : "Saved") : "Edited") \(DateFormatting.generationTime(story.createdAt))").font(.caption).foregroundStyle(AppTheme.secondaryInk)
                             Text(story.id).font(.caption2.monospaced()).foregroundStyle(AppTheme.secondaryInk).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding(12)
@@ -123,7 +123,7 @@ struct StoryListView: View {
                 Image(systemName: "doc.text").font(.largeTitle)
                 Text(viewModel.stories.isEmpty ? "No saved stories" : "Select a story").font(.headline)
                 if viewModel.stories.isEmpty {
-                    Text("Use the plus button to add a script, or generate a story in Studio.")
+                    Text("Use the plus button to add a news title, or generate a story in Studio.")
                         .font(.callout).multilineTextAlignment(.center)
                 }
             }.foregroundStyle(AppTheme.secondaryInk)
@@ -140,15 +140,15 @@ private struct AddLibraryStoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Add story").font(.title2.weight(.semibold))
-            Text("Paste your script to save it in Library.")
+            Text("Enter a news title. Related news, images and hashtags are fetched directly from the web; no AI or Script Maker server is needed.")
                 .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             VStack(alignment: .leading, spacing: 8) {
-                Text("Title").font(.headline)
-                TextField("Story title", text: $viewModel.newStoryTitle)
+                Text("Title / headline").font(.headline)
+                TextField("News title or headline", text: $viewModel.newStoryTitle)
                     .textFieldStyle(.roundedBorder).focused($titleFocused)
             }
             VStack(alignment: .leading, spacing: 8) {
-                Text("Script").font(.headline)
+                Text("Script (optional)").font(.headline)
                 TextEditor(text: $viewModel.newStoryScript)
                     .font(.body).scrollContentBackground(.hidden).padding(8)
                     .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
@@ -162,14 +162,17 @@ private struct AddLibraryStoryView: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                     .buttonStyle(StudioButtonStyle())
                     .disabled(viewModel.isAddingStory)
-                Button("Add story") {
+                LoadingButton(isLoading: viewModel.isAddingStory) {
                     Task { if await viewModel.addStory() { dismiss() } }
+                } label: {
+                    Text("Add story")
                 }
                 .buttonStyle(StudioPrimaryButtonStyle()).keyboardShortcut(.defaultAction)
                 .disabled(!viewModel.canAddStory)
             }
         }
-        .padding(24).frame(width: 560, height: 560)
+        .padding(24).frame(width: 600, height: 600)
+        .interactiveDismissDisabled(viewModel.isAddingStory)
         .foregroundStyle(AppTheme.ink).background(AppTheme.card)
         .onAppear { titleFocused = true }
     }

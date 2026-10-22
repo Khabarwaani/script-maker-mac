@@ -16,10 +16,16 @@ final class MainReleaseSampleAPITests: XCTestCase {
 @MainActor
 private final class TestClipboard: ClipboardWriting {
     var contents: String?
+    var imageData: Data?
     var succeeds = true
     func write(_ text: String) -> Bool {
         guard succeeds else { return false }
         contents = text
+        return true
+    }
+    func writeImage(_ data: Data) -> Bool {
+        guard succeeds else { return false }
+        imageData = data
         return true
     }
 }
@@ -36,15 +42,43 @@ private actor MainReleaseWorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class MainReleaseLocalWorkflowTests: XCTestCase {
-    func testAddStoryRequiresScriptAndSelectsSavedUUID() async throws {
+    func testCopyImageWritesCachedBytesAndReportsClipboardFailure() async {
+        let clipboard = TestClipboard()
+        let vm = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard)
+        let data = Data([4, 5, 6])
+        vm.imagePreviews["sample://image"] = data
+        await vm.copyImage("sample://image")
+        XCTAssertEqual(clipboard.imageData, data)
+        XCTAssertEqual(vm.copyFeedback, "Image copied")
+        clipboard.succeeds = false
+        await vm.copyImage("sample://image")
+        XCTAssertTrue(vm.copyFeedback?.contains("Could not copy image") == true)
+        XCTAssertFalse(vm.isCopyingImage)
+    }
+
+    func testCopyImageLoadsUncachedImageAndReportsLoadFailure() async {
+        let clipboard = TestClipboard()
+        let url = URL(fileURLWithPath: "/tmp/image.png")
+        let vm = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url))
+        await vm.copyImage(url.absoluteString)
+        XCTAssertEqual(clipboard.imageData, Data([1, 2, 3]))
+        let failing = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url, fails: true))
+        clipboard.imageData = nil
+        await failing.copyImage(url.absoluteString)
+        XCTAssertNil(clipboard.imageData)
+        XCTAssertTrue(failing.copyFeedback?.contains("Could not copy image") == true)
+        XCTAssertFalse(failing.isCopyingImage)
+    }
+
+    func testAddStoryAcceptsOptionalScriptAndSelectsSavedUUID() async throws {
         let repository = MainReleaseWorkflowStoryRepository()
         let library = LibraryViewModel(config: releaseTestConfig(), repository: repository)
         library.prepareNewStory()
         XCTAssertFalse(library.canAddStory)
-        library.newStoryTitle = "Manual story"
-        XCTAssertFalse(library.canAddStory)
         let rejected = await library.addStory()
         XCTAssertFalse(rejected)
+        library.newStoryTitle = "Manual story"
+        XCTAssertTrue(library.canAddStory)
         library.newStoryScript = "  Full pasted screenplay\nSpoken dialogue  "
         XCTAssertTrue(library.canAddStory)
         let saved = await library.addStory()
@@ -232,7 +266,7 @@ final class LibraryDetailTests: XCTestCase {
         let repo = MainReleaseWorkflowStoryRepository()
         let story = Story(title: "Update target", scriptText: "Keep script")
         await repo.save(story)
-        let vm = LibraryViewModel(config: config, repository: repo, updater: LibraryUpdateClient())
+        let vm = LibraryViewModel(config: config, repository: repo, updater: ReleaseLibraryUpdateStub())
         await vm.refresh()
         await vm.update(.hashtags)
         XCTAssertFalse(vm.selectedStory?.hashtags?.isEmpty ?? true)
@@ -253,7 +287,10 @@ private struct TestMediaImporter: LibraryMediaImporting {
         if fails { throw APIError.transport("Test import failure") }
         return destination
     }
-    func imageData(at url: URL) async throws -> Data { Data([1, 2, 3]) }
+    func imageData(at url: URL) async throws -> Data {
+        if fails { throw APIError.transport("Test image load failure") }
+        return Data([1, 2, 3])
+    }
 }
 
 final class LibraryNetworkContractTests: XCTestCase {
@@ -365,14 +402,13 @@ final class SharedAISelectionTests: XCTestCase {
         let original = config.selectedAI, recents = config.recentAIIdentifiers
         defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
         config.recentAIIdentifiers = []
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog())
-        let library = LibraryViewModel(config: config)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
         for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
         config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
         XCTAssertEqual(config.recentAIIdentifiers.count, 5)
         XCTAssertEqual(Set(config.recentAIIdentifiers).count, 5)
         XCTAssertEqual(config.recentAIIdentifiers.first, "Provider/model-3/high")
-        XCTAssertEqual(generator.selectedAIIdentifier, library.selectedAIEngine)
+        XCTAssertEqual(generator.selectedAIIdentifier, config.selectedAI.identifier)
         generator.resetConfiguration()
         XCTAssertEqual(generator.selectedAIIdentifier, "Provider/model-3/high")
         XCTAssertEqual(AppConfig(defaults: defaults).selectedAI.identifier, config.selectedAI.identifier)
@@ -455,5 +491,13 @@ private final class SharingSpy: StorySharing {
         self.title = title; self.text = text; self.source = sourceURL
         if fails { throw APIError.transport("Share failed") }
         return outcome
+    }
+}
+
+private struct ReleaseLibraryUpdateStub: LibraryUpdating {
+    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
+                localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
+        LibraryUpdateResult(hashtags: ["#News"], images: ["https://example.com/image.jpg"],
+                            news: [.init(title: "News", url: "https://example.com/news", source: "Publisher")])
     }
 }

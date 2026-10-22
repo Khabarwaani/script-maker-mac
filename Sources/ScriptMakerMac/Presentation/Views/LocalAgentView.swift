@@ -31,7 +31,11 @@ private struct LocalAgentInputForm: View {
                     .accessibilityValue(viewModel.provider == provider ? "Selected" : "")
                 }
                 Text(viewModel.availabilityReason(viewModel.provider)).font(.caption).foregroundStyle(.secondary)
-                Button("Refresh agents and providers") { Task { await viewModel.refreshProviders() } }.disabled(viewModel.isRefreshing)
+                LoadingButton(isLoading: viewModel.isRefreshing) {
+                    Task { await viewModel.refreshProviders() }
+                } label: {
+                    Text("Refresh agents and providers")
+                }
                 if viewModel.provider != .appleLocal {
                     TextField("Model (provider default)", text: $viewModel.model).accessibilityLabel("Model override")
                 }
@@ -51,9 +55,13 @@ private struct LocalAgentInputForm: View {
             }
             .disabled(viewModel.isRunning).textFieldStyle(.roundedBorder)
             HStack {
-                Button("Run") { viewModel.run() }.buttonStyle(.borderedProminent).disabled(!viewModel.canRun)
+                LoadingButton(isLoading: viewModel.isRunning) {
+                    viewModel.run()
+                } label: {
+                    Text("Run")
+                }
+                .buttonStyle(.borderedProminent).disabled(!viewModel.canRun)
                 if viewModel.isRunning {
-                    ProgressView().controlSize(.small)
                     Button("Cancel") { viewModel.cancel() }.disabled(viewModel.isCancelling)
                 }
             }

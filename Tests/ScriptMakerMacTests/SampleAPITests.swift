@@ -171,7 +171,7 @@ final class SampleAPITests: XCTestCase {
         appConfig.dataSource = .offline
         appConfig.localJSONDelay = 0
         let testSource = "🇮🇳 India Top Stories & Breaking"
-        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
         viewModel.selectedStorySource = testSource
         viewModel.topic = ""
         await viewModel.refreshHeadlines()
@@ -185,7 +185,7 @@ final class SampleAPITests: XCTestCase {
         let suite = UserDefaults(suiteName: "test.api.categories.\(UUID().uuidString)")!
         let appConfig = AppConfig(defaults: suite)
         appConfig.dataSource = .offline
-        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
         await viewModel.loadNewsCategories()
         XCTAssertFalse(viewModel.storySources.isEmpty)
         XCTAssertTrue(viewModel.storySources.contains("🇮🇳 India Top Stories & Breaking"))
@@ -195,7 +195,7 @@ final class SampleAPITests: XCTestCase {
     func testGenerateViewModelRefreshHashtagsEmptyByDefault() async throws {
         let suite = UserDefaults(suiteName: "test.api.hashtags.\(UUID().uuidString)")!
         let appConfig = AppConfig(defaults: suite)
-        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository())
+        let viewModel = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
         XCTAssertTrue(viewModel.trendingHashtags.isEmpty)
     }
 }
@@ -239,7 +239,7 @@ private actor WorkflowStoryRepository: StoryRepository {
 final class LocalWorkflowTests: XCTestCase {
     func testSourceLabelsEnableManualAndHashtagInputs() throws {
         let config = AppConfig()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository(), newsProvider: StubStudioNewsProvider())
         generator.selectedStorySource = try XCTUnwrap(generator.storySources.first)
         XCTAssertTrue(generator.isManualSource)
         generator.selectedStorySource = try XCTUnwrap(generator.storySources.first { $0.contains("Hashtags") })
@@ -259,7 +259,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.dataSource = .offline
         config.localJSONDelay = 0
         let repository = WorkflowStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: StubStudioNewsProvider())
         let library = LibraryViewModel(config: config, repository: repository)
         await library.refresh()
         XCTAssertTrue(library.stories.isEmpty)
@@ -307,7 +307,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.dataSource = .offline
         config.localJSONDelay = 0
         let repository = WorkflowStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: StubStudioNewsProvider())
         generator.topic = "Input topic is not the story title"
         generator.scriptCount = 3
         generator.workflowMode = .continuous
@@ -356,7 +356,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.dataSource = .offline
         config.localJSONDelay = 0
         let repository = WorkflowStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: StubStudioNewsProvider())
         generator.scriptCount = 1
         generator.topic = "Step-wise lifecycle test"
         await generator.start()
@@ -375,7 +375,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.localJSONDelay = 0
 
         let repository = WorkflowStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: StubStudioNewsProvider())
         generator.topic = "Dynamic stream test"
         await generator.start()
 
@@ -420,7 +420,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.localJSONDelay = 0
 
         let repository = WorkflowStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: StubStudioNewsProvider())
         generator.topic = "Library autosave test"
         var navigated = false
         generator.onNavigateToLibrary = { navigated = true }
@@ -445,7 +445,7 @@ final class LocalWorkflowTests: XCTestCase {
         config.localJSONDelay = 0
 
         let repository = WorkflowStoryRepository()
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository)
+        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: StubStudioNewsProvider())
         generator.topic = "Extra detail verification"
 
         await generator.start()
@@ -470,7 +470,7 @@ final class LocalWorkflowTests: XCTestCase {
     func testStudioConfigAutoSavesOnChange() async throws {
         let suite = UserDefaults(suiteName: "test.config.autosave.\(UUID().uuidString)")!
         let appConfig = AppConfig(defaults: suite)
-        let generator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+        let generator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository(), newsProvider: StubStudioNewsProvider())
 
         // Default dialogue/scripts should be 1
         XCTAssertEqual(generator.scriptCount, 1)
@@ -491,7 +491,7 @@ final class LocalWorkflowTests: XCTestCase {
         XCTAssertEqual(saved.characterCount, 2)
 
         // Verify a new ViewModel restored the exact persisted values
-        let restoredGenerator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository())
+        let restoredGenerator = GenerateViewModel(config: appConfig, catalogProvider: BundledStudioCatalog(), repository: WorkflowStoryRepository(), newsProvider: StubStudioNewsProvider())
         XCTAssertEqual(restoredGenerator.duration, 45)
         XCTAssertEqual(restoredGenerator.scriptCount, 2)
         XCTAssertEqual(restoredGenerator.selectedEmotion, "Shock")

@@ -8,6 +8,7 @@ struct StoryDetailView: View {
     let onDelete: () -> Void
     let onMerge: (String) -> Void
     @State private var showingEdit = false
+    @State private var showingScriptChat = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,38 +34,60 @@ struct StoryDetailView: View {
                             viewModel.prepareEdits(story); showingEdit = true
                         } label: { Image(systemName: "pencil") }
                         .buttonStyle(.plain).help("Edit and save as a new story")
-                        .accessibilityLabel("Edit story")
+                        .accessibilityLabel("Edit story").disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
                     }
                     if !story.summary.isEmpty {
                         StoryDetailSection("Summary") { Text(story.summary).font(.body) }
                     }
+                    if let receipt = story.uploadReceipt {
+                        StoryDetailSection("Google upload") {
+                            Text("Row \(receipt.id) · \(receipt.uploadedAt)")
+                            if let url = URL(string: receipt.previewURL), url.scheme == "https" {
+                                Link("Open uploaded video", destination: url)
+                            }
+                        }
+                    }
                     StorySourcesSection(story: story, viewModel: viewModel)
                     StoryImagesSection(story: story, viewModel: viewModel)
-                    StoryDetailSection("Screenplay") {
-                        if let script = story.scriptText, !script.isEmpty {
+                    if !StringFormatting.isBlank(story.scriptText ?? "") {
+                        HStack {
+                            Text("Script refinement").font(.headline)
+                            Spacer()
+                            Button("Refine with Script Chat", systemImage: "bubble.left.and.text.bubble.right") {
+                                viewModel.scriptChat?.begin(story)
+                                showingScriptChat = true
+                            }
+                            .disabled(viewModel.scriptChat == nil || viewModel.isSavingEdits || !viewModel.busyUpdates.isEmpty)
+                        }
+                        StoryDetailSection("Screenplay") {
+                            if let script = story.scriptText {
                             Text(script).font(.body).lineSpacing(5)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Label("No screenplay was included in this story.", systemImage: "doc.text")
-                                .foregroundStyle(AppTheme.secondaryInk)
+                            }
                         }
                     }
                     StoryVersionsSection(story: story, viewModel: viewModel)
-                    if !story.headline.isEmpty || !(story.stageOutputs ?? [:]).isEmpty {
+                    if !(story.stageOutputs ?? [:]).isEmpty {
                         StoryGenerationDetails(story: story)
                     }
                     if let videoURL = story.videoURL, !videoURL.isEmpty {
                         StoryDetailSection("Video") {
                             if let url = URL(string: videoURL) {
                                 StoryVideoPreview(url: url)
+                                    .frame(height: 260)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .overlay(alignment: .topTrailing) {
                                         Button { Task { await viewModel.remove(.video(videoURL), from: story.id) } } label: {
                                             Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)
                                         }.buttonStyle(.plain).help("Remove video").accessibilityLabel("Remove video").padding(8)
                                     }
                             }
-                            Button("Merge closing clip") { onMerge(story.id) }
-                                .buttonStyle(StudioButtonStyle())
+                            LoadingButton(isLoading: viewModel.isMerging) {
+                                onMerge(story.id)
+                            } label: {
+                                Text("Merge closing clip")
+                            }
+                            .buttonStyle(StudioButtonStyle())
                         }
                     }
                 }
@@ -78,6 +101,11 @@ struct StoryDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear { viewModel.copyFeedback = nil }
         .onChange(of: story.id) { _, _ in viewModel.copyFeedback = nil }
+        .sheet(isPresented: $showingScriptChat) {
+            if let chat = viewModel.scriptChat {
+                ScriptChatView(viewModel: chat, onSave: { await viewModel.saveRefinedScript() })
+            }
+        }
         .sheet(isPresented: $showingEdit) { EditLibraryStoryView(storyID: story.id, viewModel: viewModel) }
         .task(id: story.imageURLs) { await viewModel.loadImagePreviews(for: story) }
     }
@@ -97,20 +125,25 @@ private struct StoryDetailToolbar: View {
                 LibraryActionLabel(icon: "photo.badge.arrow.down", isLoading: viewModel.busyUpdates.contains(.images))
             }.buttonStyle(.plain).help("Update images").accessibilityLabel("Update images")
                 .disabled(viewModel.busyUpdates.contains(.images))
+            Button { Task { await viewModel.enrich(storyID: story.id) } } label: {
+                LibraryActionLabel(icon: "arrow.triangle.2.circlepath", isLoading: !viewModel.busyUpdates.isEmpty)
+            }.buttonStyle(.plain).help("Refresh news, images and hashtags from this title").accessibilityLabel("Refresh related content")
+                .disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
             Divider().frame(height: 24)
             Menu {
-                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Google Drive…", systemImage: "externaldrive") }
-                Button { Task { await viewModel.share(story, to: .telegram) } } label: { Label("Telegram…", systemImage: "paperplane") }
+                Button { Task { await viewModel.share(story, to: .googleDrive) } } label: { Label("Export story text…", systemImage: "doc.text") }
+                Button { Task { await viewModel.upload(story, to: .telegram) } } label: { Label("Upload to Telegram", systemImage: "paperplane") }
+                Button { Task { await viewModel.upload(story, to: .googleSheets) } } label: { Label("Upload to Google Drive / Sheets", systemImage: "tablecells") }
                 Divider()
                 Button("Copy News Links + Hashtags") { viewModel.copy(viewModel.shareText(for: story), label: "News links and hashtags") }
                 Divider()
                 ShareLink(item: viewModel.shareText(for: story)) { Label("News Links + Hashtags", systemImage: "square.and.arrow.up") }
                 ShareLink(item: story.scriptText ?? "") { Label("Script", systemImage: "doc.text") }
                     .disabled(StringFormatting.isBlank(story.scriptText ?? ""))
-            } label: { LibraryActionLabel(icon: "square.and.arrow.up") }
+            } label: { LibraryActionLabel(icon: "square.and.arrow.up", isLoading: viewModel.isUploading || viewModel.isSharing) }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
                 .help("Share story").accessibilityLabel("Share story")
-                .disabled(viewModel.isSharing)
+                .disabled(viewModel.isSharing || viewModel.isUploading)
             Menu {
                 ForEach(StoryCopyFormat.allCases) { format in
                     if format == .all { Divider() }
@@ -126,11 +159,27 @@ private struct StoryDetailToolbar: View {
             .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
             .help("Copy story content").accessibilityLabel("Copy story content")
             Menu {
-                Button("Add image…") { importKind = .image; showingImport = true }
-                Button("Add video…") { importKind = .video; showingImport = true }
-            } label: { LibraryActionLabel(icon: "square.and.arrow.down") }
+                Button("Add image…", systemImage: "photo.badge.plus") { importKind = .image; showingImport = true }
+                Button("Add video…", systemImage: "video.badge.plus") { importKind = .video; showingImport = true }
+                Divider()
+                if let images = story.imageURLs, images.count > 1 {
+                    Menu("Copy image", systemImage: "doc.on.doc") {
+                        ForEach(Array(images.enumerated()), id: \.offset) { index, source in
+                            Button("Image \(index + 1)", systemImage: "photo") {
+                                Task { await viewModel.copyImage(source) }
+                            }
+                        }
+                    }.disabled(viewModel.isCopyingImage)
+                } else {
+                    Button("Copy image", systemImage: "doc.on.doc") {
+                        if let source = story.imageURLs?.first {
+                            Task { await viewModel.copyImage(source) }
+                        }
+                    }.disabled(story.imageURLs?.isEmpty != false || viewModel.isCopyingImage)
+                }
+            } label: { LibraryActionLabel(icon: "rectangle.stack.badge.plus") }
                 .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain).modifier(LibraryActionFrame())
-                .help("Add image or video").accessibilityLabel("Add media").disabled(viewModel.isImportingMedia)
+                .help("Add media or copy an image").accessibilityLabel("Media actions").disabled(viewModel.isImportingMedia)
             Divider().frame(height: 24)
             Spacer(minLength: 0)
             Button { showingReset = true } label: { LibraryActionLabel(icon: "arrow.counterclockwise") }
@@ -166,7 +215,7 @@ private struct StoryDetailHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(story.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? "Generated" : "Edited") \(DateFormatting.generationTime(story.createdAt))")
+            Text("\(story.generationNumber.map { "(\($0)) · " } ?? "")\(story.sourceStoryID == nil ? (story.stageOutputs?.isEmpty == false ? "Generated" : "Saved") : "Edited") \(DateFormatting.generationTime(story.createdAt))")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Text("UUID · \(story.id)").font(.caption.monospaced())
                 .foregroundStyle(AppTheme.secondaryInk).fixedSize(horizontal: false, vertical: true)
@@ -293,6 +342,11 @@ private struct StoryImagesSection: View {
                                 Link("Open image", destination: url)
                             }
                         }.padding(12).background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                            .contextMenu {
+                                Button("Copy image", systemImage: "doc.on.doc") {
+                                    Task { await viewModel.copyImage(value) }
+                                }.disabled(viewModel.isCopyingImage)
+                            }
                             .overlay(alignment: .topTrailing) {
                                 Button { Task { await viewModel.remove(.image(value), from: story.id) } } label: {
                                     Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24)
@@ -309,13 +363,33 @@ private struct StoryImagesSection: View {
     }
 }
 
-private struct StoryVideoPreview: View {
+private struct StoryVideoPreview: NSViewRepresentable {
     let url: URL
-    @State private var player: AVPlayer
-    init(url: URL) { self.url = url; _player = State(initialValue: AVPlayer(url: url)) }
-    var body: some View {
-        VideoPlayer(player: player).frame(height: 260).clipShape(RoundedRectangle(cornerRadius: 8))
-            .onDisappear { player.pause() }
+
+    final class Coordinator {
+        var sourceURL: URL?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .default
+        view.videoGravity = .resizeAspect
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        guard context.coordinator.sourceURL != url else { return }
+        view.player?.pause()
+        view.player = AVPlayer(url: url)
+        context.coordinator.sourceURL = url
+    }
+
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: Coordinator) {
+        view.player?.pause()
+        view.player = nil
+        coordinator.sourceURL = nil
     }
 }
 
@@ -354,12 +428,12 @@ private struct EditLibraryStoryView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Edit story").font(.title2.weight(.semibold))
             Text("Title").font(.headline)
-            Text(viewModel.editedTitle).font(.body.weight(.medium)).textSelection(.enabled)
-            Text("The edited copy keeps this title and gets a new UUID and timestamp.")
+            TextField("Title / headline", text: $viewModel.editedTitle).textFieldStyle(.roundedBorder)
+            Text("Changing the title refreshes related news, images and hashtags for the edited copy.")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Text("Summary").font(.headline)
             TextField("Summary", text: $viewModel.editedSummary, axis: .vertical).lineLimit(2...3).textFieldStyle(.roundedBorder)
-            Text("Script").font(.headline)
+            Text("Script (optional)").font(.headline)
             TextEditor(text: $viewModel.editedScript).font(.body).scrollContentBackground(.hidden).padding(8)
                 .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                 .background(ScrollBarConfiguration()).accessibilityLabel("Edit script")

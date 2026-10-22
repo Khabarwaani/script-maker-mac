@@ -20,6 +20,7 @@ protocol StoryRepository: Sendable {
 @MainActor
 protocol ClipboardWriting {
     func write(_ text: String) -> Bool
+    func writeImage(_ data: Data) -> Bool
 }
 
 enum StoryShareDestination { case googleDrive, telegram }
@@ -40,4 +41,14 @@ enum LibraryMediaKind { case image, video }
 protocol LibraryMediaImporting: Sendable {
     func importFile(_ url: URL) async throws -> URL
     func imageData(at url: URL) async throws -> Data
+}
+
+protocol StoryUploading: Sendable {
+    func upload(_ story: Story, to destination: LibraryUploadDestination, options: LibraryUploadOptions) async throws -> LibraryUploadResult
+}
+
+@MainActor
+protocol UploadSettingsStoring {
+    func load() throws -> LibraryUploadOptions
+    func save(_ options: LibraryUploadOptions) throws
 }

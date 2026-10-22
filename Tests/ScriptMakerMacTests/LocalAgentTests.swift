@@ -227,7 +227,7 @@ final class LocalAgentViewModelTests: XCTestCase {
         vm.run(); await idle(vm)
         XCTAssertEqual(vm.rawOutput, "bad")
         XCTAssertNotNil(vm.errorMessage)
-        XCTAssertEqual(ContentViewModel.Tab.allCases.map(\.title), ["Studio", "Library", "LocalAgent"])
+        XCTAssertEqual(ContentViewModel.Tab.allCases.map(\.title), ["Studio", "Library", "LocalAgent", "Pipeline"])
     }
     private func idle(_ vm: LocalAgentViewModel) async {
         for _ in 0..<200 { if !vm.isRunning { return }; try? await Task.sleep(for: .milliseconds(5)) }
@@ -336,4 +336,5 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
         await recorder.record(input); return response
     }
     func purgeMemory() {}
+    func clearMemory() {}
 }

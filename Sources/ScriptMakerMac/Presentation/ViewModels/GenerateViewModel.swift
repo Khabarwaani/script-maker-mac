@@ -10,9 +10,13 @@ import Observation
 final class GenerateViewModel {
     private let config: AppConfig
     private let repository: any StoryRepository
+    private let newsProvider: any StudioNewsProviding
     private let catalogProvider: any StudioCatalogProviding
     private var catalog: StudioCatalog?
+    private var localNewsCategories: NewsCategoriesResponse?
     private var eventTask: Task<Void, Never>?
+    private var headlineRequestID: UUID?
+    private var hashtagRequestID: UUID?
 
     /// Config for child views that need it (e.g. thumbnails).
     var appConfig: AppConfig { config }
@@ -47,6 +51,14 @@ final class GenerateViewModel {
     var isSavedToLibrary: Bool = false
     /// Callback triggered to navigate to the Library tab.
     var onNavigateToLibrary: (() -> Void)?
+    /// Callback triggered to navigate to the Pipeline tab with topic and location.
+    var onNavigateToPipeline: ((String, String) -> Void)?
+
+    func startInPipeline() {
+        let cleanTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTopic.isEmpty else { return }
+        onNavigateToPipeline?(cleanTopic, location)
+    }
 
     /// Total elapsed milliseconds across all completed phases or from the stream end event.
     var totalElapsedMs: Int? {
@@ -64,10 +76,13 @@ final class GenerateViewModel {
     /// Formatted total elapsed time across the entire pipeline.
     var formattedTotalElapsed: String? {
         guard let ms = totalElapsedMs, ms > 0 else { return nil }
-        if ms < 1000 {
-            return "\(ms)ms"
+        let sec = Double(ms) / 1000.0
+        if sec >= 10.0 {
+            return "\(Int(round(sec)))s"
+        } else if sec >= 1.0 {
+            return String(format: "%.1fs", sec)
         } else {
-            return String(format: "%.1fs", Double(ms) / 1000.0)
+            return String(format: "%.2fs", sec)
         }
     }
 
@@ -135,10 +150,12 @@ final class GenerateViewModel {
     var headlines: [String] = []
     var selectedHeadline: String = ""
     var headlinesErrorMessage: String?
+    var location: String { config.newsSettings.location }
 
     // Story & Topic — verified against Streamlit (ai-script-maker) 2026-10-11.
     // Order: STORY_SECTION_ORDER; labels: SECTION_LABELS.
     static let manualSourceLabel = "✏️ Manual Topic"
+    static let hashtagSourceLabel = "#️⃣ Trending Hashtags"
     var storySources: [String] = []
     var selectedStorySource: String = "🇮🇳 India Top Stories & Breaking"
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
@@ -146,6 +163,9 @@ final class GenerateViewModel {
     var hashtagItems: [NewsHashtag] = []
     var selectedHashtag: String = ""
     var hashtagsErrorMessage: String?
+    var selectedHashtagDetails: NewsHashtag?
+    var hashtagDetailError: String?
+    var isLoadingHashtagDetail = false
     var customHashtag: String = "" {
         didSet { if !isApplyingConfig { saveStudioConfig() } }
     }
@@ -207,10 +227,11 @@ final class GenerateViewModel {
     var instructionText: String = ""
     var isRefreshingHeadlines = false
 
-    init(config: AppConfig, catalogProvider: any StudioCatalogProviding, repository: any StoryRepository = LocalStoryRepository()) {
+    init(config: AppConfig, catalogProvider: any StudioCatalogProviding, repository: any StoryRepository, newsProvider: any StudioNewsProviding) {
         self.config = config
         self.repository = repository
         self.catalogProvider = catalogProvider
+        self.newsProvider = newsProvider
         self.isApplyingConfig = true
         defer { self.isApplyingConfig = false }
         loadCatalog()
@@ -229,7 +250,7 @@ final class GenerateViewModel {
 
     var isLocalJSON: Bool { config.dataSource != .server }
     var isCatalogReady: Bool { catalog != nil }
-    var isHashtagSource: Bool { selectedStorySource == "#️⃣ Trending Hashtags (Google)" }
+    var isHashtagSource: Bool { selectedStorySource == Self.hashtagSourceLabel }
     var retryRange: ClosedRange<Int> { 1...5 }
     var setupNotice: String?
 
@@ -295,7 +316,7 @@ final class GenerateViewModel {
         do {
             let loaded = try catalogProvider.load()
             catalog = loaded
-            storySources = loaded.storySources
+            if isLocalJSON || localNewsCategories == nil { storySources = loaded.storySources }
             aiSources = loaded.aiSources
             emotions = loaded.emotions
             characterKinds = loaded.characterKinds
@@ -347,6 +368,7 @@ final class GenerateViewModel {
         selectedHashtag = c.hashtag
         selectedHeadline = c.headline
         let source = c.storySource
+            .replacingOccurrences(of: "#️⃣ Trending Hashtags (Google)", with: Self.hashtagSourceLabel)
             .replacingOccurrences(of: "\\u270F", with: "✏")
             .replacingOccurrences(of: "\\uFE0F", with: "\u{FE0F}")
             .replacingOccurrences(of: "\\u20E3", with: "\u{20E3}")
@@ -365,25 +387,43 @@ final class GenerateViewModel {
         }
     }
 
-    /// Refresh headlines (re-load from sample data / server).
+    /// Refresh headlines from local news feeds or bundled samples.
     /// If forceFresh is false, uses 24-hour cache when available.
     func refreshHeadlines(forceFresh: Bool = false) async {
+        if isHashtagSource {
+            if isLocalJSON { onHashtagChanged(selectedHashtag) }
+            else { await loadHashtagDetail() }
+            return
+        }
         isRefreshingHeadlines = true
         headlinesErrorMessage = nil
-        defer { isRefreshingHeadlines = false }
+        let requestID = UUID()
+        headlineRequestID = requestID
+        let source = selectedStorySource
+        let settings = config.newsDiscoveryCacheIdentifier
+        let localJSON = isLocalJSON
+        defer { if headlineRequestID == requestID { isRefreshingHeadlines = false } }
 
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
-        let cacheKey = categoryParam ?? "default"
+        let cacheKey = newsCacheKey(categoryParam)
 
-        if !forceFresh, let cached = config.getCachedHeadlines(forSource: cacheKey), !cached.isEmpty {
+        let cacheDuration = isLocalJSON ? 86400 : config.newsSettings.cacheDuration
+        if !forceFresh, cacheDuration > 0,
+           let cached = config.getCachedHeadlines(forSource: cacheKey, maxAge: cacheDuration), !cached.isEmpty {
             applyHeadlines(cached, forSource: cacheKey)
             return
         }
 
         do {
-            let service = try api()
             let pageSize = config.newsPageSize
-            let response = try await service.fetchTopTitles(category: categoryParam, n: pageSize, mode: nil)
+            let response: TopTitlesResponse
+            if isLocalJSON {
+                response = try await api().fetchTopTitles(category: categoryParam, n: pageSize)
+            } else {
+                response = try await newsProvider.headlines(category: categoryParam, location: location, limit: pageSize, forceFresh: forceFresh)
+            }
+            guard headlineRequestID == requestID, selectedStorySource == source,
+                  config.newsDiscoveryCacheIdentifier == settings, isLocalJSON == localJSON else { return }
             let loadedHeadlines = response.titles.map(\.title)
             if !loadedHeadlines.isEmpty {
                 config.cacheHeadlines(loadedHeadlines, forSource: cacheKey)
@@ -393,6 +433,8 @@ final class GenerateViewModel {
                 selectedHeadline = ""
             }
         } catch {
+            guard headlineRequestID == requestID, selectedStorySource == source,
+                  config.newsDiscoveryCacheIdentifier == settings, isLocalJSON == localJSON else { return }
             headlines = []
             selectedHeadline = ""
             if isLocalJSON {
@@ -401,6 +443,12 @@ final class GenerateViewModel {
                 headlinesErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    private func newsCacheKey(_ category: String?) -> String {
+        let source = category ?? "default"
+        if isLocalJSON { return "sample:" + source }
+        return "local-news:\(config.newsDiscoveryCacheIdentifier)|\(location.lowercased())|\(source)"
     }
 
     private func applyHeadlines(_ loadedHeadlines: [String], forSource cacheKey: String) {
@@ -419,20 +467,51 @@ final class GenerateViewModel {
     func onHeadlineChanged(_ headline: String) {
         topic = headline
         let categoryParam = (isManualSource || isHashtagSource) ? nil : selectedStorySource
-        let cacheKey = categoryParam ?? "default"
+        let cacheKey = newsCacheKey(categoryParam)
         config.saveLastSelectedHeadline(headline, forSource: cacheKey)
     }
 
     /// User selected a trending hashtag.
     func onHashtagChanged(_ tag: String) {
         selectedHashtag = tag
+        hashtagDetailError = nil
+        selectedHashtagDetails = hashtagItems.first { $0.tag == tag }
         if let match = hashtagItems.first(where: { $0.tag == tag }), let headline = match.headline, !headline.isEmpty {
+            headlines = [headline]
             selectedHeadline = headline
             topic = headline
         } else if !tag.isEmpty {
             let derived = tag.replacingOccurrences(of: "#", with: "")
+            headlines = [derived]
             selectedHeadline = derived
             topic = derived
+        } else {
+            headlines = []
+            selectedHeadline = ""
+            topic = ""
+        }
+    }
+
+    func loadHashtagDetail() async {
+        guard !selectedHashtag.isEmpty, !isLoadingHashtagDetail, !isLocalJSON else { return }
+        let tag = selectedHashtag
+        let settings = config.trendingSettings
+        isLoadingHashtagDetail = true
+        hashtagDetailError = nil
+        defer { isLoadingHashtagDetail = false }
+        do {
+            let detail = try await newsProvider.hashtagDetail(for: tag)
+            guard isHashtagSource, selectedHashtag == tag, config.trendingSettings == settings else { return }
+            selectedHashtagDetails = detail
+            if let title = detail.headline, !title.isEmpty {
+                headlines = [title]
+                selectedHeadline = title
+                topic = title
+            }
+        } catch {
+            if isHashtagSource, selectedHashtag == tag, config.trendingSettings == settings {
+                hashtagDetailError = error.localizedDescription
+            }
         }
     }
 
@@ -443,88 +522,85 @@ final class GenerateViewModel {
         topic = ""
         headlinesErrorMessage = nil
         hashtagsErrorMessage = nil
+        selectedHashtagDetails = nil
+        hashtagDetailError = nil
         saveStudioConfig()
         if isHashtagSource {
-            await refreshHashtags()
+            await refreshHashtags(forceFresh: false)
         } else if !isManualSource {
             await refreshHeadlines(forceFresh: false)
         }
     }
 
-    /// Refresh trending hashtags directly from /api/v1/news/hashtags (with title extraction fallback).
-    func refreshHashtags() async {
+    /// Refresh the selected trending platform.
+    func refreshHashtags(forceFresh: Bool = true) async {
         isRefreshingHashtags = true
         hashtagsErrorMessage = nil
-        defer { isRefreshingHashtags = false }
+        let requestID = UUID()
+        hashtagRequestID = requestID
+        let source = selectedStorySource
+        let settings = config.trendingSettings
+        let localJSON = isLocalJSON
+        defer { if hashtagRequestID == requestID { isRefreshingHashtags = false } }
         do {
-            let service = try api()
-            // 1. Direct dedicated hashtags endpoint
-            if let hashtagResponse = try? await service.fetchTrendingHashtags(n: 15), !hashtagResponse.hashtags.isEmpty {
-                hashtagItems = hashtagResponse.hashtags
-                trendingHashtags = hashtagResponse.hashtags.map(\.tag)
-                if let first = hashtagResponse.hashtags.first {
-                    onHashtagChanged(first.tag)
-                }
-                return
+            let response: NewsHashtagsResponse
+            if isLocalJSON {
+                response = try await api().fetchTrendingHashtags(n: config.trendingSettings.resultLimit)
+            } else {
+                response = try await newsProvider.hashtags(limit: config.trendingSettings.resultLimit, forceFresh: forceFresh)
             }
-
-            // 2. Fallback: extract hashtags from top titles
-            let response = try await service.fetchTopTitles(category: "trending", n: 10, mode: nil)
-            var extracted: [NewsHashtag] = []
-            for item in response.titles {
-                let words = item.title.components(separatedBy: .whitespacesAndNewlines)
-                for w in words where w.hasPrefix("#") && w.count > 1 {
-                    if !extracted.contains(where: { $0.tag == w }) {
-                        extracted.append(NewsHashtag(tag: w, headline: item.title, link: item.link, source: "Trending"))
-                    }
-                }
-            }
-            hashtagItems = extracted
-            trendingHashtags = extracted.map(\.tag)
-            if let first = extracted.first {
-                onHashtagChanged(first.tag)
-            }
+            guard hashtagRequestID == requestID, selectedStorySource == source,
+                  config.trendingSettings == settings, isLocalJSON == localJSON else { return }
+            hashtagItems = response.hashtags
+            trendingHashtags = response.hashtags.map(\.tag)
+            onHashtagChanged(response.hashtags.first?.tag ?? "")
         } catch {
+            guard hashtagRequestID == requestID, selectedStorySource == source,
+                  config.trendingSettings == settings, isLocalJSON == localJSON else { return }
             hashtagItems = []
             trendingHashtags = []
-            if !isLocalJSON {
-                hashtagsErrorMessage = error.localizedDescription
+            selectedHashtag = ""
+            selectedHashtagDetails = nil
+            hashtagDetailError = nil
+            if isHashtagSource {
+                headlines = []
+                selectedHeadline = ""
+                topic = ""
             }
+            hashtagsErrorMessage = error.localizedDescription
         }
     }
 
-    var isRefreshingCategories = false
-
-    /// Fetch news categories from server when available.
+    /// Load categories from the local package, or the bundled sample catalog.
     func loadNewsCategories() async {
-        isRefreshingCategories = true
-        defer { isRefreshingCategories = false }
         guard !isLocalJSON else {
             loadCatalog()
             return
         }
         do {
-            let service = try api()
-            let response = try await service.fetchNewsCategories()
-            let serverLabels = response.categories.map(\.label)
-            if !serverLabels.isEmpty {
+            let response: NewsCategoriesResponse
+            if let cached = localNewsCategories {
+                response = cached
+            } else {
+                response = try await newsProvider.categories(location: location)
+                if !response.categories.isEmpty { localNewsCategories = response }
+            }
+            let categoryLabels = response.categories.map(\.label)
+            if !categoryLabels.isEmpty {
                 var combined = [Self.manualSourceLabel]
-                for label in serverLabels where !combined.contains(label) {
+                for label in categoryLabels where !combined.contains(label) {
                     combined.append(label)
                 }
-                if !combined.contains("#️⃣ Trending Hashtags (Google)") {
-                    combined.insert("#️⃣ Trending Hashtags (Google)", at: min(3, combined.count))
+                if !combined.contains(Self.hashtagSourceLabel) {
+                    combined.insert(Self.hashtagSourceLabel, at: min(3, combined.count))
                 }
                 storySources = combined
                 if selectedStorySource.isEmpty || !storySources.contains(selectedStorySource) {
                     if let defaultCat = response.categories.first(where: { $0.id == response.defaultCategory }) {
                         selectedStorySource = defaultCat.label
-                    } else if let first = serverLabels.first {
+                    } else if let first = categoryLabels.first {
                         selectedStorySource = first
                     }
-                }
-                if !isManualSource && !isHashtagSource {
-                    await refreshHeadlines(forceFresh: false)
                 }
             }
         } catch {
@@ -538,7 +614,7 @@ final class GenerateViewModel {
         if config.dataSource == .server {
             await loadNewsCategories()
             if isHashtagSource {
-                await refreshHashtags()
+                await refreshHashtags(forceFresh: false)
             } else if !isManualSource {
                 await refreshHeadlines(forceFresh: false)
             }
@@ -551,8 +627,10 @@ final class GenerateViewModel {
     /// Verify news endpoints are available.
     func verifyNewsEndpoints() async -> Bool {
         do {
-            let service = try api()
-            return try await service.verifyNewsEndpoints()
+            if isLocalJSON { return try await api().verifyNewsEndpoints() }
+            _ = try await newsProvider.categories()
+            _ = try await newsProvider.headlines(category: nil, limit: 1)
+            return true
         } catch {
             return false
         }
@@ -800,7 +878,7 @@ final class GenerateViewModel {
                     }
 
                 case .end(let endPayload):
-                    if let endMs = endPayload?.elapsedMs {
+                    if let endMs = endPayload?.effectiveElapsedMs {
                         streamTotalElapsedMs = endMs
                     }
                     if let endPayload, endPayload.result == "failure" {
@@ -815,7 +893,7 @@ final class GenerateViewModel {
                             }
                         }
                         generationCompleted = true
-                        await saveToLibrary()
+                        await saveToLibrary(endScripts: endPayload?.scripts)
                     }
                 }
             }
@@ -1001,7 +1079,43 @@ final class GenerateViewModel {
     // MARK: - Helpers
 
     /// Save the completed generation to the Library via the repository.
-    private func saveToLibrary() async {
+    /// Prioritizes final script text and title delivered in stream end payload.
+    private func saveToLibrary(endScripts: [StreamEndScript]? = nil) async {
+        if let endScripts, !endScripts.isEmpty {
+            for (index, script) in endScripts.enumerated() {
+                guard let scriptText = script.text, !scriptText.isEmpty else { continue }
+                let id = generatedStoryIDs[index] ?? UUID().uuidString
+                generatedStoryIDs[index] = id
+                let rawTitle = script.title ?? (!StringFormatting.isBlank(topic) ? topic : (!StringFormatting.isBlank(selectedHeadline) ? selectedHeadline : "Untitled Story"))
+                let title = StringFormatting.isBlank(rawTitle) ? "Untitled Story \(index + 1)" : rawTitle
+                let initialVersions = [
+                    StoryScriptVersion(
+                        number: 1,
+                        text: scriptText,
+                        createdAt: generationCreatedAt,
+                        instruction: instructionText.isEmpty ? nil : instructionText
+                    )
+                ]
+                let story = Story(
+                    id: id,
+                    title: title,
+                    summary: "",
+                    headline: selectedHeadline,
+                    createdAt: generationCreatedAt,
+                    status: "completed",
+                    emotion: selectedEmotion,
+                    format: selectedFormat,
+                    scriptText: scriptText,
+                    instruction: instructionText.isEmpty ? nil : instructionText,
+                    generationNumber: script.id ?? (index + 1),
+                    scriptVersions: initialVersions
+                )
+                await repository.save(story)
+            }
+            isSavedToLibrary = true
+            return
+        }
+
         let scripts = stagePayloads[.script]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.validation]?["scripts"] as? [[String: Any]]
             ?? stagePayloads[.storyboard]?["scripts"] as? [[String: Any]]

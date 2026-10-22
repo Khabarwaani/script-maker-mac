@@ -208,24 +208,56 @@ public struct StreamErrorPayload: Codable, Sendable, Equatable {
     }
 }
 
+public struct StreamEndScript: Codable, Sendable, Equatable {
+    public let id: Int?
+    public let text: String?
+    public let title: String?
+
+    public init(id: Int?, text: String?, title: String? = nil) {
+        self.id = id
+        self.text = text
+        self.title = title
+    }
+}
+
 public struct StreamEndPayload: Codable, Sendable, Equatable {
     public let type: String?
     public let result: String?
     public let error: String?
     public let code: String?
     public let elapsedMs: Int?
+    public let scripts: [StreamEndScript]?
+    public let totalDurationMs: Double?
 
-    public init(result: String? = "success", error: String? = nil, code: String? = nil, elapsedMs: Int? = nil, type: String? = "end") {
+    public init(
+        result: String? = "success",
+        error: String? = nil,
+        code: String? = nil,
+        elapsedMs: Int? = nil,
+        scripts: [StreamEndScript]? = nil,
+        totalDurationMs: Double? = nil,
+        type: String? = "end"
+    ) {
         self.type = type
         self.result = result
         self.error = error
         self.code = code
         self.elapsedMs = elapsedMs
+        self.scripts = scripts
+        self.totalDurationMs = totalDurationMs
     }
 
     enum CodingKeys: String, CodingKey {
         case type, result, error, code
         case elapsedMs = "elapsed_ms"
+        case scripts
+        case totalDurationMs = "total_duration_ms"
+    }
+
+    public var effectiveElapsedMs: Int? {
+        if let ms = elapsedMs, ms > 0 { return ms }
+        if let d = totalDurationMs, d > 0 { return Int(d) }
+        return nil
     }
 }
 
@@ -348,10 +380,13 @@ public struct PipelineSubstepState: Identifiable, Equatable, Sendable {
 
     public var formattedElapsed: String? {
         guard let ms = elapsedMs, ms > 0 else { return nil }
-        if ms < 1000 {
-            return "\(ms)ms"
+        let sec = Double(ms) / 1000.0
+        if sec >= 10.0 {
+            return "\(Int(round(sec)))s"
+        } else if sec >= 1.0 {
+            return String(format: "%.1fs", sec)
         } else {
-            return String(format: "%.1fs", Double(ms) / 1000.0)
+            return String(format: "%.2fs", sec)
         }
     }
 }
@@ -407,10 +442,13 @@ public struct PipelineStageState: Identifiable, Equatable, Sendable {
 
     public var formattedElapsed: String? {
         guard let ms = elapsedMs, ms > 0 else { return nil }
-        if ms < 1000 {
-            return "\(ms)ms"
+        let sec = Double(ms) / 1000.0
+        if sec >= 10.0 {
+            return "\(Int(round(sec)))s"
+        } else if sec >= 1.0 {
+            return String(format: "%.1fs", sec)
         } else {
-            return String(format: "%.1fs", Double(ms) / 1000.0)
+            return String(format: "%.2fs", sec)
         }
     }
 
@@ -522,12 +560,14 @@ public struct NewsHashtag: Codable, Identifiable, Equatable, Hashable, Sendable 
     public let headline: String?
     public let link: String?
     public let source: String?
+    public let summary: String?
 
-    public init(tag: String, headline: String? = nil, link: String? = nil, source: String? = nil) {
+    public init(tag: String, headline: String? = nil, link: String? = nil, source: String? = nil, summary: String? = nil) {
         self.tag = tag
         self.headline = headline
         self.link = link
         self.source = source
+        self.summary = summary
     }
 }
 

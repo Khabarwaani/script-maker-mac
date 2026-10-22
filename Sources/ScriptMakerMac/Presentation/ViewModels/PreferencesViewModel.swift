@@ -9,6 +9,139 @@ final class PreferencesViewModel {
     private let config: AppConfig
     private let connectionChecker: any ServerConnectionChecking
     private let modelCatalogProvider: (any AIModelCatalogProviding)?
+    private let uploadSettings: (any UploadSettingsStoring)?
+    var uploadOptions = LibraryUploadOptions()
+    var uploadSettingsError: String?
+    var uploadSettingsNotice: String?
+    private(set) var canSaveUploadSettings = false
+    var draftNewsSettings: NewsDiscoverySettings
+    private var draftNewsPageSize: Int
+    var newsSettingsError: String?
+    var newsSettingsNotice: String?
+    var draftTrendingSettings: TrendingDiscoverySettings
+    var trendingSettingsError: String?
+    var trendingSettingsNotice: String?
+
+    var newsRegionGeoText: String {
+        get {
+            if let geo = RegionGeo.resolve(draftNewsSettings.location) ?? RegionGeo.resolve(draftNewsSettings.region) {
+                return geo.name
+            }
+            return !draftNewsSettings.location.isEmpty ? draftNewsSettings.location : draftNewsSettings.region
+        }
+        set {
+            draftNewsSettings.location = newValue
+            if let geo = RegionGeo.resolve(newValue) {
+                draftNewsSettings.region = geo.code
+            }
+        }
+    }
+
+    var trendingRegionGeoText: String {
+        get {
+            if let geo = RegionGeo.resolve(draftTrendingSettings.region) {
+                return geo.name
+            }
+            return draftTrendingSettings.region
+        }
+        set {
+            if let geo = RegionGeo.resolve(newValue) {
+                draftTrendingSettings.region = geo.code
+            } else {
+                draftTrendingSettings.region = newValue
+            }
+        }
+    }
+
+    var trendingCacheHours: Double {
+        get { draftTrendingSettings.cacheDuration / 3600 }
+        set { draftTrendingSettings.cacheDuration = newValue * 3600 }
+    }
+
+    func loadTrendingSettings() {
+        draftTrendingSettings = config.trendingSettings
+    }
+
+    func setTrendLanguage(_ language: TrendLanguage, enabled: Bool) {
+        if enabled { draftTrendingSettings.languages.insert(language) }
+        else { draftTrendingSettings.languages.remove(language) }
+    }
+
+    func saveTrendingSettings() {
+        trendingSettingsError = nil
+        trendingSettingsNotice = nil
+        do {
+            let validated = try draftTrendingSettings.validated()
+            config.trendingSettings = validated
+            draftTrendingSettings = validated
+            trendingSettingsNotice = "Trending hashtag settings saved app-wide."
+        } catch { trendingSettingsError = error.localizedDescription }
+    }
+
+    var newsSearchHours: Double {
+        get { draftNewsSettings.searchDuration / 3600 }
+        set { draftNewsSettings.searchDuration = newValue * 3600 }
+    }
+    var newsCacheHours: Double {
+        get { draftNewsSettings.cacheDuration / 3600 }
+        set { draftNewsSettings.cacheDuration = newValue * 3600 }
+    }
+
+    func loadNewsSettings() {
+        draftNewsSettings = config.newsSettings
+        draftNewsPageSize = config.newsPageSize
+    }
+
+    func saveNewsSettings() {
+        newsSettingsError = nil
+        newsSettingsNotice = nil
+        do {
+            let validated = try draftNewsSettings.validated()
+            config.newsPageSize = draftNewsPageSize
+            config.newsSettings = validated
+            draftNewsSettings = validated
+            newsSettingsNotice = "News settings saved for Studio and Library."
+        } catch { newsSettingsError = error.localizedDescription }
+    }
+
+    func loadUploadSettings() {
+        do {
+            guard let uploadSettings else { throw APIError.notImplemented("Upload settings are unavailable.") }
+            uploadOptions = try uploadSettings.load()
+            canSaveUploadSettings = true
+            uploadSettingsError = nil
+            uploadSettingsNotice = nil
+        } catch {
+            canSaveUploadSettings = false
+            uploadSettingsError = StringFormatting.errorMessage(error)
+        }
+    }
+
+    func saveUploadSettings() {
+        uploadSettingsError = nil
+        uploadSettingsNotice = nil
+        do {
+            guard canSaveUploadSettings, let uploadSettings else {
+                throw APIError.notImplemented("Reload upload settings before saving.")
+            }
+            var options = uploadOptions
+            options.telegramToken = options.telegramToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            options.telegramChatID = options.telegramChatID.trimmingCharacters(in: .whitespacesAndNewlines)
+            options.googleAccessToken = options.googleAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            options.googleEndpoint = options.googleEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !options.telegramChatID.isEmpty, Int64(options.telegramChatID) == nil {
+                throw LibraryOperationError.invalidInput("Telegram chat ID must be a number.")
+            }
+            if !options.googleEndpoint.isEmpty {
+                guard let url = URL(string: options.googleEndpoint), url.scheme == "https", url.host == "script.google.com" else {
+                    throw LibraryOperationError.invalidInput("Google upload needs an HTTPS script.google.com deployment URL.")
+                }
+            }
+            try uploadSettings.save(options)
+            uploadOptions = options
+            uploadSettingsNotice = "Upload settings saved. Upload actions now use these settings with one click."
+        } catch { uploadSettingsError = StringFormatting.errorMessage(error) }
+    }
     private var modelCatalog: AIModelCatalog?
     var isLoadingModels = false
     var isEditingModel = false
@@ -71,10 +204,14 @@ final class PreferencesViewModel {
     var noticeMessage: String?
     var isTesting = false
 
-    init(config: AppConfig, connectionChecker: any ServerConnectionChecking, modelCatalogProvider: (any AIModelCatalogProviding)? = nil) {
+    init(config: AppConfig, connectionChecker: any ServerConnectionChecking, modelCatalogProvider: (any AIModelCatalogProviding)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil) {
         self.config = config
         self.connectionChecker = connectionChecker
         self.modelCatalogProvider = modelCatalogProvider
+        self.uploadSettings = uploadSettings
+        self.draftNewsSettings = config.newsSettings
+        self.draftTrendingSettings = config.trendingSettings
+        self.draftNewsPageSize = config.newsPageSize
         self.draftURL = config.serverURL
         self.dataSource = config.dataSource
     }
@@ -85,8 +222,8 @@ final class PreferencesViewModel {
     }
 
     var newsPageSize: Int {
-        get { config.newsPageSize }
-        set { config.newsPageSize = min(max(newValue, 1), 50) }
+        get { draftNewsPageSize }
+        set { draftNewsPageSize = min(max(newValue, 1), 100) }
     }
 
     var currentURL: String { config.serverURL }

@@ -22,6 +22,12 @@ struct ConfigSidebarView: View {
         .onChange(of: viewModel.appConfig.dataSource) { _, _ in
             Task { await viewModel.initialLoad() }
         }
+        .onChange(of: viewModel.appConfig.newsDiscoveryCacheIdentifier) { _, _ in
+            if !viewModel.isHashtagSource { Task { await viewModel.initialLoad() } }
+        }
+        .onChange(of: viewModel.appConfig.trendingSettings) { _, _ in
+            if viewModel.isHashtagSource { Task { await viewModel.onStorySourceChanged() } }
+        }
     }
 
     private var storySection: some View {
@@ -29,20 +35,10 @@ struct ConfigSidebarView: View {
             EmptyView()
         } content: {
             StudioRow("Source", inset: 0) {
-                HStack(spacing: 8) {
-                    StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
-                        .disabled(viewModel.isRefreshingCategories)
-                        .onChange(of: viewModel.selectedStorySource) { _, _ in
-                            Task { await viewModel.onStorySourceChanged() }
-                        }
-                    StudioRefreshButton(
-                        isRefreshing: viewModel.isRefreshingCategories,
-                        helpText: "Refresh news categories"
-                    ) {
-                        Task { await viewModel.loadNewsCategories() }
+                StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                    .onChange(of: viewModel.selectedStorySource) { _, _ in
+                        Task { await viewModel.onStorySourceChanged() }
                     }
-                    .padding(.trailing, 10)
-                }
             }
             if viewModel.isHashtagSource {
                 StudioRow("Trending hashtag", inset: 0) {
@@ -87,6 +83,7 @@ struct ConfigSidebarView: View {
                     }
                 }
                 StudioRow("Custom hashtag") { TextField("e.g. #MakeInIndia", text: $viewModel.customHashtag) }
+                TrendingTagDetailsSection(viewModel: viewModel)
             }
             if !viewModel.isManualSource {
                 StudioRow("Headline", inset: 0) {
@@ -210,13 +207,48 @@ struct ConfigSidebarView: View {
         } content: {
             StudioChoiceGroup(title: "Generation mode", selection: $viewModel.workflowMode, options: GenerateViewModel.WorkflowMode.allCases, label: { $0.rawValue })
             if let notice = viewModel.setupNotice { Text(notice).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
-            Button { Task { await viewModel.start() } } label: {
-                HStack {
-                    if viewModel.isRunning { ProgressView().controlSize(.small) }
+            HStack(spacing: 12) {
+                LoadingButton(isLoading: viewModel.isRunning) {
+                    Task { await viewModel.start() }
+                } label: {
                     Text(viewModel.isRunning ? "Generating…" : "Generate")
-                }.frame(maxWidth: .infinity)
-            }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)
-                .disabled(!viewModel.isCatalogReady || StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
+                        .frame(maxWidth: .infinity)
+                }.buttonStyle(StudioPrimaryButtonStyle()).controlSize(.large)
+                    .disabled(!viewModel.isCatalogReady || StringFormatting.isBlank(viewModel.topic))
+
+                Button {
+                    viewModel.startInPipeline()
+                } label: {
+                    Label("Start in Pipeline", systemImage: "arrow.triangle.branch")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(StringFormatting.isBlank(viewModel.topic) || viewModel.isRunning)
+                .help("Send current topic and launch multi-stage Pipeline")
+            }
+        }
+    }
+}
+
+private struct TrendingTagDetailsSection: View {
+    @Bindable var viewModel: GenerateViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let detail = viewModel.selectedHashtagDetails {
+                if let title = detail.headline { Text(title).font(.callout.weight(.medium)) }
+                if let summary = detail.summary { Text(summary).font(.callout).foregroundStyle(AppTheme.secondaryInk) }
+                if let source = detail.source { Text(source).font(.caption).foregroundStyle(AppTheme.secondaryInk) }
+            }
+            if !viewModel.isLocalJSON, !viewModel.selectedHashtag.isEmpty {
+                HStack {
+                    Button("Load full title and description") { Task { await viewModel.loadHashtagDetail() } }
+                        .disabled(viewModel.isLoadingHashtagDetail)
+                    if viewModel.isLoadingHashtagDetail { ProgressView().controlSize(.small) }
+                }
+            }
+            if let error = viewModel.hashtagDetailError { Text(error).font(.caption).foregroundStyle(AppTheme.danger) }
         }
     }
 }
@@ -349,23 +381,14 @@ struct StudioRefreshButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                if isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.callout)
-                        .foregroundStyle(AppTheme.ink)
-                }
-            }
-            .frame(width: 20, height: 20)
+        LoadingButton(isLoading: isRefreshing, spinnerReplacesLabel: true, action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(.callout)
+                .foregroundStyle(AppTheme.ink)
         }
+        .frame(width: 20, height: 20)
         .buttonStyle(RefreshButtonStyle())
         .help(helpText)
-        .disabled(isRefreshing)
     }
 }
 

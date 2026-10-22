@@ -5,6 +5,45 @@
 	};
 	objectVersion = 56;
 	objects = {
+TD101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingDiscoverySettings.swift; sourceTree = "<group>"; };
+TD001 = {isa = PBXBuildFile; fileRef = TD101; };
+TD102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingClientProvider.swift; sourceTree = "<group>"; };
+TD002 = {isa = PBXBuildFile; fileRef = TD102; };
+TD103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingDiscoverySettingsView.swift; sourceTree = "<group>"; };
+TD003 = {isa = PBXBuildFile; fileRef = TD103; };
+TD104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingSettingsTests.swift; sourceTree = "<group>"; };
+TD004 = {isa = PBXBuildFile; fileRef = TD104; };
+ND101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoverySettings.swift; sourceTree = "<group>"; };
+ND001 = {isa = PBXBuildFile; fileRef = ND101; };
+ND102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoverySettingsView.swift; sourceTree = "<group>"; };
+ND002 = {isa = PBXBuildFile; fileRef = ND102; };
+BT101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingButton.swift; sourceTree = "<group>"; };
+BT001 = {isa = PBXBuildFile; fileRef = BT101; };
+SC105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatTests.swift; sourceTree = "<group>"; };
+SC005 = {isa = PBXBuildFile; fileRef = SC105; };
+SC104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatView.swift; sourceTree = "<group>"; };
+SC004 = {isa = PBXBuildFile; fileRef = SC104; };
+SC103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatViewModel.swift; sourceTree = "<group>"; };
+SC003 = {isa = PBXBuildFile; fileRef = SC103; };
+SC102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalScriptChatService.swift; sourceTree = "<group>"; };
+SC002 = {isa = PBXBuildFile; fileRef = SC102; };
+SC101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptChatRefining.swift; sourceTree = "<group>"; };
+SC001 = {isa = PBXBuildFile; fileRef = SC101; };
+NS001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsProviding.swift; sourceTree = "<group>"; };
+NS002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStudioNewsProvider.swift; sourceTree = "<group>"; };
+NS003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsTests.swift; sourceTree = "<group>"; };
+NS011 = {isa = PBXBuildFile; fileRef = NS001; };
+NS012 = {isa = PBXBuildFile; fileRef = NS002; };
+NS013 = {isa = PBXBuildFile; fileRef = NS003; };
+LP004 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/NewsSearch"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.2; }; };
+LP005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/TrendingHashtag"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.0; }; };
+LD004 = {isa = XCSwiftPackageProductDependency; package = LP004; productName = NewsSearch; };
+LD005 = {isa = XCSwiftPackageProductDependency; package = LP005; productName = TrendingHashtag; };
+LB006 = {isa = PBXBuildFile; productRef = LD004; };
+LB007 = {isa = PBXBuildFile; productRef = LD005; };
+LB008 = {isa = PBXBuildFile; productRef = LD004; };
+LB009 = {isa = PBXBuildFile; productRef = LD005; };
+
 		DY001 = {isa = PBXBuildFile; fileRef = DY101; };
 		DY101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInputSchema.swift; sourceTree = "<group>"; };
 		DY002 = {isa = PBXBuildFile; fileRef = DY102; };
@@ -27,6 +66,26 @@
 		Jlibrary = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
 		M001 = {isa = PBXBuildFile; fileRef = M101; };
 		M101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainReleaseRegressionTests.swift; sourceTree = "<group>"; };
+		LL01 = {isa = PBXBuildFile; fileRef = LL11; };
+		LL11 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryUpdateClient.swift; sourceTree = "<group>"; };
+		LL02 = {isa = PBXBuildFile; fileRef = LL12; };
+		LL12 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoryUploadClient.swift; sourceTree = "<group>"; };
+		LL03 = {isa = PBXBuildFile; fileRef = LL13; };
+		LL13 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryUploadSettingsView.swift; sourceTree = "<group>"; };
+		LL04 = {isa = PBXBuildFile; fileRef = LL14; };
+		LL14 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
+		PL001 = {isa = PBXBuildFile; fileRef = PL101; };
+		PL101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowModels.swift; sourceTree = "<group>"; };
+		PL002 = {isa = PBXBuildFile; fileRef = PL102; };
+		PL102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowResolving.swift; sourceTree = "<group>"; };
+		PL003 = {isa = PBXBuildFile; fileRef = PL103; };
+		PL103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPipelineFlowResolver.swift; sourceTree = "<group>"; };
+		PL004 = {isa = PBXBuildFile; fileRef = PL104; };
+		PL104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTabViewModel.swift; sourceTree = "<group>"; };
+		PL005 = {isa = PBXBuildFile; fileRef = PL105; };
+		PL105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTabView.swift; sourceTree = "<group>"; };
+		PL006 = {isa = PBXBuildFile; fileRef = PL106; };
+		PL106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowTests.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -218,6 +277,9 @@
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
+				PL101 /* PipelineFlowModels.swift */,
+				TD101,
+				ND101,
 				L101 /* LocalAgentModels.swift */,
 				DY101 /* AgentInputSchema.swift */,
 				R002 /* PipelineModels.swift */,
@@ -231,12 +293,13 @@
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				PL102 /* PipelineFlowResolving.swift */,
 				L102 /* LocalAgentRunning.swift */,
 				R028 /* PipelineService.swift */,
 				R034 /* ImageService.swift */,
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
-				R025 /* WebClient.swift */,
+				R025 /* WebClient.swift */, NS001, SC101,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -278,8 +341,12 @@
 		G018 /* WebClients */ = {
 			isa = PBXGroup;
 			children = (
+				PL103 /* LocalPipelineFlowResolver.swift */,
+				TD102,
 				L103 /* TerminalLocalAgentService.swift */,
+				LL11 /* LocalLibraryUpdateClient.swift */, NS002, SC102,
 				L107 /* StrictLocalAgentSession.swift */,
+				LL12 /* LocalStoryUploadClient.swift */,
 				R026 /* NetworkWebClient.swift */,
 				R027 /* OfflineWebClient.swift */,
 			);
@@ -315,15 +382,19 @@
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				PL105 /* PipelineTabView.swift */,
+				TD103,
+				ND102,
 				L105 /* LocalAgentView.swift */,
+				LL13 /* LibraryUploadSettingsView.swift */,
 				DY102 /* DynamicAgentInputForm.swift */,
 				R008 /* ContentView.swift */,
-				R049 /* AppTheme.swift */,
+				R049 /* AppTheme.swift */, BT101 /* LoadingButton.swift */,
 				R030 /* SceneThumbnail.swift */,
 				R043 /* ConfigSidebarView.swift */,
 				R044 /* StoryListView.swift */,
 				R046 /* StudioDetailView.swift */,
-				R045 /* StoryDetailView.swift */,
+				R045 /* StoryDetailView.swift */, SC104,
 				R031 /* StageTracker.swift */,
 				R009 /* PreferencesView.swift */,
 				R010 /* GenerateView.swift */,
@@ -341,10 +412,11 @@
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				PL104 /* PipelineTabViewModel.swift */,
 				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
-				R007 /* GenerateViewModel.swift */,
+				R007 /* GenerateViewModel.swift */, SC103,
 				R035 /* ThumbnailViewModel.swift */,
 				R018 /* ServerAddressBarViewModel.swift */,
 				R023 /* LibraryViewModel.swift */,
@@ -395,7 +467,9 @@
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				L106 /* LocalAgentTests.swift */, M101 /* MainReleaseRegressionTests.swift */,
+				PL106 /* PipelineFlowTests.swift */,
+				L106 /* LocalAgentTests.swift */,
+				LL14 /* LocalLibraryTests.swift */, NS003, TD104, SC105, M101 /* MainReleaseRegressionTests.swift */,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
 				E002 /* SampleDataTests.swift */,
@@ -428,7 +502,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			);
 			buildRules = ( );
 			dependencies = ( );
-			packageProductDependencies = ( LD001, LD002, LD003, );
+			packageProductDependencies = ( LD001, LD002, LD003, LD004, LD005, );
 			name = ScriptMakerMac;
 			productName = ScriptMakerMac;
 			productReference = R013 /* ScriptMakerMac.app */;
@@ -445,7 +519,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			dependencies = (
 				D001 /* PBXTargetDependency */,
 			);
-			packageProductDependencies = ( LD001, LD002, );
+			packageProductDependencies = ( LD001, LD002, LD004, LD005, );
 			name = ScriptMakerMacTests;
 			productName = ScriptMakerMacTests;
 			productReference = R024 /* ScriptMakerMacTests.xctest */;
@@ -473,11 +547,21 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PL001 /* PipelineFlowModels.swift in Sources */,
+				PL002 /* PipelineFlowResolving.swift in Sources */,
+				PL003 /* LocalPipelineFlowResolver.swift in Sources */,
+				PL004 /* PipelineTabViewModel.swift in Sources */,
+				PL005 /* PipelineTabView.swift in Sources */,
+				TD001, TD002, TD003,
+				ND001, ND002,
 				L005 /* LocalAgentView.swift in Sources */,
+				LL03 /* LibraryUploadSettingsView.swift in Sources */,
 				DY002 /* DynamicAgentInputForm.swift in Sources */,
 				L004 /* LocalAgentViewModel.swift in Sources */,
 				L003 /* TerminalLocalAgentService.swift in Sources */,
+				LL01 /* LocalLibraryUpdateClient.swift in Sources */, NS011, NS012, SC001, SC002, SC003, SC004, BT001,
 				L007 /* StrictLocalAgentSession.swift in Sources */,
+				LL02 /* LocalStoryUploadClient.swift in Sources */,
 				L002 /* LocalAgentRunning.swift in Sources */,
 				L001 /* LocalAgentModels.swift in Sources */,
 				DY001 /* AgentInputSchema.swift in Sources */,
@@ -529,7 +613,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 		P002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( LB001, LB002, LB003, );
+			files = ( LB001, LB002, LB003, LB006, LB007, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 P006 /* Build revision */ = {
@@ -547,7 +631,9 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				L006 /* LocalAgentTests.swift in Sources */, M001 /* MainReleaseRegressionTests.swift in Sources */,
+				PL006 /* PipelineFlowTests.swift in Sources */,
+				L006 /* LocalAgentTests.swift in Sources */,
+				LL04 /* LocalLibraryTests.swift in Sources */, NS013, TD004, SC005, M001 /* MainReleaseRegressionTests.swift in Sources */,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
 				E012 /* SampleDataTests.swift in Sources */,
@@ -558,7 +644,7 @@ P006 /* Build revision */ = {
 		P005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( LB004, LB005, );
+			files = ( LB004, LB005, LB008, LB009, );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		P003 /* Resources */ = {
@@ -683,7 +769,7 @@ P006 /* Build revision */ = {
 			knownRegions = ( en, );
 			mainGroup = G001;
 			productRefGroup = G003 /* Products */;
-			packageReferences = ( LP001, LP002, LP003, );
+			packageReferences = ( LP001, LP002, LP003, LP004, LP005, );
 			projectDirPath = "";
 			projectRoot = "";
 			targets = ( T001 /* ScriptMakerMac */, T002 /* ScriptMakerMacTests */, );

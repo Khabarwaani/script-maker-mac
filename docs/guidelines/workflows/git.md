@@ -24,3 +24,9 @@ gh pr create --draft --base develop --title "feat: (#<issue>) <desc>"
 8. Merge only after user says yes: `gh pr merge <num> --squash`.
 9. Issues: `gh issue create --type Bug|Feature|Task` (types, never labels).
 10. Review threads: fix, push, then reply on the PR. Never resolve only in the GitHub UI.
+11. Keep the primary checkout on current `develop`; use a separate worktree for
+    implementation. After approved CI passes, merge the PR into `develop`, update
+    the primary checkout, and remove the merged branch locally/remotely and its
+    worktree. Do not discard unmerged work during cleanup.
+12. Local launch verification uses integrated `develop` and Xcode's default
+    DerivedData location; no custom `-derivedDataPath` or repo-local build output.
