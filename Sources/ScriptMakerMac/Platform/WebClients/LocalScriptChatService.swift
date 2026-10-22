@@ -3,9 +3,35 @@ import KhabarwaaniAgent
 
 struct LocalScriptChatService: ScriptChatRefining {
     let runner: any LocalAgentRunning
+    private let defaultSessionID: String
+
+    init(runner: any LocalAgentRunning, sessionID: String = "script-chat") {
+        self.runner = runner
+        self.defaultSessionID = sessionID
+    }
 
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] {
         await runner.availability()
+    }
+
+    func prewarm(for provider: LocalAgentProvider, model: String) async {
+        let trimmed = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        var settings = LocalAgentSessionSettings()
+        settings.model = trimmed
+        settings.persistence = .persistentStdio
+        settings.keepMemory = true
+        let dummy = ScriptChat.Input(originalScript: "warmup", latestScript: "warmup", userInstruction: "warmup", instruction: "")
+        let json = (try? String(decoding: JSONEncoder().encode(dummy), as: UTF8.self)) ?? "{}"
+        let request = LocalAgentRequest(
+            agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
+            inputJSON: json, provider: provider, executable: provider.executable,
+            model: trimmed.isEmpty ? nil : trimmed, session: settings,
+            responseInstructions: "", sessionID: defaultSessionID)
+        await runner.prewarm(sessionID: defaultSessionID, request: request)
+    }
+
+    func closeSession() async {
+        await runner.closeSession(id: defaultSessionID)
     }
 
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft {
@@ -18,11 +44,15 @@ struct LocalScriptChatService: ScriptChatRefining {
         let model = request.model.trimmingCharacters(in: .whitespacesAndNewlines)
         var settings = LocalAgentSessionSettings()
         settings.model = model
+        settings.persistence = .persistentStdio
+        settings.keepMemory = true
+        let resolvedSessionID = request.sessionID ?? defaultSessionID
         let result = try await runner.run(LocalAgentRequest(
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
             inputJSON: json, provider: request.provider, executable: request.provider.executable,
             model: model.isEmpty ? nil : model, session: settings,
-            responseInstructions: "Write the consolidated instruction field in English only. Keep latestScript in the original script's language unless the user explicitly requests a different script language. This language rule applies to instruction metadata, not to the script dialogue."))
+            responseInstructions: "Write the consolidated instruction field in English only. Keep latestScript in the original script's language unless the user explicitly requests a different script language. This language rule applies to instruction metadata, not to the script dialogue.",
+            sessionID: resolvedSessionID))
         try Task.checkCancellation()
         let output: ScriptChat.Output
         do { output = try JSONDecoder().decode(ScriptChat.Output.self, from: Data(result.rawOutput.utf8)) }

@@ -20,6 +20,11 @@ final class ScriptChatViewModel {
     var provider: LocalAgentProvider = .codex
     var model = ""
 
+    private var sessionID: String {
+        if let id = source?.id { return "script-chat-\(id)" }
+        return "script-chat-default"
+    }
+
     init(service: any ScriptChatRefining) { self.service = service }
 
     var originalScript: String { source?.scriptText ?? "" }
@@ -64,10 +69,17 @@ final class ScriptChatViewModel {
     func discardConsolidatedInstructionEdits() { if !isRefining { instructionDraft = draft.instruction } }
 
     func begin(_ story: Story) {
+        if source?.id == story.id, (!turns.isEmpty || !StringFormatting.isBlank(draft.latestScript)) {
+            return
+        }
+        let previousStoryID = source?.id
         cancel()
         source = nil; turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
         instructionDraft = ""
+        if let previousStoryID, previousStoryID != story.id {
+            Task { [service] in await service.closeSession() }
+        }
         guard let script = story.scriptText, !StringFormatting.isBlank(script) else {
             errorMessage = "This story has no script to refine."
             return
@@ -77,8 +89,28 @@ final class ScriptChatViewModel {
         instructionDraft = draft.instruction
     }
 
+    func reset() {
+        guard let story = source else { return }
+        cancel()
+        turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
+        let script = story.scriptText ?? ""
+        draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
+        instructionDraft = draft.instruction
+        Task { [service] in await service.closeSession() }
+    }
+
+    func closeSession() async {
+        cancel()
+        await service.closeSession()
+    }
+
+    func prewarm() async {
+        guard canUseProvider || (source != nil && !isRefining) else { return }
+        await service.prewarm(for: provider, model: model)
+    }
+
     func refreshProviders() async {
-        isLoadingProviders = true
+        if providers.isEmpty { isLoadingProviders = true }
         defer { isLoadingProviders = false }
         let available = await service.availability()
         guard !Task.isCancelled else { return }
@@ -124,7 +156,8 @@ final class ScriptChatViewModel {
                         working = ScriptChatDraft(latestScript: working.latestScript, instruction: override)
                     }
                     let result = try await service.refine(ScriptChatRequest(originalScript: original, draft: working,
-                        userInstruction: instruction, provider: selectedProvider, model: selectedModel))
+                        userInstruction: instruction, provider: selectedProvider, model: selectedModel,
+                        sessionID: sessionID))
                     try Task.checkCancellation()
                     guard self?.operationID == id else { return }
                     guard !StringFormatting.isBlank(result.latestScript), !StringFormatting.isBlank(result.instruction) else {

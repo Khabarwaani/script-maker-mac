@@ -11,6 +11,7 @@ struct TerminalLocalAgentService: LocalAgentRunning {
     private let removeWorkspace: @Sendable (URL) throws -> Void
     private let readDiagnostics: @Sendable (URL) -> String?
     private let providerAvailability: @Sendable () -> [LocalAgentProvider: LocalAgentAvailability]
+    private let sessionPool = TerminalSessionPool()
 
     init(entries: [AgentCatalogEntry]? = nil,
          makeSession: @escaping SessionFactory,
@@ -26,6 +27,22 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         self.providerAvailability = providerAvailability
     }
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { providerAvailability() }
+    func prewarm(sessionID: String, request: LocalAgentRequest) async {
+        guard sessionPool.session(for: sessionID, provider: request.provider, model: request.model) == nil else { return }
+        do {
+            let workspace = try makeWorkspace()
+            let session = try makeSession(request, workspace)
+            sessionPool.store(.init(workspace: workspace, session: session, provider: request.provider, model: request.model), for: sessionID)
+        } catch {
+            AppLog.debug("LocalAgent prewarm: \(error.localizedDescription)")
+        }
+    }
+    func closeSession(id: String) async {
+        if let cached = sessionPool.remove(for: id) {
+            cached.session.purgeMemory()
+            do { try removeWorkspace(cached.workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+        }
+    }
     private func entries() throws -> [AgentCatalogEntry] {
         if let registeredEntries { return registeredEntries }
         return try KhabarwaaniAgent.executableCatalog()
@@ -52,15 +69,33 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         try schema.validate(JSONDecoder().decode(AgentJSON.self, from: data))
         try entry.validateInput(data)
         try Task.checkCancellation()
-        let workspace = try makeWorkspace()
+        let isPersistent = request.sessionID != nil
+        let sessionID = request.sessionID
+        let workspace: URL
+        let session: any ManagedLocalAgentSession
+        if let sessionID {
+            if let cached = sessionPool.session(for: sessionID, provider: request.provider, model: request.model) {
+                workspace = cached.workspace
+                session = cached.session
+            } else {
+                if let old = sessionPool.remove(for: sessionID) {
+                    old.session.purgeMemory()
+                    do { try removeWorkspace(old.workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+                }
+                workspace = try makeWorkspace()
+                session = try makeSession(request, workspace)
+                sessionPool.store(.init(workspace: workspace, session: session, provider: request.provider, model: request.model), for: sessionID)
+            }
+        } else {
+            workspace = try makeWorkspace()
+            session = try makeSession(request, workspace)
+        }
         var result: LocalAgentResult
         do {
-            let session = try makeSession(request, workspace)
-            defer { session.purgeMemory() }
             let raw = try await withTaskCancellationHandler {
                 do { return try await entry.execute(input: data, session: session) }
                 catch AgentCatalogError.invalidOutput(let raw, let reason) { throw LocalAgentError.invalidOutput(raw: raw, reason: reason) }
-            } onCancel: { session.purgeMemory() }
+            } onCancel: { if !isPersistent { session.purgeMemory() } }
             try Task.checkCancellation()
             let value = try JSONSerialization.jsonObject(with: Data(raw.utf8), options: [.fragmentsAllowed])
             let pretty = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed])
@@ -72,7 +107,13 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             result.metadata = (["Agent: \(entry.identity.name)\nVersion: \(entry.identity.version)\nExecution: this Mac"] + records).joined(separator: "\n\n")
         } catch {
             let diagnostics = readDiagnostics(workspace)
-            do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+            if let sessionID {
+                _ = sessionPool.remove(for: sessionID)
+                session.purgeMemory()
+                do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+            } else {
+                do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+            }
             if !Task.isCancelled, let diagnostics, !diagnostics.isEmpty {
                 if case LocalAgentError.invalidOutput = error { throw error }
                 let message = Self.failureMessage(in: diagnostics)
@@ -81,7 +122,10 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             }
             throw error
         }
-        try removeWorkspace(workspace)
+        if !isPersistent {
+            session.purgeMemory()
+            try removeWorkspace(workspace)
+        }
         return result
     }
     private static func failureMessage(in diagnostics: String) -> String? {
@@ -92,5 +136,35 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             if object["type"] as? String == "error", let message = object["message"] as? String { return message }
         }
         return nil
+    }
+}
+
+private final class TerminalSessionPool: @unchecked Sendable {
+    struct Cached {
+        let workspace: URL
+        let session: any ManagedLocalAgentSession
+        let provider: LocalAgentProvider
+        let model: String?
+    }
+    private let lock = NSLock()
+    private var entries: [String: Cached] = [:]
+
+    func session(for id: String, provider: LocalAgentProvider, model: String?) -> Cached? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let cached = entries[id] else { return nil }
+        return (cached.provider == provider && cached.model == model) ? cached : nil
+    }
+
+    func store(_ cached: Cached, for id: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries[id] = cached
+    }
+
+    func remove(for id: String) -> Cached? {
+        lock.lock()
+        defer { lock.unlock() }
+        return entries.removeValue(forKey: id)
     }
 }
