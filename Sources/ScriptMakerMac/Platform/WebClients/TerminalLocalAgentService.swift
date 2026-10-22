@@ -67,7 +67,7 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         try schema.validate(JSONDecoder().decode(AgentJSON.self, from: data))
         try entry.validateInput(data)
         try Task.checkCancellation()
-        let isPersistent = request.sessionID != nil
+        let isPersistent = request.sessionID != nil && request.session.persistence != .ephemeral
         let workspace: URL
         let session: any ManagedLocalAgentSession
         if isPersistent {
@@ -82,9 +82,13 @@ struct TerminalLocalAgentService: LocalAgentRunning {
             workspace = try makeWorkspace()
             session = try makeSession(request, workspace)
         }
-        session.clearMemory()
-        defer {
+        if !request.session.keepMemory {
             session.clearMemory()
+        }
+        defer {
+            if !request.session.keepMemory {
+                session.clearMemory()
+            }
             if !isPersistent {
                 session.purgeMemory()
                 do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }

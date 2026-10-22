@@ -19,13 +19,19 @@ final class ScriptChatViewModel {
     var userInstruction = ""
     var provider: LocalAgentProvider = .codex
     var model = ""
+    var mode: ScriptRefinementExecutionMode
+    private let config: AppConfig?
 
     private var sessionID: String {
         if let id = source?.id { return "script-chat-\(id)" }
         return "script-chat-default"
     }
 
-    init(service: any ScriptChatRefining) { self.service = service }
+    init(service: any ScriptChatRefining, config: AppConfig? = nil, initialMode: ScriptRefinementExecutionMode = .fastClean) {
+        self.service = service
+        self.config = config
+        self.mode = config?.scriptRefinementMode ?? initialMode
+    }
 
     var originalScript: String { source?.scriptText ?? "" }
     var originalInstruction: String { source?.instruction ?? "" }
@@ -77,6 +83,7 @@ final class ScriptChatViewModel {
         source = nil; turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
         instructionDraft = ""
+        if let config { mode = config.scriptRefinementMode }
         if let previousStoryID, previousStoryID != story.id {
             Task { [service] in await service.closeSession() }
         }
@@ -106,7 +113,7 @@ final class ScriptChatViewModel {
 
     func prewarm() async {
         guard canUseProvider || (source != nil && !isRefining) else { return }
-        await service.prewarm(for: provider, model: model)
+        await service.prewarm(for: provider, model: model, mode: mode)
     }
 
     func refreshProviders() async {
@@ -145,6 +152,7 @@ final class ScriptChatViewModel {
         let original = originalScript
         let selectedProvider = provider
         let selectedModel = model
+        let selectedMode = mode
         let id = UUID()
         operationID = id; isRefining = true; errorMessage = nil
         task = Task { [weak self, service] in
@@ -156,7 +164,7 @@ final class ScriptChatViewModel {
                 }
                 let result = try await service.refine(ScriptChatRequest(originalScript: original, draft: working,
                     userInstruction: instruction, provider: selectedProvider, model: selectedModel,
-                    sessionID: sessionID))
+                    sessionID: sessionID, mode: selectedMode))
                 try Task.checkCancellation()
                 guard self?.operationID == id else { return }
                 guard !StringFormatting.isBlank(result.latestScript), !StringFormatting.isBlank(result.instruction) else {

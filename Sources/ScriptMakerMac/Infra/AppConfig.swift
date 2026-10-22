@@ -72,6 +72,12 @@ final class AppConfig {
         didSet { defaults.set(appearance.rawValue, forKey: "appearance") }
     }
 
+    private static let scriptRefinementModeKey = "scriptChat.refinementMode"
+
+    var scriptRefinementMode: ScriptRefinementExecutionMode {
+        didSet { defaults.set(scriptRefinementMode.rawValue, forKey: Self.scriptRefinementModeKey) }
+    }
+
     var localJSONDelay: Double {
         didSet { defaults.set(localJSONDelay, forKey: "localJSONDelay") }
     }
@@ -175,6 +181,8 @@ final class AppConfig {
         self.aiModel = defaults.string(forKey: Self.aiModelKey) ?? savedAI?.model ?? "Default"
         self.aiPower = defaults.string(forKey: Self.aiPowerKey) ?? savedAI?.power ?? "Default"
         self.appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "System") ?? .system
+        self.scriptRefinementMode = defaults.string(forKey: Self.scriptRefinementModeKey)
+            .flatMap(ScriptRefinementExecutionMode.init(rawValue:)) ?? .fastClean
         self.serverURL = defaults.string(forKey: Self.serverURLKey)
             ?? Self.defaultServerURL
         if let raw = defaults.string(forKey: Self.dataSourceKey),
@@ -209,6 +217,7 @@ final class AppConfig {
         aiSource = "Antigravity"
         aiModel = "Default"
         aiPower = "Default"
+        scriptRefinementMode = .fastClean
     }
 
     // MARK: - Studio config (smart save on Generate, like Streamlit #563)
