@@ -15,11 +15,27 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
                 supportsStudioNews: true
             ),
             PipelinePresetTemplate(
+                id: "fast-two-scene-story",
+                name: "Fast 2-Scene Viral Story",
+                description: "Studio News → News Researcher → Grounded Joke Generator → 2-Scene Story Creator → Script Chat refinement.",
+                icon: "bolt.badge.sparkle",
+                stageAgentIDs: ["NewsResearcher", "GroundedJokeGenerator", "TwoSceneStoryCreator", "ScriptChat"],
+                supportsStudioNews: true
+            ),
+            PipelinePresetTemplate(
                 id: "news-to-story",
                 name: "Direct News to 3-Scene Script",
                 description: "Studio News → Fact-check news with News Researcher → Generate 3-Scene viral story directly.",
                 icon: "newspaper",
                 stageAgentIDs: ["NewsResearcher", "ThreeSceneStoryCreator"],
+                supportsStudioNews: true
+            ),
+            PipelinePresetTemplate(
+                id: "news-to-two-scene-story",
+                name: "Direct News to 2-Scene Script",
+                description: "Studio News → Fact-check news with News Researcher → Generate 2-Scene viral story (Witty Curiosity → Full News).",
+                icon: "sparkles.tv",
+                stageAgentIDs: ["NewsResearcher", "TwoSceneStoryCreator"],
                 supportsStudioNews: true
             ),
             PipelinePresetTemplate(
@@ -36,6 +52,14 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
                 description: "Generate grounded jokes across durations → Weave selected joke punchline into Scene 3.",
                 icon: "theatermasks",
                 stageAgentIDs: ["GroundedJokeGenerator", "ThreeSceneStoryCreator"],
+                supportsStudioNews: false
+            ),
+            PipelinePresetTemplate(
+                id: "joke-to-two-scene-story",
+                name: "Quick Joke to 2-Scene Story",
+                description: "Generate grounded jokes across durations → Weave selected joke punchline into Scene 2 of a 2-scene viral story.",
+                icon: "theatermask.and.paintbrush",
+                stageAgentIDs: ["GroundedJokeGenerator", "TwoSceneStoryCreator"],
                 supportsStudioNews: false
             ),
             PipelinePresetTemplate(
@@ -86,6 +110,19 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
                     mappedDraft: mapped
                 ))
             }
+            // 3. TwoSceneStoryCreator
+            if let target = catalog.first(where: { $0.agentID == "TwoSceneStoryCreator" && $0.isExecutable }) {
+                let mapped = await mapNewsResearcherToStoryCreator(sourceStep: step, parsed: parsed, target: target)
+                options.append(PipelineTransitionOption(
+                    id: "news-to-two-scene-story-creator",
+                    targetAgentID: target.agentID,
+                    targetAgentName: target.name,
+                    title: "2-Scene Story Creator",
+                    description: "Directly create a fast 2-scene viral story (Witty Curiosity → Full News) from news.",
+                    badge: nil,
+                    mappedDraft: mapped
+                ))
+            }
 
         case "GroundedJokeGenerator", "ShekharJokeGenerator":
             // -> ThreeSceneStoryCreator
@@ -102,8 +139,22 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
                     variationSummaries: summaries
                 ))
             }
+            // -> TwoSceneStoryCreator
+            if let target = catalog.first(where: { $0.agentID == "TwoSceneStoryCreator" && $0.isExecutable }) {
+                let (mapped, summaries) = await mapJokesToStoryCreator(sourceStep: step, parsed: parsed, target: target, variationIndex: step.selectedVariationIndex)
+                options.append(PipelineTransitionOption(
+                    id: "joke-to-two-scene-story-creator",
+                    targetAgentID: target.agentID,
+                    targetAgentName: target.name,
+                    title: "2-Scene Story Creator",
+                    description: "Weave the generated joke punchline into Scene 2 of a 2-scene viral story.",
+                    badge: nil,
+                    mappedDraft: mapped,
+                    variationSummaries: summaries
+                ))
+            }
 
-        case "ThreeSceneStoryCreator":
+        case "ThreeSceneStoryCreator", "TwoSceneStoryCreator":
             // -> ScriptChat
             if let target = catalog.first(where: { ($0.agentID == "ScriptChat" || $0.agentID == "ScriptRefiner") && $0.isExecutable }) {
                 let mapped = await mapStoryCreatorToScriptChat(parsed: parsed, target: target)
@@ -151,12 +202,14 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
         switch (sourceStep.agentID, targetDefinition.agentID) {
         case ("NewsResearcher", "GroundedJokeGenerator"):
             return await mapNewsResearcherToGroundedJoke(sourceStep: sourceStep, parsed: parsed, target: targetDefinition)
-        case ("NewsResearcher", "ThreeSceneStoryCreator"):
+        case ("NewsResearcher", "ThreeSceneStoryCreator"), ("NewsResearcher", "TwoSceneStoryCreator"):
             return await mapNewsResearcherToStoryCreator(sourceStep: sourceStep, parsed: parsed, target: targetDefinition)
-        case ("GroundedJokeGenerator", "ThreeSceneStoryCreator"), ("ShekharJokeGenerator", "ThreeSceneStoryCreator"):
+        case ("GroundedJokeGenerator", "ThreeSceneStoryCreator"), ("ShekharJokeGenerator", "ThreeSceneStoryCreator"),
+             ("GroundedJokeGenerator", "TwoSceneStoryCreator"), ("ShekharJokeGenerator", "TwoSceneStoryCreator"):
             let (mapped, _) = await mapJokesToStoryCreator(sourceStep: sourceStep, parsed: parsed, target: targetDefinition, variationIndex: variationIndex)
             return mapped
-        case ("ThreeSceneStoryCreator", "ScriptChat"), ("ThreeSceneStoryCreator", "ScriptRefiner"):
+        case ("ThreeSceneStoryCreator", "ScriptChat"), ("ThreeSceneStoryCreator", "ScriptRefiner"),
+             ("TwoSceneStoryCreator", "ScriptChat"), ("TwoSceneStoryCreator", "ScriptRefiner"):
             return await mapStoryCreatorToScriptChat(parsed: parsed, target: targetDefinition)
         case ("ScriptChat", "ScriptChat"), ("ScriptRefiner", "ScriptChat"), ("ScriptChat", "ScriptRefiner"):
             return await mapScriptChatLoop(parsed: parsed, target: targetDefinition)

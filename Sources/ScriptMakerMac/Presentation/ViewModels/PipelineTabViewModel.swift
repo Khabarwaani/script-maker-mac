@@ -117,7 +117,7 @@ final class PipelineTabViewModel {
     var isStorySavable: Bool {
         steps.contains { step in
             step.status == .completed &&
-            (step.agentID == "ThreeSceneStoryCreator" || step.agentID == "ScriptChat" || step.agentID == "ScriptRefiner")
+            (step.agentID == "ThreeSceneStoryCreator" || step.agentID == "TwoSceneStoryCreator" || step.agentID == "ScriptChat" || step.agentID == "ScriptRefiner")
         }
     }
 
@@ -657,7 +657,7 @@ final class PipelineTabViewModel {
     func saveStoryToLibrary() {
         // Find best candidate step
         guard let storyStep = steps.last(where: {
-            $0.status == .completed && ($0.agentID == "ThreeSceneStoryCreator" || $0.agentID == "ScriptChat" || $0.agentID == "ScriptRefiner")
+            $0.status == .completed && ($0.agentID == "ThreeSceneStoryCreator" || $0.agentID == "TwoSceneStoryCreator" || $0.agentID == "ScriptChat" || $0.agentID == "ScriptRefiner")
         }) else {
             errorMessage = "No completed story found to save to Library."
             return
