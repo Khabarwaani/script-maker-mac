@@ -25,6 +25,29 @@ private actor ChatRepository: StoryRepository {
 
 @MainActor
 final class ScriptChatTests: XCTestCase {
+    func testRefineAgainWithoutNewInputUsesLatestScriptAndConsolidatedInstructions() async {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        XCTAssertFalse(chat.canRefine)
+        chat.userInstruction = "Shorten the dialogue"
+        await chat.refine()
+        XCTAssertTrue(chat.userInstruction.isEmpty)
+        XCTAssertTrue(chat.canRefine)
+        await chat.refine()
+        let requests = await service.requests
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.last?.originalScript, "Original")
+        XCTAssertEqual(requests.last?.draft.latestScript, "Draft 1")
+        XCTAssertEqual(requests.last?.draft.instruction, "Active instructions 1")
+        XCTAssertEqual(requests.last?.userInstruction, "Active instructions 1")
+        XCTAssertEqual(chat.draft.latestScript, "Draft 2")
+        XCTAssertEqual(chat.turns.count, 2)
+        XCTAssertTrue(chat.canRefine)
+        XCTAssertTrue(chat.canSave)
+    }
+
     func testIterativeTurnsKeepOriginalAndCarryLatestDraftAndInstructions() async throws {
         let refiner = ChatRefinerStub()
         let vm = ScriptChatViewModel(service: refiner)

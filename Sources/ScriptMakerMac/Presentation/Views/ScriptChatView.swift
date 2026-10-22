@@ -65,12 +65,16 @@ struct ScriptChatView: View {
                 Text("Next refinement instruction").font(.headline)
                 TextField("How should the script change?", text: $viewModel.userInstruction, axis: .vertical)
                     .lineLimit(2...4).textFieldStyle(.roundedBorder).disabled(viewModel.isRefining || isSaving)
+                if !viewModel.turns.isEmpty {
+                    Text("Add a new instruction, or refine again using the consolidated instructions and latest script.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             HStack {
                 LoadingButton(isLoading: viewModel.isRefining) {
                     Task { await viewModel.refine() }
                 } label: {
-                    Text("Refine")
+                    Text(viewModel.turns.isEmpty ? "Refine" : "Refine again")
                 }
                 .disabled(!viewModel.canRefine || isSaving)
                 if viewModel.isRefining {

@@ -38,7 +38,7 @@ final class ScriptChatViewModel {
     }
     var canRefine: Bool {
         canUseProvider && !hasHistoryEdits && (!StringFormatting.isBlank(userInstruction)
-            || (hasConsolidatedInstructionEdits && !StringFormatting.isBlank(instructionDraft)))
+            || ((!turns.isEmpty || hasConsolidatedInstructionEdits) && !StringFormatting.isBlank(instructionDraft)))
     }
     var canApplyHistoryEdits: Bool {
         canUseProvider && !hasConsolidatedInstructionEdits && hasHistoryEdits
