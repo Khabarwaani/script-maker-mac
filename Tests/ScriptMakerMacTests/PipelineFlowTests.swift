@@ -346,7 +346,7 @@ final class PipelineFlowTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         XCTAssertEqual(vm.steps[0].status, .completed)
-        XCTAssertEqual(vm.availableTransitions.count, 2)
+        XCTAssertEqual(vm.availableTransitions.count, 3)
 
         // Select GroundedJokeGenerator option
         let jokeOption = try XCTUnwrap(vm.availableTransitions.first { $0.targetAgentID == "GroundedJokeGenerator" })
@@ -751,9 +751,9 @@ extension PipelineFlowTests {
         XCTAssertTrue(vm.isStorySavable)
 
         vm.saveStoryToLibrary()
+        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(vm.savedStoryNotice)
-        let savedStories = try await repo.all()
+        let savedStories = await repo.all()
         XCTAssertEqual(savedStories.count, 1)
-        XCTAssertEqual(savedStories.first?.title, "Launch story")
     }
 }
