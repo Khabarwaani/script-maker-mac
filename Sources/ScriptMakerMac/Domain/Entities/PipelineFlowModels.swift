@@ -47,7 +47,7 @@ struct PipelineOutputBlock: Identifiable, Equatable, Sendable {
                 }
                 let heading = fields["title"]?.string ?? title
                 var result: [Self] = heading.isEmpty ? [] : [.init(id: path + ".heading", title: heading, text: "")]
-                for key in keys where key != "title" {
+                for key in keys where !["title", "verification", "words_count"].contains(key) {
                     result += blocks(fields[key]!, title: label(key), path: path + "." + key)
                 }
                 return result
