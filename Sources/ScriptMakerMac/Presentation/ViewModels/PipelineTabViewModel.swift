@@ -6,6 +6,10 @@ import Observation
 @MainActor
 final class PipelineTabViewModel {
     var mode: PipelineMode = .preset
+    var executionMode: PipelineExecutionMode = .continuous
+    var refinementInstruction = "Polish dialogue pacing and punchlines while preserving the facts, scene structure and script language."
+    var editedOutput = ""
+    private(set) var isPauseRequested = false
     private(set) var presets: [PipelinePresetTemplate] = []
     var selectedPreset: PipelinePresetTemplate?
 
@@ -87,6 +91,21 @@ final class PipelineTabViewModel {
         guard isAvailable(step.provider) else { return false }
         guard let def = activeDefinition, def.isExecutable else { return false }
         return (try? preparedInputJSON(for: step, definition: def)) != nil
+    }
+
+    var hasOutputEdits: Bool { activeStep?.result.map { editedOutput != $0.text } ?? false }
+    var outputBlocks: [PipelineOutputBlock] {
+        guard let result = activeStep?.result else { return [] }
+        return PipelineOutputBlock.sections(from: result.text.isEmpty ? result.rawOutput : result.text)
+    }
+    var canContinue: Bool {
+        guard !isRunning, !hasOutputEdits, activeStep?.status == .completed else { return false }
+        return mode == .preset ? activeStepIndex + 1 < steps.count : !availableTransitions.isEmpty
+    }
+
+    var runTitle: String {
+        if executionMode == .continuous { return "Run Pipeline" }
+        return activeStep?.status == .completed ? "Re-run Stage" : "Run Stage"
     }
 
     var isStorySavable: Bool {
@@ -214,6 +233,7 @@ final class PipelineTabViewModel {
     }
 
     func applyStudioTopic(_ topic: String) {
+        guard !isRunning else { return }
         studioTopic = topic
         selectedHeadline = topic
         selectedStudioSource = .manual
@@ -272,8 +292,10 @@ final class PipelineTabViewModel {
 
         var newSteps: [AgentPipelineStep] = []
         for (index, agentID) in preset.stageAgentIDs.enumerated() {
-            guard let def = catalog.first(where: { $0.agentID == agentID && $0.isExecutable }) ?? catalog.first(where: { $0.agentID == agentID }) else {
-                continue
+            guard let def = catalog.first(where: { $0.agentID == agentID && $0.isExecutable }) else {
+                steps = []
+                errorMessage = "\(agentID) is not available locally. Choose another workflow or refresh the catalog."
+                return
             }
             var draft = AgentInputDraft(schema: def.schema, required: true)
             if index == 0, !studioTopic.isEmpty {
@@ -302,6 +324,7 @@ final class PipelineTabViewModel {
         self.steps = newSteps
         self.activeStepIndex = 0
         self.availableTransitions = []
+        editedOutput = ""
     }
 
     // MARK: - Configurable Mode Orchestration
@@ -340,7 +363,7 @@ final class PipelineTabViewModel {
     }
 
     func selectNextOption(_ option: PipelineTransitionOption) {
-        guard !isRunning else { return }
+        guard !isRunning, !hasOutputEdits else { return }
         guard let def = catalog.first(where: { $0.agentID == option.targetAgentID && $0.isExecutable }) else { return }
 
         let nextIndex = steps.count
@@ -358,6 +381,8 @@ final class PipelineTabViewModel {
         activeStepIndex = nextIndex
         availableTransitions = []
         savedStoryNotice = nil
+        editedOutput = ""
+        fillRefinementInstruction(at: nextIndex)
     }
 
     func selectCustomNextAgent(_ agentID: String) async {
@@ -383,8 +408,9 @@ final class PipelineTabViewModel {
     }
 
     func selectVariationIndex(_ index: Int) async {
-        guard activeStepIndex < steps.count else { return }
+        guard !isRunning, activeStepIndex < steps.count else { return }
         steps[activeStepIndex].selectedVariationIndex = index
+        invalidateFollowingStages()
 
         // In configurable mode, refresh options with the new variation
         if mode == .configurable {
@@ -405,87 +431,209 @@ final class PipelineTabViewModel {
     func selectStep(at index: Int) {
         guard steps.indices.contains(index), !isRunning else { return }
         activeStepIndex = index
+        editedOutput = activeStep?.result?.text ?? ""
+        availableTransitions = []
+        if mode == .configurable, let step = activeStep, step.status == .completed {
+            Task {
+                let options = await flowResolver.compatibleTransitions(from: step, catalog: catalog)
+                guard !isRunning, activeStep?.id == step.id else { return }
+                availableTransitions = options
+            }
+        }
+    }
+
+    func selectProvider(_ selected: LocalAgentProvider) {
+        guard !isRunning else { return }
+        provider = selected
+        for index in steps.indices { steps[index].provider = selected }
     }
 
     // MARK: - Execution
 
-    func runActiveStep() {
-        guard canRunActiveStep, let step = activeStep, let def = activeDefinition else { return }
+    func runActiveStep() { startExecution(continuous: false, advanceFirst: false) }
 
-        let inputJSON: String
-        do {
-            inputJSON = try preparedInputJSON(for: step, definition: def)
-        } catch {
-            self.errorMessage = error.localizedDescription
-            return
-        }
+    func runPipeline() {
+        startExecution(continuous: executionMode == .continuous, advanceFirst: false)
+    }
 
-        let effectiveModel = modelOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : modelOverride.trimmingCharacters(in: .whitespacesAndNewlines)
-        let request = LocalAgentRequest(
-            agentID: step.agentID,
-            version: step.version,
-            inputJSON: inputJSON,
-            provider: step.provider,
-            executable: step.provider.executable,
-            model: effectiveModel
-        )
+    func continuePipeline() {
+        guard canContinue else { return }
+        startExecution(continuous: executionMode == .continuous, advanceFirst: true)
+    }
 
+    func pauseAfterStage() {
+        guard isRunning, !isCancelling else { return }
+        isPauseRequested = true
+        statusMessage = "Pausing after this stage…"
+    }
+
+    func waitForExecution() async { await executionTask?.value }
+
+    private func startExecution(continuous: Bool, advanceFirst: Bool) {
+        guard !isRunning, !hasOutputEdits, advanceFirst ? canContinue : canRunActiveStep else { return }
         isRunning = true
         isCancelling = false
+        isPauseRequested = false
         errorMessage = nil
-        steps[activeStepIndex].status = .running
-        steps[activeStepIndex].startedAt = Date()
-        steps[activeStepIndex].errorMessage = nil
-        statusMessage = "Running \(step.agentName) (\(step.version)) with \(step.provider.title)…"
-
-        executionTask = Task { [weak self, service, flowResolver] in
+        savedStoryNotice = nil
+        executionTask = Task { [weak self] in
             guard let self else { return }
+            defer {
+                self.isRunning = false
+                self.isCancelling = false
+                self.isPauseRequested = false
+                self.executionTask = nil
+            }
             do {
-                let output = try await service.run(request)
-                try Task.checkCancellation()
-
-                self.steps[self.activeStepIndex].status = .completed
-                self.steps[self.activeStepIndex].completedAt = Date()
-                self.steps[self.activeStepIndex].result = output
-                self.steps[self.activeStepIndex].rawOutput = output.rawOutput
-                self.statusMessage = "\(step.agentName) completed"
-
-                let completedStep = self.steps[self.activeStepIndex]
-
-                if self.mode == .preset {
-                    // Check if next step exists in preset sequence
-                    let nextIdx = self.activeStepIndex + 1
-                    if nextIdx < self.steps.count {
-                        let nextDef = self.catalog.first(where: { $0.agentID == self.steps[nextIdx].agentID })
-                        if let nextDef {
-                            let mappedDraft = await flowResolver.mapOutput(
-                                from: completedStep,
-                                to: nextDef,
-                                variationIndex: completedStep.selectedVariationIndex
-                            )
-                            self.steps[nextIdx].draft = mappedDraft
-                        }
-                    }
-                } else {
-                    // Configurable mode: resolve dynamic next transitions
-                    let transitions = await flowResolver.compatibleTransitions(from: completedStep, catalog: self.catalog)
-                    self.availableTransitions = transitions
+                if advanceFirst {
+                    guard try await self.advanceStage() else { self.statusMessage = "Pipeline completed"; return }
                 }
+                repeat {
+                    try Task.checkCancellation()
+                    try await self.executeStage()
+                    try Task.checkCancellation()
+                    if self.isPauseRequested {
+                        self.statusMessage = "Paused · review or edit before continuing"
+                        break
+                    }
+                    guard continuous else {
+                        self.statusMessage = "Stage completed · review or edit before continuing"
+                        break
+                    }
+                    guard try await self.advanceStage() else {
+                        self.statusMessage = "Pipeline completed"
+                        break
+                    }
+                } while true
             } catch {
                 if Task.isCancelled || error is CancellationError {
-                    self.steps[self.activeStepIndex].status = .cancelled
+                    if self.activeStep?.status == .running { self.steps[self.activeStepIndex].status = .cancelled }
                     self.statusMessage = "Cancelled"
                 } else {
-                    self.steps[self.activeStepIndex].status = .failed
+                    if self.activeStep?.status == .running { self.steps[self.activeStepIndex].status = .failed }
                     self.steps[self.activeStepIndex].errorMessage = error.localizedDescription
                     self.errorMessage = error.localizedDescription
-                    self.statusMessage = "Failed"
+                    self.statusMessage = "Stopped · review this stage"
                 }
             }
-            self.isRunning = false
-            self.isCancelling = false
-            self.executionTask = nil
         }
+    }
+
+    private func executeStage() async throws {
+        fillRefinementInstruction(at: activeStepIndex)
+        guard let step = activeStep, let definition = activeDefinition, definition.isExecutable else {
+            throw LocalAgentError.invalidInput("This stage is not available locally.")
+        }
+        guard isAvailable(step.provider), definition.supports(step.provider) else {
+            throw LocalAgentError.invalidInput("Choose an available provider that supports \(step.agentName).")
+        }
+        let input = try preparedInputJSON(for: step, definition: definition)
+        invalidateFollowingStages()
+        let index = activeStepIndex
+        steps[index].status = .running
+        steps[index].startedAt = Date()
+        steps[index].completedAt = nil
+        steps[index].result = nil
+        steps[index].rawOutput = ""
+        steps[index].errorMessage = nil
+        editedOutput = ""
+        statusMessage = "Running \(step.agentName)…"
+        let model = modelOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        let output = try await service.run(LocalAgentRequest(agentID: step.agentID, version: step.version,
+            inputJSON: input, provider: step.provider, executable: step.provider.executable,
+            model: model.isEmpty ? nil : model))
+        try Task.checkCancellation()
+        steps[index].status = .completed
+        steps[index].completedAt = Date()
+        steps[index].result = output
+        steps[index].rawOutput = output.rawOutput
+        editedOutput = output.text
+        try await prepareFollowingStage()
+    }
+
+    private func prepareFollowingStage() async throws {
+        guard let completed = activeStep else { return }
+        if mode == .preset {
+            let next = activeStepIndex + 1
+            guard next < steps.count else { return }
+            guard let definition = catalog.first(where: { $0.agentID == steps[next].agentID && $0.isExecutable }) else {
+                throw LocalAgentError.invalidInput("The next stage is not available locally.")
+            }
+            let draft = await flowResolver.mapOutput(from: completed, to: definition, variationIndex: completed.selectedVariationIndex)
+            try Task.checkCancellation()
+            steps[next].draft = draft
+            fillRefinementInstruction(at: next)
+        } else {
+            let options = await flowResolver.compatibleTransitions(from: completed, catalog: catalog)
+            try Task.checkCancellation()
+            availableTransitions = options
+        }
+    }
+
+    private func advanceStage() async throws -> Bool {
+        try Task.checkCancellation()
+        if mode == .preset {
+            guard activeStepIndex + 1 < steps.count else { return false }
+            activeStepIndex += 1
+        } else {
+            let visited = Set(steps.prefix(activeStepIndex + 1).map(\.agentID))
+            let candidates = availableTransitions.filter { !visited.contains($0.targetAgentID) }
+            guard let option = candidates.first(where: { $0.badge == "Recommended" }) ?? candidates.first else { return false }
+            guard let definition = catalog.first(where: { $0.agentID == option.targetAgentID && $0.isExecutable }) else {
+                throw LocalAgentError.invalidInput("The next agent is not available locally.")
+            }
+            let previous = activeStepIndex
+            steps.append(AgentPipelineStep(stepIndex: steps.count, agentID: definition.agentID,
+                agentName: definition.name, version: definition.version, provider: steps[previous].provider,
+                draft: option.mappedDraft, sourceStepIndex: previous))
+            activeStepIndex = steps.count - 1
+            fillRefinementInstruction(at: activeStepIndex)
+        }
+        editedOutput = activeStep?.result?.text ?? ""
+        availableTransitions = []
+        return true
+    }
+
+    private func fillRefinementInstruction(at index: Int) {
+        guard steps[index].agentID == "ScriptChat" || steps[index].agentID == "ScriptRefiner",
+              StringFormatting.isBlank(steps[index].draft.fields["userInstruction"]?.text ?? "") else { return }
+        steps[index].draft.fields["userInstruction"]?.text = refinementInstruction
+    }
+
+    private func invalidateFollowingStages() {
+        let next = activeStepIndex + 1
+        guard next < steps.count else { return }
+        if mode == .configurable {
+            steps.removeSubrange(next...)
+        } else {
+            for index in next..<steps.count {
+                steps[index].status = .pending
+                steps[index].result = nil
+                steps[index].rawOutput = ""
+                steps[index].errorMessage = nil
+                steps[index].startedAt = nil
+                steps[index].completedAt = nil
+            }
+        }
+    }
+
+    func applyOutputEdits() async {
+        guard !isRunning, hasOutputEdits, activeStep?.status == .completed else { return }
+        isRunning = true
+        defer { isRunning = false }
+        do {
+            let value = try JSONDecoder().decode(AgentJSON.self, from: Data(editedOutput.utf8))
+            guard case .object = value else { throw LocalAgentError.invalidInput("Stage output must be a JSON object.") }
+            let formatted = try value.json()
+            steps[activeStepIndex].result?.text = formatted
+            steps[activeStepIndex].rawOutput = formatted
+            editedOutput = formatted
+            invalidateFollowingStages()
+            availableTransitions = []
+            try await prepareFollowingStage()
+            errorMessage = nil
+            statusMessage = "Output updated · ready to continue"
+        } catch { errorMessage = "Could not update stage output: \(error.localizedDescription)" }
     }
 
     func cancelActiveStep() {

@@ -1,5 +1,62 @@
 import Foundation
 
+enum PipelineExecutionMode: String, CaseIterable, Identifiable, Sendable {
+    case continuous = "Continuous"
+    case stepWise = "Step-wise"
+    var id: String { rawValue }
+}
+
+struct PipelineOutputBlock: Identifiable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let text: String
+
+    static func sections(from raw: String) -> [Self] {
+        guard let value = try? JSONDecoder().decode(AgentJSON.self, from: Data(raw.utf8)) else {
+            return [.init(id: "output", title: "Output", text: raw)]
+        }
+        func label(_ key: String) -> String {
+            switch key {
+            case "latestScript": return "Script"
+            case "instruction": return "Consolidated instructions"
+            case "items": return "Stories"
+            case "notes": return "Research findings"
+            default: return key.replacingOccurrences(of: "_", with: " ").capitalized
+            }
+        }
+        func blocks(_ value: AgentJSON, title: String, path: String) -> [Self] {
+            switch value {
+            case .null: return []
+            case .string(let text): return [.init(id: path, title: title, text: text)]
+            case .bool(let flag): return [.init(id: path, title: title, text: flag ? "Yes" : "No")]
+            case .number(let number): return [.init(id: path, title: title, text: number.formatted())]
+            case .array(let values):
+                if values.allSatisfy({ $0.string != nil }) {
+                    return [.init(id: path, title: title, text: values.compactMap(\.string).map { "• " + $0 }.joined(separator: "\n"))]
+                }
+                return values.enumerated().flatMap { blocks($0.element, title: "\(title) \($0.offset + 1)", path: "\(path).\($0.offset)") }
+            case .object(let fields):
+                if let speaker = fields["speaker"]?.string, let dialogue = fields["dialogue"]?.string {
+                    return [.init(id: path, title: "", text: "\(speaker): \(dialogue)")]
+                }
+                let priority = ["title", "topic", "verified", "confidence", "date", "location", "people", "notes", "news_content", "jokes", "variations", "items", "scenes", "goal", "dialogues", "latestScript", "instruction"]
+                let keys = fields.keys.sorted {
+                    let a = priority.firstIndex(of: $0) ?? priority.count
+                    let b = priority.firstIndex(of: $1) ?? priority.count
+                    return a == b ? $0 < $1 : a < b
+                }
+                let heading = fields["title"]?.string ?? title
+                var result: [Self] = heading.isEmpty ? [] : [.init(id: path + ".heading", title: heading, text: "")]
+                for key in keys where key != "title" {
+                    result += blocks(fields[key]!, title: label(key), path: path + "." + key)
+                }
+                return result
+            }
+        }
+        return blocks(value, title: "", path: "output")
+    }
+}
+
 /// Operational mode for the Pipeline tab.
 enum PipelineMode: String, CaseIterable, Identifiable, Sendable {
     case preset = "Preset"
