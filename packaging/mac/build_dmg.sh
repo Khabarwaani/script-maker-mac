@@ -6,13 +6,12 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-APP="ScriptMakerMac.app"
 
 if [ $# -ge 1 ]; then
     VERSION="$1"
 else
     VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' \
-        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null || echo 1.0)"
+        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null || echo 1.1.0)"
 fi
 DMG="ScriptMakerMac-${VERSION}.dmg"
 
@@ -20,12 +19,26 @@ echo "==> Building (Release)..."
 xcodebuild -project ../../ScriptMakerMac.xcodeproj \
   -scheme ScriptMakerMac \
   -configuration Release \
-  -derivedDataPath build \
-  CODE_SIGNING_ALLOWED=NO clean build
+  -destination 'generic/platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO build
 
-BUILT_APP="build/Build/Products/Release/$APP"
+SETTINGS_FILE="$(mktemp -t scriptmaker-release-settings.XXXXXX)"
+trap 'rm -f "$SETTINGS_FILE"' EXIT
+xcodebuild -project ../../ScriptMakerMac.xcodeproj \
+  -scheme ScriptMakerMac \
+  -configuration Release \
+  -destination 'generic/platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO -showBuildSettings -json > "$SETTINGS_FILE"
+
+BUILT_APP="$(python3 -c '
+import json, sys, os
+targets = json.load(open(sys.argv[1]))
+settings = next(t["buildSettings"] for t in targets if t.get("target") == "ScriptMakerMac")
+print(os.path.join(settings["TARGET_BUILD_DIR"], settings["FULL_PRODUCT_NAME"]))
+' "$SETTINGS_FILE")"
+
 if [ ! -d "$BUILT_APP" ]; then
-    echo "ERROR: $APP not found under build/ after xcodebuild." >&2
+    echo "ERROR: built app missing at $BUILT_APP." >&2
     exit 1
 fi
 echo "==> Built: $BUILT_APP"

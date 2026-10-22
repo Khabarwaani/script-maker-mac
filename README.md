@@ -181,7 +181,7 @@ Open `ScriptMakerMac.xcworkspace` (or `ScriptMakerMac.xcodeproj`) at the repo ro
 ## Build the DMG (on a Mac)
 
 ```bash
-packaging/mac/build_dmg.sh 1.0
+packaging/mac/build_dmg.sh 1.1.0
 ```
 
 ## CI
