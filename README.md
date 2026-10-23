@@ -20,7 +20,7 @@ Keep the local KhabarwaaniAgent checkout beside this repository. AgentAtom and
 TerminalAgentSession resolve from GitHub release ranges; KhabarwaaniAgent stays
 a local path dependency.
 
-Validated with KhabarwaaniAgent 1.1.0, including ThreeSceneStoryCreator 2.1.0
+Validated with KhabarwaaniAgent 1.4.1, including ThreeSceneStoryCreator 2.2.0
 and its progressive Inquire → Clarify → Payoff instructions. Agent versions come
 from discovery metadata; the app does not pin or relabel them.
 
