@@ -11,7 +11,7 @@ if [ $# -ge 1 ]; then
     VERSION="$1"
 else
     VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' \
-        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null || echo 1.1.0)"
+        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null || echo 1.2.0)"
 fi
 DMG="ScriptMakerMac-${VERSION}.dmg"
 
