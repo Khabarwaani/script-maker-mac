@@ -56,7 +56,7 @@ private func makeSampleDefinitions() throws -> [LocalAgentDefinition] {
     return [
         LocalAgentDefinition(agentID: "NewsResearcher", name: "News Researcher", version: "1.1.0", schema: newsSchema, requiresWebResearch: true, isExecutable: true),
         LocalAgentDefinition(agentID: "GroundedJokeGenerator", name: "Grounded Joke Generator", version: "1.2.0", schema: jokeSchema, requiresWebResearch: false, isExecutable: true),
-        LocalAgentDefinition(agentID: "ThreeSceneStoryCreator", name: "3-Scene Story Creator", version: "2.1.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
+        LocalAgentDefinition(agentID: "ThreeSceneStoryCreator", name: "3-Scene Story Creator", version: "2.2.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
         LocalAgentDefinition(agentID: "TwoSceneStoryCreator", name: "2-Scene Story Creator", version: "1.0.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
         LocalAgentDefinition(agentID: "ScriptChat", name: "Script Chat", version: "1.0.0", schema: chatSchema, requiresWebResearch: false, isExecutable: true)
     ]
@@ -216,7 +216,7 @@ final class PipelineFlowTests: XCTestCase {
             stepIndex: 2,
             agentID: "ThreeSceneStoryCreator",
             agentName: "3-Scene Story Creator",
-            version: "2.1.0",
+            version: "2.2.0",
             provider: .codex,
             draft: draft,
             status: .completed,
