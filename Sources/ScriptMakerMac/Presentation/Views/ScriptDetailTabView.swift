@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Master-detail workspace for expanding scenes into continuous-shot visual direction for AI video generation.
+/// Master-detail workspace for expanding standalone scenes into continuous-shot visual direction for AI video generation.
+/// Operates completely independently from Library stories.
 struct ScriptDetailTabView: View {
     @Bindable var viewModel: ScriptDetailViewModel
 
@@ -32,7 +33,7 @@ private struct ScriptDetailSidebarView: View {
                     .foregroundStyle(AppTheme.ink)
                 Spacer()
                 Button {
-                    viewModel.createNewStory()
+                    viewModel.createNewItem()
                 } label: {
                     Label("New Scene", systemImage: "plus")
                         .labelStyle(.iconOnly)
@@ -66,7 +67,7 @@ private struct ScriptDetailSidebarView: View {
 
             Divider().overlay(AppTheme.line)
 
-            if viewModel.filteredStories.isEmpty {
+            if viewModel.filteredItems.isEmpty {
                 VStack(spacing: 12) {
                     Spacer()
                     Image(systemName: "sparkles.tv")
@@ -76,7 +77,7 @@ private struct ScriptDetailSidebarView: View {
                         .font(.callout)
                         .foregroundStyle(AppTheme.secondaryInk)
                     Button("Create New Scene") {
-                        viewModel.createNewStory()
+                        viewModel.createNewItem()
                     }
                     Spacer()
                 }
@@ -84,11 +85,11 @@ private struct ScriptDetailSidebarView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 4) {
-                        ForEach(viewModel.filteredStories) { story in
+                        ForEach(viewModel.filteredItems) { item in
                             ScriptDetailRowView(
-                                story: story,
-                                isSelected: viewModel.selectedStoryID == story.id,
-                                onSelect: { viewModel.selectStory(id: story.id) }
+                                item: item,
+                                isSelected: viewModel.selectedItemID == item.id,
+                                onSelect: { viewModel.selectItem(id: item.id) }
                             )
                         }
                     }
@@ -102,12 +103,12 @@ private struct ScriptDetailSidebarView: View {
 }
 
 private struct ScriptDetailRowView: View {
-    let story: Story
+    let item: ScriptDetailItem
     let isSelected: Bool
     let onSelect: () -> Void
 
     var hasDetail: Bool {
-        !(story.stageOutputs?["ScriptDetail"] ?? "").isEmpty
+        !item.detailedScript.isEmpty
     }
 
     var body: some View {
@@ -116,7 +117,7 @@ private struct ScriptDetailRowView: View {
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(story.title.isEmpty ? "Untitled Scene" : story.title)
+                    Text(item.title.isEmpty ? "Untitled Scene" : item.title)
                         .font(.body.weight(isSelected ? .semibold : .medium))
                         .foregroundStyle(AppTheme.ink)
                         .lineLimit(1)
@@ -129,7 +130,7 @@ private struct ScriptDetailRowView: View {
                     }
                 }
 
-                let previewText = story.scriptText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let previewText = item.originalScript.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !previewText.isEmpty {
                     Text(previewText)
                         .font(.caption)
@@ -188,16 +189,16 @@ private struct ScriptDetailEditorView: View {
 
                 // Save Button
                 LoadingButton(isLoading: viewModel.isSaving) {
-                    Task { await viewModel.saveCurrentStory() }
+                    Task { await viewModel.saveCurrentItem() }
                 } label: {
                     Label("Save", systemImage: "square.and.arrow.down")
                 }
                 .help("Save title, original script, and visual details")
 
                 // Delete Button
-                if let id = viewModel.selectedStoryID {
+                if let id = viewModel.selectedItemID {
                     Button(role: .destructive) {
-                        Task { await viewModel.deleteStory(id: id) }
+                        Task { await viewModel.deleteItem(id: id) }
                     } label: {
                         Image(systemName: "trash")
                     }

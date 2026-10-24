@@ -31,16 +31,16 @@ private actor DetailRefinerStub: ScriptDetailRefining {
     }
 }
 
-private actor DetailStoryRepository: StoryRepository {
-    var stories: [Story] = []
+private actor DetailItemRepository: ScriptDetailRepository {
+    var items: [ScriptDetailItem] = []
 
-    func all() -> [Story] { stories }
-    func save(_ story: Story) {
-        stories.removeAll { $0.id == story.id }
-        stories.append(story)
+    func all() -> [ScriptDetailItem] { items }
+    func save(_ item: ScriptDetailItem) {
+        items.removeAll { $0.id == item.id }
+        items.append(item)
     }
     func remove(id: String) {
-        stories.removeAll { $0.id == id }
+        items.removeAll { $0.id == id }
     }
 }
 
@@ -113,44 +113,44 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertTrue(executed.first?.inputJSON.contains("Cinematic lighting") == true)
     }
 
-    func testViewModelInitialStateAndStoryLoading() async {
+    func testViewModelInitialStateAndItemLoading() async {
         let refiner = DetailRefinerStub()
-        let repo = DetailStoryRepository()
+        let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
         let config = AppConfig()
 
-        let story1 = Story(id: "1", title: "Scene One", createdAt: "2026-10-24T00:00:00Z", scriptText: "Original text 1")
-        let story2 = Story(id: "2", title: "Scene Two", createdAt: "2026-10-24T01:00:00Z", scriptText: "Original text 2")
-        await repo.save(story1)
-        await repo.save(story2)
+        let item1 = ScriptDetailItem(id: "1", title: "Scene One", originalScript: "Original text 1", createdAt: "2026-10-24T00:00:00Z")
+        let item2 = ScriptDetailItem(id: "2", title: "Scene Two", originalScript: "Original text 2", createdAt: "2026-10-24T01:00:00Z")
+        await repo.save(item1)
+        await repo.save(item2)
 
-        let vm = ScriptDetailViewModel(service: refiner, storyRepository: repo, clipboard: clipboard, config: config)
-        await vm.loadStories()
+        let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
+        await vm.loadItems()
 
-        XCTAssertEqual(vm.stories.count, 2)
-        XCTAssertEqual(vm.selectedStoryID, "2") // Newest first
+        XCTAssertEqual(vm.items.count, 2)
+        XCTAssertEqual(vm.selectedItemID, "2") // Newest first
         XCTAssertEqual(vm.editingTitle, "Scene Two")
         XCTAssertEqual(vm.editingOriginalScript, "Original text 2")
         XCTAssertTrue(vm.canRunDetail)
     }
 
-    func testCreateNewStoryAndEditing() async {
+    func testCreateNewItemAndEditing() async {
         let refiner = DetailRefinerStub()
-        let repo = DetailStoryRepository()
+        let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
         let config = AppConfig()
 
-        let vm = ScriptDetailViewModel(service: refiner, storyRepository: repo, clipboard: clipboard, config: config)
-        await vm.loadStories()
+        let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
+        await vm.loadItems()
 
-        XCTAssertEqual(vm.stories.count, 1) // Creates blank scene if repo empty
+        XCTAssertEqual(vm.items.count, 1) // Creates blank scene if repo empty
         XCTAssertEqual(vm.editingTitle, "Untitled Scene")
 
-        vm.createNewStory()
-        XCTAssertEqual(vm.stories.count, 2)
+        vm.createNewItem()
+        XCTAssertEqual(vm.items.count, 2)
         vm.editingTitle = "Brand New Scene"
         vm.editingOriginalScript = "Character A: Wow\nCharacter B: Incredible"
-        await vm.saveCurrentStory()
+        await vm.saveCurrentItem()
 
         let all = await repo.all()
         XCTAssertTrue(all.contains { $0.title == "Brand New Scene" })
@@ -158,15 +158,15 @@ final class ScriptDetailTests: XCTestCase {
 
     func testRunDetailUpdatesDraftAndSavesOutput() async throws {
         let refiner = DetailRefinerStub()
-        let repo = DetailStoryRepository()
+        let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
         let config = AppConfig()
 
-        let story = Story(id: "s1", title: "Tea Stall", scriptText: "Asha: चाय तैयार है?\nRavi: हाँ, बस 2 मिनट।")
-        await repo.save(story)
+        let item = ScriptDetailItem(id: "s1", title: "Tea Stall", originalScript: "Asha: चाय तैयार है?\nRavi: हाँ, बस 2 मिनट।")
+        await repo.save(item)
 
-        let vm = ScriptDetailViewModel(service: refiner, storyRepository: repo, clipboard: clipboard, config: config)
-        await vm.loadStories()
+        let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
+        await vm.loadItems()
         vm.editingUserInstruction = "Warm steam from the kettle, slow continuous camera move."
 
         await vm.runDetail()
@@ -180,16 +180,17 @@ final class ScriptDetailTests: XCTestCase {
         // Verify persisted in repository
         let all = await repo.all()
         let saved = all.first { $0.id == "s1" }
-        XCTAssertEqual(saved?.stageOutputs?["ScriptDetail"], vm.editingDetailedScript)
+        XCTAssertEqual(saved?.detailedScript, vm.editingDetailedScript)
+        XCTAssertEqual(saved?.instruction, vm.editingConsolidatedInstruction)
     }
 
     func testCopyScriptCopiesDetailedWhenPresentOtherwiseOriginal() async {
         let refiner = DetailRefinerStub()
-        let repo = DetailStoryRepository()
+        let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
         let config = AppConfig()
 
-        let vm = ScriptDetailViewModel(service: refiner, storyRepository: repo, clipboard: clipboard, config: config)
+        let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
         vm.editingOriginalScript = "Original Dialogue Only"
         vm.editingDetailedScript = ""
 
@@ -204,46 +205,94 @@ final class ScriptDetailTests: XCTestCase {
 
     func testSearchFiltering() async {
         let refiner = DetailRefinerStub()
-        let repo = DetailStoryRepository()
+        let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
         let config = AppConfig()
 
-        let s1 = Story(id: "1", title: "Morning News", scriptText: "Coffee shop scene")
-        let s2 = Story(id: "2", title: "Evening Talk", scriptText: "Rooftop dialogue")
+        let s1 = ScriptDetailItem(id: "1", title: "Morning News", originalScript: "Coffee shop scene")
+        let s2 = ScriptDetailItem(id: "2", title: "Evening Talk", originalScript: "Rooftop dialogue")
         await repo.save(s1)
         await repo.save(s2)
 
-        let vm = ScriptDetailViewModel(service: refiner, storyRepository: repo, clipboard: clipboard, config: config)
-        await vm.loadStories()
+        let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
+        await vm.loadItems()
 
         vm.searchQuery = "Morning"
-        XCTAssertEqual(vm.filteredStories.count, 1)
-        XCTAssertEqual(vm.filteredStories.first?.id, "1")
+        XCTAssertEqual(vm.filteredItems.count, 1)
+        XCTAssertEqual(vm.filteredItems.first?.id, "1")
 
         vm.searchQuery = "rooftop"
-        XCTAssertEqual(vm.filteredStories.count, 1)
-        XCTAssertEqual(vm.filteredStories.first?.id, "2")
+        XCTAssertEqual(vm.filteredItems.count, 1)
+        XCTAssertEqual(vm.filteredItems.first?.id, "2")
     }
 
-    func testDeleteStoryRemovesAndSelectsNext() async {
+    func testDeleteItemRemovesAndSelectsNext() async {
         let refiner = DetailRefinerStub()
-        let repo = DetailStoryRepository()
+        let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
         let config = AppConfig()
 
-        let s1 = Story(id: "1", title: "First")
-        let s2 = Story(id: "2", title: "Second")
+        let s1 = ScriptDetailItem(id: "1", title: "First")
+        let s2 = ScriptDetailItem(id: "2", title: "Second")
         await repo.save(s1)
         await repo.save(s2)
 
-        let vm = ScriptDetailViewModel(service: refiner, storyRepository: repo, clipboard: clipboard, config: config)
-        await vm.loadStories()
-        XCTAssertEqual(vm.stories.count, 2)
+        let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
+        await vm.loadItems()
+        XCTAssertEqual(vm.items.count, 2)
 
-        await vm.deleteStory(id: "1")
-        XCTAssertEqual(vm.stories.count, 1)
+        await vm.deleteItem(id: "1")
+        XCTAssertEqual(vm.items.count, 1)
         let remaining = await repo.all()
         XCTAssertEqual(remaining.count, 1)
         XCTAssertEqual(remaining.first?.id, "2")
+    }
+
+    func testScriptDetailRepositoryIsolationFromStoryRepository() async {
+        let suiteName = "test_script_detail_isolation_\(UUID().uuidString)"
+        guard let userDefaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults")
+            return
+        }
+        defer { userDefaults.removePersistentDomain(forName: suiteName) }
+
+        let detailDataSource = UserDefaultsScriptDetailDataSource(key: "test_script_detail_items", userDefaults: userDefaults)
+        let detailRepo = LocalScriptDetailRepository(dataSource: detailDataSource)
+
+        let storyDataSource = UserDefaultsStoryDataSource(store: KeyValueStore(defaults: userDefaults))
+        let storyRepo = LocalStoryRepository(dataSource: storyDataSource)
+
+        // Save into detail repository
+        let detailItem = ScriptDetailItem(
+            id: "detail-1",
+            title: "Detail Isolation Test",
+            originalScript: "Visual scene text",
+            detailedScript: "Detailed prompt text"
+        )
+        await detailRepo.save(detailItem)
+
+        // Save into story repository
+        let story = Story(
+            id: "story-1",
+            title: "Library Story",
+            scriptText: "Story script text"
+        )
+        await storyRepo.save(story)
+
+        // Verify detail repo only contains detail item
+        let detailItems = await detailRepo.all()
+        XCTAssertEqual(detailItems.count, 1)
+        XCTAssertEqual(detailItems.first?.id, "detail-1")
+        XCTAssertEqual(detailItems.first?.title, "Detail Isolation Test")
+
+        // Verify story repo only contains story
+        let stories = await storyRepo.all()
+        XCTAssertEqual(stories.count, 1)
+        XCTAssertEqual(stories.first?.id, "story-1")
+        XCTAssertEqual(stories.first?.title, "Library Story")
+
+        // Verify neither leaks into the other
+        XCTAssertFalse(detailItems.contains { $0.id == "story-1" })
+        XCTAssertFalse(stories.contains { $0.id == "detail-1" })
     }
 }

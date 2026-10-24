@@ -120,7 +120,8 @@ enum CompositionRoot {
         let flowResolver = LocalPipelineFlowResolver()
         let pipeline = PipelineTabViewModel(service: agentService, flowResolver: flowResolver, storyRepository: repository, newsProvider: newsProvider, defaultLocation: config.newsSettings.location)
         let detailService = LocalScriptDetailService(runner: agentService)
-        let scriptDetail = ScriptDetailViewModel(service: detailService, storyRepository: repository, clipboard: clipboard, config: config)
+        let detailRepository = LocalScriptDetailRepository()
+        let scriptDetail = ScriptDetailViewModel(service: detailService, repository: detailRepository, clipboard: clipboard, config: config)
         return ContentViewModel(
             config: config,
             preferencesViewModel: preferences,
