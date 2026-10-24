@@ -17,7 +17,7 @@ actor LocalNewsResearcherService: NewsResearching {
     func research(_ request: NewsResearchRequest) async throws -> NewsResearchResult {
         let trimmedTopic = request.topic.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTopic.isEmpty else {
-            throw APIError.malformed("A news topic or headline is required for research.")
+            throw LocalAgentError.invalidInput("A news topic or headline is required for research.")
         }
 
         let input = NewsResearcherInput(
@@ -31,7 +31,7 @@ actor LocalNewsResearcherService: NewsResearching {
         encoder.outputFormatting = [.prettyPrinted]
         let inputData = try encoder.encode(input)
         guard let inputJSON = String(data: inputData, encoding: .utf8) else {
-            throw APIError.malformed("Failed to encode research input payload.")
+            throw LocalAgentError.invalidInput("Failed to encode research input payload.")
         }
 
         let agentRequest = LocalAgentRequest(
