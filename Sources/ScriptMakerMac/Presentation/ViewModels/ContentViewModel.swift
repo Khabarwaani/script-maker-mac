@@ -6,7 +6,7 @@ import Observation
 @MainActor
 final class ContentViewModel {
     enum Tab: String, CaseIterable, Identifiable {
-        case studio, library, localAgent, pipeline
+        case studio, library, localAgent, pipeline, scriptDetail
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -14,6 +14,7 @@ final class ContentViewModel {
             case .library: return "Library"
             case .localAgent: return "LocalAgent"
             case .pipeline: return "Pipeline"
+            case .scriptDetail: return "Script Detail"
             }
         }
     }
@@ -24,15 +25,25 @@ final class ContentViewModel {
     let libraryViewModel: LibraryViewModel
     let localAgentViewModel: LocalAgentViewModel
     let pipelineViewModel: PipelineTabViewModel
+    let scriptDetailViewModel: ScriptDetailViewModel
 
     var selectedTab: Tab = .studio
 
-    init(config: AppConfig, preferencesViewModel: PreferencesViewModel, generateViewModel: GenerateViewModel, libraryViewModel: LibraryViewModel, localAgentViewModel: LocalAgentViewModel, pipelineViewModel: PipelineTabViewModel) {
+    init(
+        config: AppConfig,
+        preferencesViewModel: PreferencesViewModel,
+        generateViewModel: GenerateViewModel,
+        libraryViewModel: LibraryViewModel,
+        localAgentViewModel: LocalAgentViewModel,
+        pipelineViewModel: PipelineTabViewModel,
+        scriptDetailViewModel: ScriptDetailViewModel
+    ) {
         self.config = config
         self.preferencesViewModel = preferencesViewModel
         self.generateViewModel = generateViewModel
         self.libraryViewModel = libraryViewModel
         self.localAgentViewModel = localAgentViewModel
         self.pipelineViewModel = pipelineViewModel
+        self.scriptDetailViewModel = scriptDetailViewModel
     }
 }
