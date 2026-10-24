@@ -44,7 +44,6 @@ enum CompositionRoot {
             TrendingHashtagClient(provider: try settings.frameworkProvider(), configuration: try settings.frameworkConfiguration())
         })
         let newsProvider = LocalStudioNewsProvider(news: makeNews, trends: { try trendClients.client() })
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: repository, newsProvider: newsProvider)
         let files = FileStore()
         let agentService = TerminalLocalAgentService(
             makeSession: { request, workspace in
@@ -117,6 +116,8 @@ enum CompositionRoot {
         let localAgent = LocalAgentViewModel(service: agentService)
         let clipboard = MacClipboardWriter(store: PasteboardStore())
         let library = LibraryViewModel(config: config, repository: repository, clipboard: clipboard, updater: LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (try makeNews(true), config.newsPageSize) }), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }), uploadSettings: uploadSettings, scriptChat: ScriptChatViewModel(service: LocalScriptChatService(runner: agentService), config: config))
+        let researchService = LocalNewsResearcherService(runner: agentService)
+        let researcher = ResearcherViewModel(newsProvider: newsProvider, researchService: researchService, clipboard: clipboard, config: config)
         let flowResolver = LocalPipelineFlowResolver()
         let pipeline = PipelineTabViewModel(service: agentService, flowResolver: flowResolver, storyRepository: repository, newsProvider: newsProvider, defaultLocation: config.newsSettings.location)
         let detailService = LocalScriptDetailService(runner: agentService)
@@ -125,7 +126,7 @@ enum CompositionRoot {
         return ContentViewModel(
             config: config,
             preferencesViewModel: preferences,
-            generateViewModel: generator,
+            researcherViewModel: researcher,
             libraryViewModel: library,
             localAgentViewModel: localAgent,
             pipelineViewModel: pipeline,
