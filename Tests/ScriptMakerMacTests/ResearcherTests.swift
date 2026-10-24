@@ -124,6 +124,8 @@ final class ResearcherTests: XCTestCase {
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         await vm.initialLoad()
 
+        XCTAssertEqual(vm.categories.count, 2)
+        XCTAssertEqual(vm.selectedCategory, "National")
         XCTAssertEqual(vm.headlines.count, 2)
         XCTAssertEqual(vm.selectedHeadline, "Breakthrough in Green Hydrogen")
         XCTAssertEqual(vm.topic, "Breakthrough in Green Hydrogen")
@@ -132,6 +134,25 @@ final class ResearcherTests: XCTestCase {
         vm.onHeadlineChanged("Space mission launched")
         XCTAssertEqual(vm.selectedHeadline, "Space mission launched")
         XCTAssertEqual(vm.topic, "Space mission launched")
+    }
+
+    func testViewModelCategorySubgroupsAndHeadlines() async {
+        let newsProvider = StubResearcherNewsProvider()
+        let runner = StubResearcherAgentRunner()
+        let service = LocalNewsResearcherService(runner: runner)
+        let clipboard = StubClipboard()
+        let config = AppConfig()
+
+        let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
+        await vm.loadCategories()
+
+        XCTAssertEqual(vm.categories.count, 2)
+        XCTAssertEqual(vm.selectedCategory, "National")
+        XCTAssertEqual(vm.headlines.count, 2)
+
+        await vm.onCategoryChanged("Technology")
+        XCTAssertEqual(vm.selectedCategory, "Technology")
+        XCTAssertEqual(vm.headlines.count, 2)
     }
 
     func testViewModelTrendingHashtagsSync() async {

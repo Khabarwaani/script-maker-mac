@@ -19,11 +19,18 @@ final class ResearcherViewModel {
     var storySources: [String] = [newsSourceLabel, hashtagSourceLabel, manualSourceLabel]
     var selectedStorySource: String = newsSourceLabel
 
+    // Two-level News Subgroups & Headlines
+    var categories: [NewsCategory] = []
+    var selectedCategory: String = ""
+    var isRefreshingCategories: Bool = false
+    var categoriesErrorMessage: String? = nil
+
     var headlines: [String] = []
     var selectedHeadline: String = ""
     var isRefreshingHeadlines: Bool = false
     var headlinesErrorMessage: String? = nil
 
+    // Trending Hashtags
     var trendingHashtags: [NewsHashtag] = []
     var selectedHashtag: String = ""
     var customHashtag: String = ""
@@ -31,11 +38,13 @@ final class ResearcherViewModel {
     var hashtagsErrorMessage: String? = nil
     var selectedTagDetail: NewsHashtag? = nil
 
+    // Topic & Input
     var topic: String = ""
     var sourceURL: String = ""
     var humanInstruction: String = ""
     var language: String = "English"
 
+    // Agent Execution
     var selectedProvider: LocalAgentProvider = .appleLocal
     var customModel: String = ""
     var availableProviders: [LocalAgentProvider: LocalAgentAvailability] = [:]
@@ -75,7 +84,7 @@ final class ResearcherViewModel {
         if isHashtagSource {
             await refreshHashtags(forceFresh: false)
         } else if !isManualSource {
-            await refreshHeadlines(forceFresh: false)
+            await loadCategories(forceFresh: false)
         }
     }
 
@@ -83,14 +92,47 @@ final class ResearcherViewModel {
         if isHashtagSource {
             await refreshHashtags(forceFresh: false)
         } else if !isManualSource {
-            await refreshHeadlines(forceFresh: false)
+            if categories.isEmpty {
+                await loadCategories(forceFresh: false)
+            } else {
+                await refreshHeadlines(forceFresh: false)
+            }
         } else {
             // Custom topic mode: leave topic as is or clear headline
             selectedHeadline = ""
         }
     }
 
-    // MARK: - Headlines & Hashtags
+    // MARK: - Two-Level News: Categories (Subgroups) & Headlines
+
+    func loadCategories(forceFresh: Bool = false) async {
+        guard !isRefreshingCategories else { return }
+        isRefreshingCategories = true
+        categoriesErrorMessage = nil
+        defer { isRefreshingCategories = false }
+
+        do {
+            let resp = try await newsProvider.categories(location: config.newsSettings.location)
+            categories = resp.categories
+            if selectedCategory.isEmpty || !categories.contains(where: { $0.id == selectedCategory }) {
+                if categories.contains(where: { $0.id == resp.defaultCategory }) {
+                    selectedCategory = resp.defaultCategory
+                } else if let first = categories.first {
+                    selectedCategory = first.id
+                }
+            }
+            await refreshHeadlines(forceFresh: forceFresh)
+        } catch {
+            categoriesErrorMessage = error.localizedDescription
+            await refreshHeadlines(forceFresh: forceFresh)
+        }
+    }
+
+    func onCategoryChanged(_ newCategory: String) async {
+        guard selectedCategory != newCategory else { return }
+        selectedCategory = newCategory
+        await refreshHeadlines(forceFresh: false)
+    }
 
     func refreshHeadlines(forceFresh: Bool = false) async {
         guard !isRefreshingHeadlines else { return }
@@ -98,9 +140,10 @@ final class ResearcherViewModel {
         headlinesErrorMessage = nil
         defer { isRefreshingHeadlines = false }
 
+        let categoryParam = selectedCategory.isEmpty ? nil : selectedCategory
         do {
             let resp = try await newsProvider.headlines(
-                category: nil,
+                category: categoryParam,
                 location: config.newsSettings.location,
                 limit: config.newsPageSize,
                 forceFresh: forceFresh
@@ -110,12 +153,16 @@ final class ResearcherViewModel {
             if selectedHeadline.isEmpty || !headlines.contains(selectedHeadline) {
                 if let first = headlines.first {
                     onHeadlineChanged(first)
+                } else {
+                    selectedHeadline = ""
                 }
             }
         } catch {
             headlinesErrorMessage = error.localizedDescription
         }
     }
+
+    // MARK: - Trending Hashtags
 
     func refreshHashtags(forceFresh: Bool = true) async {
         guard !isRefreshingHashtags else { return }

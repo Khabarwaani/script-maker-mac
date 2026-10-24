@@ -8,7 +8,7 @@ struct ResearcherView: View {
         GeometryReader { geometry in
             HStack(alignment: .top, spacing: 0) {
                 sidebarView
-                    .frame(width: max(360, min(420, geometry.size.width * 0.38)))
+                    .frame(width: max(380, min(460, geometry.size.width * 0.38)))
                 Divider().overlay(AppTheme.line)
                 detailAreaView
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -24,240 +24,296 @@ struct ResearcherView: View {
 
     private var sidebarView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                sourceSection
-                topicSection
-                advancedSection
-                providerSection
+            VStack(alignment: .leading, spacing: 24) {
+                storySection
+                researcherAgentSection
                 actionSection
             }
-            .padding(20)
+            .padding(24)
         }
-        .background(AppTheme.card)
+        .background(AppTheme.paper)
         .scrollIndicators(.visible)
+        .background(ScrollBarConfiguration())
         .disabled(viewModel.isResearching)
     }
 
-    private var sourceSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("News Source")
-                .font(.caption.weight(.bold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(AppTheme.secondaryInk)
-
-            Picker("Source", selection: $viewModel.selectedStorySource) {
-                ForEach(viewModel.storySources, id: \.self) { source in
-                    Text(source).tag(source)
-                }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: viewModel.selectedStorySource) { _, _ in
-                Task { await viewModel.onStorySourceChanged() }
+    private var storySection: some View {
+        StudioSection("Story") {
+            EmptyView()
+        } content: {
+            StudioRow("Source", inset: 0) {
+                StudioOptionPicker("Source", selection: $viewModel.selectedStorySource, options: viewModel.storySources)
+                    .onChange(of: viewModel.selectedStorySource) { _, _ in
+                        Task { await viewModel.onStorySourceChanged() }
+                    }
             }
 
             if viewModel.isHashtagSource {
-                hashtagControls
+                StudioRow("Trending hashtag", inset: 0) {
+                    HStack(spacing: 8) {
+                        if viewModel.trendingHashtags.isEmpty {
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingHashtags {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading hashtags…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.hashtagsErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No hashtags found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        } else {
+                            StudioOptionPicker(
+                                "Trending hashtag",
+                                selection: $viewModel.selectedHashtag,
+                                options: [""] + viewModel.trendingHashtags.map(\.tag),
+                                label: { $0.isEmpty ? "None" : $0 }
+                            )
+                            .disabled(viewModel.isRefreshingHashtags)
+                            .onChange(of: viewModel.selectedHashtag) { _, new in
+                                viewModel.onHashtagChanged(new)
+                            }
+                        }
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingHashtags,
+                            helpText: "Refresh trending hashtags"
+                        ) {
+                            Task { await viewModel.refreshHashtags(forceFresh: true) }
+                        }
+                        .padding(.trailing, 10)
+                    }
+                }
+
+                StudioRow("Custom hashtag") {
+                    TextField("e.g. #MakeInIndia", text: $viewModel.customHashtag)
+                        .onSubmit {
+                            if !viewModel.customHashtag.isEmpty {
+                                viewModel.onHashtagChanged(viewModel.customHashtag)
+                            }
+                        }
+                }
+
+                if let detail = viewModel.selectedTagDetail {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let h = detail.headline, !h.isEmpty {
+                            Text(h).font(.subheadline.weight(.medium)).foregroundStyle(AppTheme.ink)
+                        }
+                        if let s = detail.summary, !s.isEmpty {
+                            Text(s).font(.caption).foregroundStyle(AppTheme.secondaryInk).lineLimit(3)
+                        }
+                        if let src = detail.source, !src.isEmpty {
+                            Text("Source: \(src)").font(.caption2).foregroundStyle(AppTheme.secondaryInk)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                }
             } else if !viewModel.isManualSource {
-                headlineControls
-            }
-        }
-    }
+                // Group 1: Subgroup / Category
+                StudioRow("Subgroup", inset: 0) {
+                    HStack(spacing: 8) {
+                        if viewModel.categories.isEmpty {
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingCategories {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading subgroups…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.categoriesErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No subgroups found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        } else {
+                            StudioOptionPicker(
+                                "Subgroup",
+                                selection: $viewModel.selectedCategory,
+                                options: viewModel.categories.map(\.id),
+                                label: { id in
+                                    viewModel.categories.first(where: { $0.id == id })?.label ?? id
+                                }
+                            )
+                            .disabled(viewModel.isRefreshingCategories)
+                            .onChange(of: viewModel.selectedCategory) { _, newCat in
+                                Task { await viewModel.onCategoryChanged(newCat) }
+                            }
+                        }
 
-    private var headlineControls: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Headline")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(AppTheme.ink)
-                Spacer()
-                if viewModel.isRefreshingHeadlines {
-                    ProgressView().controlSize(.small)
-                }
-                Button {
-                    Task { await viewModel.refreshHeadlines(forceFresh: true) }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-                .help("Refresh headlines")
-                .disabled(viewModel.isRefreshingHeadlines)
-            }
-
-            if viewModel.headlines.isEmpty {
-                if let err = viewModel.headlinesErrorMessage {
-                    Text(err)
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.danger)
-                } else {
-                    Text("No headlines loaded")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.secondaryInk)
-                }
-            } else {
-                Picker("Headline", selection: $viewModel.selectedHeadline) {
-                    ForEach(viewModel.headlines, id: \.self) { headline in
-                        Text(headline).tag(headline)
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingCategories,
+                            helpText: "Refresh news subgroups"
+                        ) {
+                            Task { await viewModel.loadCategories(forceFresh: true) }
+                        }
+                        .padding(.trailing, 10)
                     }
                 }
-                .labelsHidden()
-                .onChange(of: viewModel.selectedHeadline) { _, new in
-                    viewModel.onHeadlineChanged(new)
-                }
-            }
-        }
-        .padding(.top, 4)
-    }
 
-    private var hashtagControls: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Trending Hashtag")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(AppTheme.ink)
-                Spacer()
-                if viewModel.isRefreshingHashtags {
-                    ProgressView().controlSize(.small)
-                }
-                Button {
-                    Task { await viewModel.refreshHashtags(forceFresh: true) }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-                .help("Refresh hashtags")
-                .disabled(viewModel.isRefreshingHashtags)
-            }
+                // Group 2: Headline
+                StudioRow("Headline", inset: 0) {
+                    HStack(spacing: 8) {
+                        if viewModel.headlines.isEmpty {
+                            HStack(spacing: 6) {
+                                if viewModel.isRefreshingHeadlines {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading headlines…")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else if let error = viewModel.headlinesErrorMessage {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.danger)
+                                    Text(error)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                } else {
+                                    Text("No headlines found")
+                                        .font(.callout)
+                                        .foregroundStyle(AppTheme.secondaryInk)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        } else {
+                            StudioOptionPicker(
+                                "Headline",
+                                selection: $viewModel.selectedHeadline,
+                                options: viewModel.headlines
+                            )
+                            .disabled(viewModel.isRefreshingHeadlines)
+                            .onChange(of: viewModel.selectedHeadline) { _, new in
+                                viewModel.onHeadlineChanged(new)
+                            }
+                        }
 
-            if viewModel.trendingHashtags.isEmpty {
-                if let err = viewModel.hashtagsErrorMessage {
-                    Text(err)
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.danger)
-                } else {
-                    Text("No hashtags loaded")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.secondaryInk)
-                }
-            } else {
-                Picker("Hashtag", selection: $viewModel.selectedHashtag) {
-                    Text("Select a hashtag…").tag("")
-                    ForEach(viewModel.trendingHashtags, id: \.tag) { tag in
-                        Text(tag.tag).tag(tag.tag)
+                        StudioRefreshButton(
+                            isRefreshing: viewModel.isRefreshingHeadlines,
+                            helpText: "Refresh headlines"
+                        ) {
+                            Task { await viewModel.refreshHeadlines(forceFresh: true) }
+                        }
+                        .padding(.trailing, 10)
                     }
                 }
-                .labelsHidden()
-                .onChange(of: viewModel.selectedHashtag) { _, new in
-                    viewModel.onHashtagChanged(new)
-                }
             }
 
-            TextField("Or custom hashtag (e.g. #ISRO)", text: $viewModel.customHashtag)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit {
-                    if !viewModel.customHashtag.isEmpty {
-                        viewModel.onHashtagChanged(viewModel.customHashtag)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(viewModel.isManualSource ? "Title" : "Topic").font(.callout.weight(.medium))
+                TextField("Write your title or news topic…", text: $viewModel.topic, axis: .vertical)
+                    .lineLimit(viewModel.isManualSource ? 1...2 : 2...4)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+
+    private var researcherAgentSection: some View {
+        StudioSection("Agent Configuration") {
+            EmptyView()
+        } content: {
+            StudioRow("Provider", inset: 0) {
+                StudioOptionPicker(
+                    "Provider",
+                    selection: Binding(
+                        get: { viewModel.selectedProvider.rawValue },
+                        set: { if let p = LocalAgentProvider(rawValue: $0) { viewModel.selectedProvider = p } }
+                    ),
+                    options: LocalAgentProvider.allCases.map(\.rawValue),
+                    label: { raw in
+                        guard let p = LocalAgentProvider(rawValue: raw) else { return raw }
+                        let avail = viewModel.availableProviders[p]
+                        let suffix = (avail?.isAvailable == true) ? "" : " (Unavailable)"
+                        return p.title + suffix
+                    }
+                )
+            }
+
+            StudioRow("Model Override") {
+                TextField("Default / Override (optional)", text: $viewModel.customModel)
+            }
+
+            DisclosureGroup("Advanced options") {
+                VStack(alignment: .leading, spacing: 12) {
+                    StudioRow("Source URL") {
+                        TextField("https://… (optional)", text: $viewModel.sourceURL)
+                    }
+                    StudioRow("Instruction") {
+                        TextField("e.g. Focus on economic impact", text: $viewModel.humanInstruction)
+                    }
+                    StudioRow("Language") {
+                        TextField("English", text: $viewModel.language)
                     }
                 }
-        }
-        .padding(.top, 4)
-    }
-
-    private var topicSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Research Topic")
-                .font(.caption.weight(.bold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(AppTheme.secondaryInk)
-
-            TextEditor(text: $viewModel.topic)
-                .font(.body)
-                .frame(minHeight: 80, maxHeight: 120)
-                .padding(6)
-                .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
-        }
-    }
-
-    private var advancedSection: some View {
-        DisclosureGroup("Advanced Options") {
-            VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Authoritative Source URL").font(.caption).foregroundStyle(AppTheme.secondaryInk)
-                    TextField("https://example.com/article", text: $viewModel.sourceURL)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Human Instruction").font(.caption).foregroundStyle(AppTheme.secondaryInk)
-                    TextField("e.g. Focus on economic impact", text: $viewModel.humanInstruction)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Language").font(.caption).foregroundStyle(AppTheme.secondaryInk)
-                    TextField("English", text: $viewModel.language)
-                        .textFieldStyle(.roundedBorder)
-                }
+                .padding(.top, 8)
             }
-            .padding(.top, 6)
-        }
-        .font(.callout.weight(.medium))
-    }
-
-    private var providerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Agent Provider")
-                .font(.caption.weight(.bold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(AppTheme.secondaryInk)
-
-            Picker("Provider", selection: $viewModel.selectedProvider) {
-                ForEach(LocalAgentProvider.allCases, id: \.self) { provider in
-                    let avail = viewModel.availableProviders[provider]
-                    let suffix = (avail?.isAvailable == true) ? "" : " (Unavailable)"
-                    Text(provider.title + suffix).tag(provider)
-                }
-            }
-            .labelsHidden()
-
-            TextField("Custom model override (optional)", text: $viewModel.customModel)
-                .textFieldStyle(.roundedBorder)
-                .font(.caption)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(AppTheme.secondaryInk)
         }
     }
 
     private var actionSection: some View {
-        VStack(spacing: 10) {
-            Button {
-                Task { await viewModel.runResearch() }
-            } label: {
-                HStack(spacing: 8) {
-                    if viewModel.isResearching {
-                        ProgressView().controlSize(.small)
-                        Text("Researching…")
-                    } else {
+        StudioSection("Research") {
+            EmptyView()
+        } content: {
+            HStack(spacing: 12) {
+                LoadingButton(isLoading: viewModel.isResearching) {
+                    Task { await viewModel.runResearch() }
+                } label: {
+                    HStack(spacing: 6) {
                         Image(systemName: "sparkle.magnifyingglass")
-                        Text("Run Research")
+                        Text(viewModel.isResearching ? "Researching…" : "Run Research")
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .buttonStyle(StudioPrimaryButtonStyle())
+                .controlSize(.large)
+                .disabled(!viewModel.canRunResearch)
+
+                Button {
+                    viewModel.openInPipeline()
+                } label: {
+                    Label("Start in Pipeline", systemImage: "arrow.triangle.branch")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(viewModel.topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isResearching)
+                .help("Open current topic in Pipeline")
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!viewModel.canRunResearch)
         }
-        .padding(.top, 4)
     }
 
     // MARK: - Right Detail Area: Research Output
 
     private var detailAreaView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 if let error = viewModel.errorMessage {
                     errorBanner(error)
                 }
@@ -273,6 +329,9 @@ struct ResearcherView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(AppTheme.paper)
+        .scrollIndicators(.visible)
+        .background(ScrollBarConfiguration())
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -292,9 +351,9 @@ struct ResearcherView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(12)
-        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.danger.opacity(0.3), lineWidth: 1))
+        .padding(14)
+        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.danger.opacity(0.4), lineWidth: 1))
     }
 
     private var loadingView: some View {
@@ -308,12 +367,12 @@ struct ResearcherView: View {
                 .font(.caption)
                 .foregroundStyle(AppTheme.secondaryInk)
         }
-        .frame(maxWidth: .infinity, minHeight: 300)
+        .frame(maxWidth: .infinity, minHeight: 360)
     }
 
     private func resultView(_ result: NewsResearchResult) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // Top Bar: Verification Badge, Confidence, Date, Location
+        VStack(alignment: .leading, spacing: 20) {
+            // Top Bar: Verification Badge, Confidence, Date, Location, Actions
             HStack(spacing: 12) {
                 HStack(spacing: 6) {
                     Image(systemName: result.verified ? "checkmark.seal.fill" : "xmark.seal.fill")
@@ -321,8 +380,8 @@ struct ResearcherView: View {
                         .fontWeight(.semibold)
                 }
                 .font(.callout)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
                 .foregroundStyle(result.verified ? AppTheme.success : AppTheme.danger)
                 .background(result.verified ? AppTheme.success.opacity(0.12) : AppTheme.danger.opacity(0.12), in: Capsule())
 
@@ -334,8 +393,8 @@ struct ResearcherView: View {
                         .foregroundStyle(AppTheme.ink)
                 }
                 .font(.callout)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
                 .background(AppTheme.sunken, in: Capsule())
 
                 if !result.date.isEmpty {
@@ -355,7 +414,6 @@ struct ResearcherView: View {
 
                 Spacer()
 
-                // Actions
                 if let msg = viewModel.copyFeedbackMessage {
                     Text(msg)
                         .font(.caption)
@@ -378,8 +436,8 @@ struct ResearcherView: View {
                 .controlSize(.small)
             }
 
-            // Key Findings / Notes Card
-            VStack(alignment: .leading, spacing: 10) {
+            // Key Findings & Grounded Notes Card
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Key Findings & Grounded Notes")
                     .font(.headline)
                     .foregroundStyle(AppTheme.ink)
@@ -389,12 +447,12 @@ struct ResearcherView: View {
                         .font(.callout)
                         .foregroundStyle(AppTheme.secondaryInk)
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
                         ForEach(Array(result.notes.enumerated()), id: \.offset) { _, note in
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: 10) {
                                 Image(systemName: "circle.fill")
                                     .font(.system(size: 6))
-                                    .padding(.top, 6)
+                                    .padding(.top, 7)
                                     .foregroundStyle(AppTheme.accent)
                                 Text(note)
                                     .font(.body)
@@ -404,7 +462,7 @@ struct ResearcherView: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
@@ -425,7 +483,7 @@ struct ResearcherView: View {
                                 Text(person).font(.callout)
                             }
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, 5)
                             .background(AppTheme.sunken, in: Capsule())
                             .foregroundStyle(AppTheme.ink)
                         }
@@ -449,8 +507,8 @@ struct ResearcherView: View {
                                 .font(.callout)
                                 .foregroundStyle(AppTheme.accent)
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(AppTheme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                                .padding(.vertical, 4)
+                                .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
                 }
@@ -461,10 +519,10 @@ struct ResearcherView: View {
                 Text(result.rawOutput)
                     .font(.caption.monospaced())
                     .foregroundStyle(AppTheme.secondaryInk)
-                    .padding(12)
+                    .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.top, 6)
+                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.top, 8)
             }
             .font(.callout.weight(.medium))
             .foregroundStyle(AppTheme.secondaryInk)
@@ -472,19 +530,19 @@ struct ResearcherView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             Image(systemName: "newspaper.fill")
-                .font(.system(size: 44))
+                .font(.system(size: 48))
                 .foregroundStyle(AppTheme.secondaryInk.opacity(0.6))
             Text("News Researcher")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(AppTheme.ink)
-            Text("Browse news headlines or trending hashtags from the left sidebar, or type a custom topic. Click Run Research to fact-check the story and generate grounded intelligence.")
+            Text("Browse news headlines by subgroup or trending hashtags from the left sidebar, or type a custom topic. Click Run Research to fact-check the story and generate grounded intelligence.")
                 .font(.callout)
                 .foregroundStyle(AppTheme.secondaryInk)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 440)
+                .frame(maxWidth: 460)
         }
-        .frame(maxWidth: .infinity, minHeight: 340)
+        .frame(maxWidth: .infinity, minHeight: 360)
     }
 }
