@@ -4,6 +4,7 @@
 # Xcode user state and build output
 xcuserdata/
 *.xcuserstate
+*.xcworkspace/
 DerivedData/
 build/
 *.xcresult

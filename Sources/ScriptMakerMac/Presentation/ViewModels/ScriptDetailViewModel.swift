@@ -1,17 +1,18 @@
 import Foundation
 import Observation
 
-/// Owns state and operations for continuous-shot visual scene detailing in a master-detail workspace.
+/// Owns state and operations for continuous-shot visual scene detailing in an independent master-detail workspace.
+/// Unlinked from and completely isolated from Library stories.
 @Observable
 @MainActor
 final class ScriptDetailViewModel {
     let service: any ScriptDetailRefining
-    let storyRepository: any StoryRepository
+    let repository: any ScriptDetailRepository
     let clipboard: any ClipboardWriting
     let config: AppConfig
 
-    var stories: [Story] = []
-    var selectedStoryID: String? = nil
+    var items: [ScriptDetailItem] = []
+    var selectedItemID: String? = nil
     var searchQuery: String = ""
 
     var editingTitle: String = ""
@@ -32,29 +33,29 @@ final class ScriptDetailViewModel {
 
     init(
         service: any ScriptDetailRefining,
-        storyRepository: any StoryRepository,
+        repository: any ScriptDetailRepository,
         clipboard: any ClipboardWriting,
         config: AppConfig
     ) {
         self.service = service
-        self.storyRepository = storyRepository
+        self.repository = repository
         self.clipboard = clipboard
         self.config = config
     }
 
-    var filteredStories: [Story] {
+    var filteredItems: [ScriptDetailItem] {
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !trimmed.isEmpty else { return stories }
-        return stories.filter {
+        guard !trimmed.isEmpty else { return items }
+        return items.filter {
             $0.title.lowercased().contains(trimmed) ||
-            ($0.scriptText?.lowercased().contains(trimmed) == true) ||
-            ($0.stageOutputs?["ScriptDetail"]?.lowercased().contains(trimmed) == true)
+            $0.originalScript.lowercased().contains(trimmed) ||
+            $0.detailedScript.lowercased().contains(trimmed)
         }
     }
 
-    var selectedStory: Story? {
-        guard let id = selectedStoryID else { return nil }
-        return stories.first { $0.id == id }
+    var selectedItem: ScriptDetailItem? {
+        guard let id = selectedItemID else { return nil }
+        return items.first { $0.id == id }
     }
 
     var canRunDetail: Bool {
@@ -74,73 +75,67 @@ final class ScriptDetailViewModel {
 
     func refresh() async {
         await refreshProviders()
-        await loadStories()
+        await loadItems()
     }
 
-    func loadStories() async {
-        let all = await storyRepository.all()
-        stories = all.sorted { $0.createdAt > $1.createdAt }
-        if let current = selectedStoryID, stories.contains(where: { $0.id == current }) {
-            selectStory(id: current)
-        } else if let first = stories.first {
-            selectStory(id: first.id)
+    func loadItems() async {
+        let all = await repository.all()
+        items = all.sorted { $0.createdAt > $1.createdAt }
+        if let current = selectedItemID, items.contains(where: { $0.id == current }) {
+            selectItem(id: current)
+        } else if let first = items.first {
+            selectItem(id: first.id)
         } else {
-            createNewStory()
+            createNewItem()
         }
     }
 
-    func selectStory(id: String) {
-        selectedStoryID = id
-        guard let story = stories.first(where: { $0.id == id }) else { return }
-        editingTitle = story.title
-        editingOriginalScript = story.scriptText ?? ""
-        editingDetailedScript = story.stageOutputs?["ScriptDetail"] ?? ""
-        editingConsolidatedInstruction = story.instruction ?? ""
+    func selectItem(id: String) {
+        selectedItemID = id
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        editingTitle = item.title
+        editingOriginalScript = item.originalScript
+        editingDetailedScript = item.detailedScript
+        editingConsolidatedInstruction = item.instruction
         editingUserInstruction = ""
         errorMessage = nil
     }
 
-    func createNewStory() {
+    func createNewItem() {
         let newID = UUID().uuidString
-        let newStory = Story(
+        let newItem = ScriptDetailItem(
             id: newID,
             title: "Untitled Scene",
-            summary: "",
-            headline: "",
-            createdAt: DateFormatting.iso8601Now(),
-            scriptText: "",
+            originalScript: "",
+            detailedScript: "",
             instruction: "",
-            stageOutputs: [:]
+            createdAt: DateFormatting.iso8601Now(),
+            updatedAt: DateFormatting.iso8601Now()
         )
-        stories.insert(newStory, at: 0)
-        selectStory(id: newID)
+        items.insert(newItem, at: 0)
+        selectItem(id: newID)
     }
 
     // MARK: - Actions
 
-    func saveCurrentStory() async {
-        guard let id = selectedStoryID else { return }
+    func saveCurrentItem() async {
+        guard let id = selectedItemID else { return }
         isSaving = true
         defer { isSaving = false }
 
         let cleanTitle = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle = cleanTitle.isEmpty ? "Untitled Scene" : cleanTitle
 
-        var existing = stories.first(where: { $0.id == id }) ?? Story(id: id)
+        var existing = items.first(where: { $0.id == id }) ?? ScriptDetailItem(id: id)
         existing.title = resolvedTitle
-        existing.scriptText = editingOriginalScript
+        existing.originalScript = editingOriginalScript
+        existing.detailedScript = editingDetailedScript
         existing.instruction = editingConsolidatedInstruction
-        var stage = existing.stageOutputs ?? [:]
-        if !editingDetailedScript.isEmpty {
-            stage["ScriptDetail"] = editingDetailedScript
-        } else {
-            stage.removeValue(forKey: "ScriptDetail")
-        }
-        existing.stageOutputs = stage
+        existing.updatedAt = DateFormatting.iso8601Now()
 
-        await storyRepository.save(existing)
-        if let idx = stories.firstIndex(where: { $0.id == id }) {
-            stories[idx] = existing
+        await repository.save(existing)
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx] = existing
         }
     }
 
@@ -154,7 +149,7 @@ final class ScriptDetailViewModel {
             latestScript: editingDetailedScript,
             instruction: editingConsolidatedInstruction
         )
-        let sessionID = selectedStoryID.map { "script-detail-\($0)" }
+        let sessionID = selectedItemID.map { "script-detail-\($0)" }
         let request = ScriptDetailRequest(
             originalScript: editingOriginalScript,
             draft: draft,
@@ -170,7 +165,7 @@ final class ScriptDetailViewModel {
             editingDetailedScript = result.latestScript
             editingConsolidatedInstruction = result.instruction
             editingUserInstruction = ""
-            await saveCurrentStory()
+            await saveCurrentItem()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -192,14 +187,14 @@ final class ScriptDetailViewModel {
         }
     }
 
-    func deleteStory(id: String) async {
-        await storyRepository.remove(id: id)
-        stories.removeAll { $0.id == id }
-        if selectedStoryID == id {
-            if let first = stories.first {
-                selectStory(id: first.id)
+    func deleteItem(id: String) async {
+        await repository.remove(id: id)
+        items.removeAll { $0.id == id }
+        if selectedItemID == id {
+            if let first = items.first {
+                selectItem(id: first.id)
             } else {
-                createNewStory()
+                createNewItem()
             }
         }
     }
