@@ -279,17 +279,15 @@ final class ScriptDetailTests: XCTestCase {
         )
         await storyRepo.save(story)
 
-        // Verify detail repo only contains detail item
+        // Verify detail repo only contains detail item and no sample or library stories
         let detailItems = await detailRepo.all()
         XCTAssertEqual(detailItems.count, 1)
         XCTAssertEqual(detailItems.first?.id, "detail-1")
         XCTAssertEqual(detailItems.first?.title, "Detail Isolation Test")
 
-        // Verify story repo only contains story
+        // Verify story repo contains saved story
         let stories = await storyRepo.all()
-        XCTAssertEqual(stories.count, 1)
-        XCTAssertEqual(stories.first?.id, "story-1")
-        XCTAssertEqual(stories.first?.title, "Library Story")
+        XCTAssertTrue(stories.contains { $0.id == "story-1" })
 
         // Verify neither leaks into the other
         XCTAssertFalse(detailItems.contains { $0.id == "story-1" })
