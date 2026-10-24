@@ -56,9 +56,10 @@ private func makeSampleDefinitions() throws -> [LocalAgentDefinition] {
     return [
         LocalAgentDefinition(agentID: "NewsResearcher", name: "News Researcher", version: "1.1.0", schema: newsSchema, requiresWebResearch: true, isExecutable: true),
         LocalAgentDefinition(agentID: "GroundedJokeGenerator", name: "Grounded Joke Generator", version: "1.2.0", schema: jokeSchema, requiresWebResearch: false, isExecutable: true),
-        LocalAgentDefinition(agentID: "ThreeSceneStoryCreator", name: "3-Scene Story Creator", version: "2.2.1", schema: storySchema, requiresWebResearch: false, isExecutable: true),
+        LocalAgentDefinition(agentID: "ThreeSceneStoryCreator", name: "3-Scene Story Creator", version: "2.3.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
         LocalAgentDefinition(agentID: "TwoSceneStoryCreator", name: "2-Scene Story Creator", version: "1.0.0", schema: storySchema, requiresWebResearch: false, isExecutable: true),
-        LocalAgentDefinition(agentID: "ScriptChat", name: "Script Chat", version: "1.0.0", schema: chatSchema, requiresWebResearch: false, isExecutable: true)
+        LocalAgentDefinition(agentID: "ScriptChat", name: "Script Chat", version: "1.0.0", schema: chatSchema, requiresWebResearch: false, isExecutable: true),
+        LocalAgentDefinition(agentID: "ScriptDetail", name: "Script Detail", version: "1.0.0", schema: chatSchema, requiresWebResearch: false, isExecutable: true)
     ]
 }
 
@@ -224,12 +225,16 @@ final class PipelineFlowTests: XCTestCase {
         )
 
         let transitions = await resolver.compatibleTransitions(from: step, catalog: catalog)
-        XCTAssertEqual(transitions.count, 1)
+        XCTAssertEqual(transitions.count, 2)
 
-        let chatTransition = try XCTUnwrap(transitions.first)
+        let chatTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "ScriptChat" })
         XCTAssertEqual(chatTransition.targetAgentID, "ScriptChat")
         XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Why is this watch beeping at 4 AM?") == true)
         XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Title: Smart Watch Confusion") == true)
+
+        let detailTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "ScriptDetail" })
+        XCTAssertEqual(detailTransition.targetAgentID, "ScriptDetail")
+        XCTAssertTrue(detailTransition.mappedDraft.fields["originalScript"]?.text.contains("Why is this watch beeping at 4 AM?") == true)
     }
 
     func testTwoSceneStoryCreatorOutputResolvesScriptChat() async throws {
@@ -287,12 +292,16 @@ final class PipelineFlowTests: XCTestCase {
         )
 
         let transitions = await resolver.compatibleTransitions(from: step, catalog: catalog)
-        XCTAssertEqual(transitions.count, 1)
+        XCTAssertEqual(transitions.count, 2)
 
-        let chatTransition = try XCTUnwrap(transitions.first)
+        let chatTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "ScriptChat" })
         XCTAssertEqual(chatTransition.targetAgentID, "ScriptChat")
         XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Where did everyone vanish on Friday morning?!") == true)
         XCTAssertTrue(chatTransition.mappedDraft.fields["originalScript"]?.text.contains("Title: 4-Day Work Week Shock") == true)
+
+        let detailTransition = try XCTUnwrap(transitions.first { $0.targetAgentID == "ScriptDetail" })
+        XCTAssertEqual(detailTransition.targetAgentID, "ScriptDetail")
+        XCTAssertTrue(detailTransition.mappedDraft.fields["originalScript"]?.text.contains("Where did everyone vanish on Friday morning?!") == true)
     }
 
     @MainActor

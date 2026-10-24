@@ -227,7 +227,7 @@ final class LocalAgentViewModelTests: XCTestCase {
         vm.run(); await idle(vm)
         XCTAssertEqual(vm.rawOutput, "bad")
         XCTAssertNotNil(vm.errorMessage)
-        XCTAssertEqual(ContentViewModel.Tab.allCases.map(\.title), ["Studio", "Library", "LocalAgent", "Pipeline"])
+        XCTAssertEqual(ContentViewModel.Tab.allCases.map(\.title), ["Studio", "Library", "LocalAgent", "Pipeline", "Script Detail"])
     }
     private func idle(_ vm: LocalAgentViewModel) async {
         for _ in 0..<200 { if !vm.isRunning { return }; try? await Task.sleep(for: .milliseconds(5)) }

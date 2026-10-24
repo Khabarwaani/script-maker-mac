@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var libraryViewModel: LibraryViewModel
     @State private var localAgentViewModel: LocalAgentViewModel
     @State private var pipelineViewModel: PipelineTabViewModel
+    @State private var scriptDetailViewModel: ScriptDetailViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
@@ -32,6 +33,7 @@ struct ContentView: View {
         )
         _localAgentViewModel = State(wrappedValue: viewModel.localAgentViewModel)
         _pipelineViewModel = State(wrappedValue: viewModel.pipelineViewModel)
+        _scriptDetailViewModel = State(wrappedValue: viewModel.scriptDetailViewModel)
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
         )
@@ -73,6 +75,7 @@ struct ContentView: View {
                 case .library: LibraryView(viewModel: libraryViewModel)
                 case .localAgent: LocalAgentView(viewModel: localAgentViewModel)
                 case .pipeline: PipelineTabView(viewModel: pipelineViewModel)
+                case .scriptDetail: ScriptDetailTabView(viewModel: scriptDetailViewModel)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
