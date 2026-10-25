@@ -197,6 +197,13 @@ final class ScriptChatViewModel {
         task?.cancel(); task = nil; isRefining = false
     }
 
-    func markSaved() { hasSavedDraft = true }
+    func markSaved() {
+        cancel()
+        source = nil
+        draft = ScriptChatDraft(latestScript: "", instruction: "")
+        instructionDraft = ""
+        turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil
+        hasSavedDraft = true
+    }
     func showSaveError(_ message: String) { errorMessage = message }
 }

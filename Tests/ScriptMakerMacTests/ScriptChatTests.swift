@@ -97,7 +97,7 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertFalse(vm.isRefining)
     }
 
-    func testSaveCreatesNewEntryAndPreservesOriginal() async throws {
+    func testSaveReplacesOriginalAndKeepsOnlyLatestScript() async throws {
         let repository = ChatRepository()
         let original = Story(title: "A story", videoURL: "https://example.com/old.mp4", scriptText: "Original script", stageOutputs: ["script": "old output"])
         await repository.save(original)
@@ -114,16 +114,27 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertNotEqual(copy.id, original.id)
         XCTAssertEqual(copy.sourceStoryID, original.id)
         XCTAssertEqual(copy.scriptText, "Draft 1")
-        XCTAssertEqual(copy.instruction, "Active instructions 1")
-        XCTAssertEqual(copy.scriptVersions?.map(\.text), ["Original script", "Draft 1"])
+        XCTAssertNil(copy.instruction)
+        XCTAssertNil(copy.scriptVersions?.first?.instruction)
+        XCTAssertNil(chat.source)
+        XCTAssertEqual(chat.originalScript, "")
+        XCTAssertEqual(chat.consolidatedInstruction, "")
+        XCTAssertEqual(chat.draft.latestScript, "")
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertEqual(copy.scriptVersions?.map(\.text), ["Draft 1"])
         XCTAssertNil(copy.stageOutputs)
         XCTAssertNil(copy.videoURL)
         XCTAssertNil(copy.uploadReceipt)
-        XCTAssertEqual(library.stories.first(where: { $0.id == original.id }), original)
+        XCTAssertNil(library.stories.first(where: { $0.id == original.id }))
+        XCTAssertEqual(library.stories.count, 1)
+        XCTAssertEqual(copy.currentScriptVersionID, copy.scriptVersions?.first?.id)
         let duplicate = await library.saveRefinedScript()
         XCTAssertFalse(duplicate)
         let persisted = await repository.all()
-        XCTAssertEqual(persisted.count, 2)
+        XCTAssertEqual(persisted.map(\.id), [copy.id])
+        await library.refresh()
+        XCTAssertEqual(library.stories.map(\.id), [copy.id])
+        XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Draft 1"])
     }
 
     func testEmptyOriginalAndNoSuccessfulTurnCannotSave() async throws {
