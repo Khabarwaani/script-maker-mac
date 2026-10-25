@@ -190,13 +190,14 @@ final class LibraryViewModel {
         defer { isSavingEdits = false }
         var refined = original
         appendVersion(chat.draft.latestScript, instruction: chat.draft.instruction, to: &refined)
+        refined.scriptVersions = refined.scriptVersions.map { Array($0.suffix(1)) }
         refined.instruction = chat.draft.instruction
         refined.uploadReceipt = nil
         refined.videoURL = nil
-        await saveEditedCopy(refined, originalID: original.id)
+        await saveEditedCopy(refined, originalID: original.id, replacingOriginal: true)
         chat.markSaved()
         await chat.closeSession()
-        actionNotice = "Refined script saved as a new story"
+        actionNotice = "Latest script saved"
         return true
     }
 
@@ -298,7 +299,7 @@ final class LibraryViewModel {
         await repository.save(story)
     }
 
-    private func saveEditedCopy(_ edited: Story, originalID: String) async {
+    private func saveEditedCopy(_ edited: Story, originalID: String, replacingOriginal: Bool = false) async {
         var copy = edited
         copy.id = UUID().uuidString
         copy.createdAt = DateFormatting.iso8601Now()
@@ -307,6 +308,10 @@ final class LibraryViewModel {
         copy.stageOutputs = nil
         copy.status = "saved"
         await repository.save(copy)
+        if replacingOriginal {
+            await repository.remove(id: originalID)
+            stories.removeAll { $0.id == originalID }
+        }
         stories.insert(copy, at: 0)
         selectedStoryID = copy.id
         actionNotice = "Edited copy saved as a new story"
