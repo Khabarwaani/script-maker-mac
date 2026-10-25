@@ -74,17 +74,11 @@ enum CompositionRoot {
                 case .persistentStdio: persistence = .persistentStdio(memory: memory)
                 case .daemon: persistence = .daemon(memory: memory)
                 }
-                let arguments: [String]
-                switch request.provider {
-                case .codex: arguments = ["--skip-git-repo-check"]
-                case .grok: arguments = ["--single"]
-                default: arguments = []
-                }
                 let config = TerminalAgentConfiguration(
                     executablePath: launcher.path,
                     model: request.model,
                     workingDirectory: workspace,
-                    extraArguments: CLIArguments(arguments),
+                    extraArguments: CLIArguments(request.provider.sessionArguments),
                     additionalSearchPaths: searchPaths,
                     metadata: .init(rawValue: metadata),
                     persistenceMode: persistence)

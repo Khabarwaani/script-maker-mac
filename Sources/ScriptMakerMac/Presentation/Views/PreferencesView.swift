@@ -31,6 +31,8 @@ struct PreferencesView: View {
                             Text(mode.label).tag(mode)
                         }
                     }
+                    Text("Local agents run in a temporary workspace. Imported media is copied to Library/Application Support/ScriptMakerMac/Media; exports use the destination you choose. Installed AI providers use their own saved sign-in settings. Script Maker does not need broad Documents access for script generation.")
+                        .font(.caption).foregroundStyle(AppTheme.secondaryInk)
                     Text(viewModel.scriptRefinementMode.summary)
                         .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 }

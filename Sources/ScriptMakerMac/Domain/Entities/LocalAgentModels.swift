@@ -16,6 +16,14 @@ enum LocalAgentProvider: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var title: String { self == .appleLocal ? "Apple Intelligence (on-device)" : rawValue.capitalized }
     var executable: String { self == .antigravity ? "agy" : rawValue }
+    var sessionArguments: [String] {
+        switch self {
+        case .codex: return ["--skip-git-repo-check"]
+        case .antigravity: return ["--new-project", "--sandbox"]
+        case .grok: return ["--single"]
+        default: return []
+        }
+    }
 }
 
 struct LocalAgentSessionSettings: Sendable {

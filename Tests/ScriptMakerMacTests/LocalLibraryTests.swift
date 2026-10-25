@@ -319,11 +319,10 @@ final class LocalLibraryNetworkTests: XCTestCase {
         } catch { XCTAssertTrue(error.localizedDescription.contains("Could not find related news")) }
     }
 
-    func testTelegramUsesExistingTokenAndChatCacheForTitleOnlyStory() async throws {
+    func testTelegramUsesSavedTokenAndAppSupportChatCacheForTitleOnlyStory() async throws {
         let home = try temporaryHome()
         let files = FileStore()
-        try files.writeCreatingDirectory(Data("# comment\n123:fake-token\n".utf8), to: home.appendingPathComponent("Documents/telegrambot/bot_token.txt"))
-        try files.writeCreatingDirectory(Data(#"{"chat_id":42}"#.utf8), to: home.appendingPathComponent(".cache/telegram_bot_chat_id.json"))
+        try files.writeCreatingDirectory(Data(#"{"chat_id":42}"#.utf8), to: home.appendingPathComponent("Library/Application Support/ScriptMakerMac/telegram-chat.json"))
         LocalLibraryHTTPStub.handler = { request in
             XCTAssertEqual(request.url?.path, "/bot123:fake-token/sendMessage")
             let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
@@ -331,8 +330,23 @@ final class LocalLibraryNetworkTests: XCTestCase {
             XCTAssertEqual(body["text"], "Only a title\n#News")
             return (200, [:], Data(#"{"ok":true,"result":{"message_id":1}}"#.utf8))
         }
-        let result = try await uploader(home: home).upload(Story(title: "Only a title", hashtags: ["#News"]), to: .telegram, options: .init())
+        let result = try await uploader(home: home).upload(Story(title: "Only a title", hashtags: ["#News"]), to: .telegram, options: .init(telegramToken: "123:fake-token"))
         XCTAssertEqual(result.message, "Telegram: sent to 1 chat(s).")
+    }
+
+    func testLegacyDocumentsTokenIsNotUsedImplicitly() async throws {
+        let home = try temporaryHome()
+        try FileStore().writeCreatingDirectory(Data("123:old-token".utf8), to: home.appendingPathComponent("Documents/telegrambot/bot_token.txt"))
+        LocalLibraryHTTPStub.handler = { _ in
+            XCTFail("Missing saved credentials must fail before networking")
+            return (500, [:], Data())
+        }
+        do {
+            _ = try await uploader(home: home).upload(Story(title: "Test"), to: .telegram, options: .init())
+            XCTFail("Expected Settings guidance")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("Settings"))
+        }
     }
 
     func testSavedTelegramSettingsOverrideExistingFiles() async throws {
@@ -436,7 +450,7 @@ final class LocalLibraryNetworkTests: XCTestCase {
 
     func testTelegramGroupFailureReportsSuccessfulDirectDelivery() async throws {
         let home = try temporaryHome()
-        try FileStore().writeCreatingDirectory(Data("-1001\n-1001\n".utf8), to: home.appendingPathComponent("Documents/telegrambot/group_ids.txt"))
+        try FileStore().writeCreatingDirectory(Data("[-1001]".utf8), to: home.appendingPathComponent("Library/Application Support/ScriptMakerMac/telegram-groups.json"))
         LocalLibraryHTTPStub.handler = { request in
             if request.url?.lastPathComponent == "getUpdates" {
                 return (200, [:], Data(#"{"ok":true,"result":[]}"#.utf8))

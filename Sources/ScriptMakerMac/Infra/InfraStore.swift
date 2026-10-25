@@ -153,6 +153,7 @@ struct FileStore: Sendable {
         let script = """
         #!/bin/bash
         set -o pipefail
+        cd -- \(quote(workspace.path)) || exit 1
         export PATH=\(quote(paths.joined(separator: ":")))
         arguments=()
         for argument in "$@"; do

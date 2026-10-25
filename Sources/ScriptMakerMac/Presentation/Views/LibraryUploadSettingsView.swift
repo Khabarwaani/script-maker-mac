@@ -10,7 +10,7 @@ struct LibraryUploadSettingsView: View {
             SecureField("Bot token", text: $viewModel.uploadOptions.telegramToken)
             TextField("Chat ID", text: $viewModel.uploadOptions.telegramChatID)
             Toggle("Also send to configured Telegram groups", isOn: $viewModel.uploadOptions.includeTelegramGroups)
-            Text("Leave token and chat ID blank to use your existing Telegram bot setup.")
+            Text("Save your bot token here. Leave chat ID blank to discover it after you message your bot. Script Maker does not read Telegram settings from Documents.")
                 .font(.caption).foregroundStyle(AppTheme.secondaryInk)
             Divider()
             Text("Google Drive / Sheets").font(.headline)
