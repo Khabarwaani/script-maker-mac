@@ -45,6 +45,7 @@ struct ScriptChatView: View {
             if let reason = viewModel.providers[viewModel.provider], !reason.isAvailable {
                 Text(reason.reason).font(.callout).foregroundStyle(.secondary)
             }
+            ScriptChatRevisionPicker(viewModel: viewModel, isSaving: isSaving)
             ScrollViewReader { scroll in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -217,5 +218,54 @@ private struct ScriptChatInstructions: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }.padding(.horizontal, 12).padding(.bottom, 12)
+    }
+}
+
+private struct ScriptChatRevisionPicker: View {
+    @Bindable var viewModel: ScriptChatViewModel
+    let isSaving: Bool
+    @State private var pendingRevisionID: UUID?
+    @State private var showingDiscardConfirmation = false
+
+    var body: some View {
+        HStack {
+            Button {
+                requestSelection(viewModel.previousRevisionID)
+            } label: {
+                Label("Previous revision", systemImage: "chevron.left")
+            }
+            .disabled(!viewModel.canSelectPreviousRevision || isSaving)
+            Picker("Working revision", selection: Binding(
+                get: { viewModel.selectedRevisionID },
+                set: { requestSelection($0) })) {
+                Text("Original script").tag(Optional<UUID>.none)
+                ForEach(Array(viewModel.revisions.enumerated()), id: \.element.id) { index, revision in
+                    Text("Revision \(index + 1)").tag(Optional(revision.id))
+                }
+            }
+            .frame(maxWidth: 280)
+            .disabled(viewModel.isRefining || isSaving)
+            Spacer()
+            Text("Refine from any revision. Other revisions stay available until you save.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .confirmationDialog("Discard unsaved edits and switch revisions?", isPresented: $showingDiscardConfirmation) {
+            Button("Discard edits and switch", role: .destructive) {
+                Task { await viewModel.selectRevision(pendingRevisionID) }
+            }
+            Button("Keep editing", role: .cancel) { }
+        } message: {
+            Text("Your current script edits, pending instruction, and instruction edits will be discarded. Generated revisions will remain available.")
+        }
+    }
+
+    private func requestSelection(_ id: UUID?) {
+        guard id != viewModel.selectedRevisionID else { return }
+        pendingRevisionID = id
+        if viewModel.hasUnsavedRevisionEdits {
+            showingDiscardConfirmation = true
+        } else {
+            Task { await viewModel.selectRevision(id) }
+        }
     }
 }

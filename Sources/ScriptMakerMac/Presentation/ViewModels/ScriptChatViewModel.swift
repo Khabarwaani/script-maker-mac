@@ -11,6 +11,8 @@ final class ScriptChatViewModel {
     private(set) var source: Story?
     private(set) var draft = ScriptChatDraft(latestScript: "", instruction: "")
     private(set) var turns: [ScriptChatTurn] = []
+    private(set) var revisions: [ScriptChatRevision] = []
+    private(set) var selectedRevisionID: UUID?
     private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
     private(set) var isRefining = false
     private(set) var isLoadingProviders = false
@@ -36,7 +38,33 @@ final class ScriptChatViewModel {
     var originalScript: String { source?.scriptText ?? "" }
     var originalInstruction: String { source?.instruction ?? "" }
     var hasHistoryEdits: Bool { !historyEdits.isEmpty }
-    var hasScriptEdits: Bool { draft.latestScript != (turns.last?.script ?? originalScript) }
+    var hasScriptEdits: Bool { draft.latestScript != (selectedRevision?.draft.latestScript ?? originalScript) }
+    private var selectedRevision: ScriptChatRevision? { revisions.first { $0.id == selectedRevisionID } }
+    var canSelectPreviousRevision: Bool { !isRefining && selectedRevisionID != nil }
+    var previousRevisionID: UUID? {
+        guard let index = revisions.firstIndex(where: { $0.id == selectedRevisionID }), index > 0 else { return nil }
+        return revisions[index - 1].id
+    }
+    var hasUnsavedRevisionEdits: Bool {
+        hasScriptEdits || hasConsolidatedInstructionEdits || hasHistoryEdits || !StringFormatting.isBlank(userInstruction)
+    }
+
+    func selectRevision(_ revisionID: UUID?) async {
+        guard !isRefining, revisionID != selectedRevisionID, source != nil else { return }
+        let revision = revisions.first { $0.id == revisionID }
+        guard revisionID == nil || revision != nil else { return }
+        cancel()
+        let id = operationID
+        isRefining = true
+        await service.closeSession()
+        guard operationID == id else { return }
+        selectedRevisionID = revisionID
+        draft = revision?.draft ?? ScriptChatDraft(latestScript: originalScript, instruction: originalInstruction)
+        instructionDraft = draft.instruction
+        turns = revision?.turns ?? []
+        historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
+        isRefining = false
+    }
     var editableScript: String {
         get { draft.latestScript }
         set {
@@ -91,7 +119,7 @@ final class ScriptChatViewModel {
         }
         let previousStoryID = source?.id
         cancel()
-        source = nil; turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
+        source = nil; turns = []; revisions = []; selectedRevisionID = nil; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
         instructionDraft = ""
         if let config { mode = config.scriptRefinementMode }
@@ -110,7 +138,7 @@ final class ScriptChatViewModel {
     func reset() async {
         guard let story = source else { return }
         cancel()
-        turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
+        turns = []; revisions = []; selectedRevisionID = nil; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         let script = story.scriptText ?? ""
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
         instructionDraft = draft.instruction
@@ -189,6 +217,9 @@ final class ScriptChatViewModel {
                 self.draft = result
                 self.instructionDraft = result.instruction
                 self.turns = completed
+                let revision = ScriptChatRevision(draft: result, turns: completed)
+                self.revisions.append(revision)
+                self.selectedRevisionID = revision.id
                 self.historyEdits = [:]
                 if clearInput { self.userInstruction = "" }
                 self.hasSavedDraft = false
@@ -213,7 +244,7 @@ final class ScriptChatViewModel {
         source = nil
         draft = ScriptChatDraft(latestScript: "", instruction: "")
         instructionDraft = ""
-        turns = []; historyEdits = [:]; userInstruction = ""; errorMessage = nil
+        turns = []; revisions = []; selectedRevisionID = nil; historyEdits = [:]; userInstruction = ""; errorMessage = nil
         hasSavedDraft = true
     }
     func showSaveError(_ message: String) { errorMessage = message }

@@ -45,3 +45,15 @@ struct ScriptChatTurn: Identifiable, Equatable, Sendable {
         self.instructionOverride = instructionOverride
     }
 }
+
+struct ScriptChatRevision: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let draft: ScriptChatDraft
+    let turns: [ScriptChatTurn]
+
+    init(draft: ScriptChatDraft, turns: [ScriptChatTurn]) {
+        id = UUID()
+        self.draft = draft
+        self.turns = turns
+    }
+}

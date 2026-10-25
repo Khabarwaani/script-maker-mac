@@ -175,7 +175,7 @@ final class ScriptChatServiceTests: XCTestCase {
         let lastRequest = await runner.lastRequest
         let request = try XCTUnwrap(lastRequest)
         XCTAssertEqual(request.agentID, "ScriptChat")
-        XCTAssertEqual(request.version, "1.0.0")
+        XCTAssertEqual(request.version, "1.0.1")
         XCTAssertEqual(request.model, "test-model")
         XCTAssertEqual(request.sessionID, "script-chat")
         XCTAssertEqual(request.session.persistence, .persistentStdio)
@@ -703,5 +703,86 @@ extension ScriptChatTests {
         XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Manually rewritten script"])
         let stored = await repository.all()
         XCTAssertEqual(stored.count, 1)
+    }
+}
+
+extension ScriptChatTests {
+    func testEarlierRevisionRestoresItsContextAndCanBranchWithoutLosingLaterRevisions() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original", instruction: "Baseline"))
+        await chat.refreshProviders()
+        chat.userInstruction = "First change"
+        await chat.refine()
+        let first = try XCTUnwrap(chat.selectedRevisionID)
+        chat.userInstruction = "Second change"
+        await chat.refine()
+        let second = try XCTUnwrap(chat.selectedRevisionID)
+        XCTAssertEqual(chat.previousRevisionID, first)
+        await chat.selectRevision(first)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+        XCTAssertEqual(chat.consolidatedInstruction, "Active instructions 1")
+        XCTAssertEqual(chat.turns.count, 1)
+        XCTAssertFalse(chat.hasScriptEdits)
+        chat.userInstruction = "Fix the first draft differently"
+        await chat.refine()
+        let request = await service.requests.last
+        XCTAssertEqual(request?.draft.latestScript, "Draft 1")
+        XCTAssertEqual(request?.draft.instruction, "Active instructions 1")
+        XCTAssertEqual(chat.revisions.count, 3)
+        XCTAssertEqual(chat.turns.count, 2)
+        await chat.selectRevision(second)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 2")
+        XCTAssertEqual(chat.turns.last?.userInstruction, "Second change")
+        await chat.selectRevision(nil)
+        XCTAssertEqual(chat.draft.latestScript, "Original")
+        XCTAssertEqual(chat.consolidatedInstruction, "Baseline")
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertEqual(chat.revisions.count, 3)
+    }
+
+    func testFailedRefinementKeepsSelectedRevisionAndArchivesForRecovery() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "First change"
+        await chat.refine()
+        let selected = chat.selectedRevisionID
+        chat.editableScript = "Manual correction"
+        chat.userInstruction = "Fix pacing"
+        XCTAssertTrue(chat.hasUnsavedRevisionEdits)
+        await service.configure(fail: true)
+        await chat.refine()
+        XCTAssertEqual(chat.selectedRevisionID, selected)
+        XCTAssertEqual(chat.draft.latestScript, "Manual correction")
+        XCTAssertEqual(chat.revisions.count, 1)
+        XCTAssertEqual(chat.userInstruction, "Fix pacing")
+        XCTAssertNotNil(chat.errorMessage)
+        await chat.selectRevision(nil)
+        await chat.selectRevision(selected)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+        XCTAssertFalse(chat.hasUnsavedRevisionEdits)
+    }
+
+    func testHistoryReplayArchivesReplacedVersionsAndSaveClearsChatRevisions() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "First"
+        await chat.refine()
+        let old = try XCTUnwrap(chat.selectedRevisionID)
+        let turn = try XCTUnwrap(chat.turns.first)
+        chat.setHistoryInstruction("Corrected instruction", for: turn.id)
+        await chat.applyHistoryEdits()
+        XCTAssertEqual(chat.revisions.count, 2)
+        XCTAssertNotEqual(chat.selectedRevisionID, old)
+        await chat.selectRevision(old)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+        XCTAssertEqual(chat.turns.first?.userInstruction, "First")
+        chat.markSaved()
+        XCTAssertTrue(chat.revisions.isEmpty)
+        XCTAssertNil(chat.selectedRevisionID)
     }
 }
