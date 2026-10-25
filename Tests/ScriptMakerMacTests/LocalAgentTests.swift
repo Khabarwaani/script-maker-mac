@@ -350,7 +350,7 @@ final class LocalAgentWorkspaceTests: XCTestCase {
         let files = FileStore()
         let workspace = try files.makeTemporaryDirectory()
         defer { try? files.removeDirectory(at: workspace) }
-        let launcher = try files.makeCLILauncher(executable: URL(fileURLWithPath: "/usr/bin/pwd"), searchPaths: [], in: workspace)
+        let launcher = try files.makeCLILauncher(executable: URL(fileURLWithPath: "/bin/pwd"), searchPaths: [], in: workspace)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [launcher.path]
