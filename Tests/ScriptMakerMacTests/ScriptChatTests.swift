@@ -618,3 +618,90 @@ extension ScriptChatTests {
         XCTAssertEqual(modes.last, .daemon)
     }
 }
+
+extension ScriptChatTests {
+    func testRefinementStartsFromSelectedLibraryVersion() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let repository = ChatRepository()
+        let selected = StoryScriptVersion(number: 2, text: "Selected script", createdAt: "2026-10-25", instruction: nil)
+        let original = Story(scriptText: "Previous script", scriptVersions: [selected])
+        await repository.save(original)
+        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        await library.refresh()
+        chat.begin(original)
+        await chat.refreshProviders()
+        chat.userInstruction = "Refine previous script"
+        await chat.refine()
+
+        await library.useVersion(selected, storyID: original.id)
+        let current = try XCTUnwrap(library.stories.first { $0.id == original.id })
+        chat.begin(current)
+        XCTAssertEqual(chat.originalScript, selected.text)
+        XCTAssertEqual(chat.draft.latestScript, selected.text)
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertTrue(chat.consolidatedInstruction.isEmpty)
+        chat.userInstruction = "Refine selected script"
+        await chat.refine()
+        let request = await service.requests.last
+        XCTAssertEqual(request?.originalScript, selected.text)
+        XCTAssertEqual(request?.draft.latestScript, selected.text)
+        XCTAssertEqual(request?.userInstruction, "Refine selected script")
+    }
+}
+
+extension ScriptChatTests {
+    func testRepeatedRefinementUsesManuallyRewrittenScript() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original", instruction: "Keep facts"))
+        await chat.refreshProviders()
+        chat.editableScript = "First manual rewrite"
+        XCTAssertTrue(chat.canRefine)
+        await chat.refine()
+        chat.editableScript = "Second manual rewrite"
+        chat.userInstruction = "Shorten this rewrite"
+        await chat.refine()
+        await chat.refine()
+        let requests = await service.requests
+        XCTAssertEqual(requests.map(\.draft.latestScript), ["First manual rewrite", "Second manual rewrite", "Draft 2"])
+        XCTAssertEqual(requests.map(\.originalScript), ["Original", "Original", "Original"])
+        XCTAssertEqual(chat.draft.latestScript, "Draft 3")
+        XCTAssertEqual(chat.turns.count, 3)
+        XCTAssertTrue(chat.canSave)
+    }
+
+    func testFailedRewriteKeepsEditedScriptAndBlankScriptCannotRunOrSave() async {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.editableScript = "Manual rewrite"
+        chat.userInstruction = "Make this warmer"
+        await service.configure(fail: true)
+        await chat.refine()
+        XCTAssertEqual(chat.editableScript, "Manual rewrite")
+        XCTAssertEqual(chat.userInstruction, "Make this warmer")
+        XCTAssertNotNil(chat.errorMessage)
+        chat.editableScript = "  "
+        XCTAssertFalse(chat.canRefine)
+        XCTAssertFalse(chat.canSave)
+    }
+
+    func testManuallyRewrittenScriptCanBeSavedWithoutProviderRun() async throws {
+        let repository = ChatRepository()
+        let chat = ScriptChatViewModel(service: ChatRefinerStub())
+        let original = Story(scriptText: "Original")
+        await repository.save(original)
+        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        await library.refresh()
+        chat.begin(original)
+        chat.editableScript = "Manually rewritten script"
+        let saved = await library.saveRefinedScript()
+        XCTAssertTrue(saved)
+        XCTAssertEqual(library.selectedStory?.scriptText, "Manually rewritten script")
+        XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Manually rewritten script"])
+        let stored = await repository.all()
+        XCTAssertEqual(stored.count, 1)
+    }
+}

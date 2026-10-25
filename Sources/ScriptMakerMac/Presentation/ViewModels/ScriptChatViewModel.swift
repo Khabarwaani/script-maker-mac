@@ -36,6 +36,15 @@ final class ScriptChatViewModel {
     var originalScript: String { source?.scriptText ?? "" }
     var originalInstruction: String { source?.instruction ?? "" }
     var hasHistoryEdits: Bool { !historyEdits.isEmpty }
+    var hasScriptEdits: Bool { draft.latestScript != (turns.last?.script ?? originalScript) }
+    var editableScript: String {
+        get { draft.latestScript }
+        set {
+            guard source != nil, !isRefining, !hasHistoryEdits else { return }
+            draft = ScriptChatDraft(latestScript: newValue, instruction: draft.instruction)
+            hasSavedDraft = false
+        }
+    }
     var consolidatedInstruction: String {
         get { instructionDraft }
         set {
@@ -48,16 +57,16 @@ final class ScriptChatViewModel {
         source != nil && !isRefining && !isLoadingProviders && providers[provider]?.isAvailable == true
     }
     var canRefine: Bool {
-        canUseProvider && !hasHistoryEdits && (!StringFormatting.isBlank(userInstruction)
-            || ((!turns.isEmpty || hasConsolidatedInstructionEdits) && !StringFormatting.isBlank(instructionDraft)))
+        canUseProvider && !hasHistoryEdits && !StringFormatting.isBlank(draft.latestScript) && (!StringFormatting.isBlank(userInstruction)
+            || ((!turns.isEmpty || hasScriptEdits || hasConsolidatedInstructionEdits) && !StringFormatting.isBlank(instructionDraft)))
     }
     var canApplyHistoryEdits: Bool {
-        canUseProvider && !hasConsolidatedInstructionEdits && hasHistoryEdits
+        canUseProvider && !hasScriptEdits && !hasConsolidatedInstructionEdits && hasHistoryEdits
             && turns.allSatisfy { !StringFormatting.isBlank(historyInstruction(for: $0.id)) }
     }
     var canSave: Bool {
         !isRefining && !hasHistoryEdits && !hasConsolidatedInstructionEdits && !hasSavedDraft
-            && !turns.isEmpty && !StringFormatting.isBlank(draft.latestScript)
+            && source != nil && !StringFormatting.isBlank(draft.latestScript)
             && draft.latestScript != source?.scriptText
     }
 
@@ -66,7 +75,7 @@ final class ScriptChatViewModel {
     }
 
     func setHistoryInstruction(_ value: String, for id: UUID) {
-        guard !isRefining, !hasConsolidatedInstructionEdits,
+        guard !isRefining, !hasScriptEdits, !hasConsolidatedInstructionEdits,
               let turn = turns.first(where: { $0.id == id }) else { return }
         historyEdits[id] = value == turn.userInstruction ? nil : value
     }
@@ -75,7 +84,9 @@ final class ScriptChatViewModel {
     func discardConsolidatedInstructionEdits() { if !isRefining { instructionDraft = draft.instruction } }
 
     func begin(_ story: Story) {
-        if source?.id == story.id, (!turns.isEmpty || !StringFormatting.isBlank(draft.latestScript)) {
+        if source?.id == story.id, source?.scriptText == story.scriptText,
+           source?.currentScriptVersionID == story.currentScriptVersionID, source?.instruction == story.instruction,
+           (!turns.isEmpty || !StringFormatting.isBlank(draft.latestScript)) {
             return
         }
         let previousStoryID = source?.id
