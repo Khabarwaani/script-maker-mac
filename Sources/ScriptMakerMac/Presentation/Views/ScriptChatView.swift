@@ -76,7 +76,7 @@ struct ScriptChatView: View {
                             .id("refined-script")
                         }
                         ScriptChatInstructions(viewModel: viewModel).disabled(isSaving)
-                        ScriptChatHistory(viewModel: viewModel).frame(height: 150)
+                        ScriptChatInstructionHistoryView(viewModel: viewModel).frame(height: 150)
                             .disabled(isSaving || viewModel.hasScriptEdits || viewModel.hasConsolidatedInstructionEdits)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -158,7 +158,7 @@ private struct ScriptChatScriptPanel: View {
     }
 }
 
-private struct ScriptChatHistory: View {
+private struct ScriptChatInstructionHistoryView: View {
     @Bindable var viewModel: ScriptChatViewModel
 
     var body: some View {
