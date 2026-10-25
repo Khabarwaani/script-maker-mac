@@ -270,7 +270,7 @@ private struct ScriptChatRevisionPicker: View {
                                     onSelect: { requestSelection(revision.id) })
                             }
                         }
-                    }.frame(maxHeight: 200)
+                    }.frame(maxHeight: 140).scrollIndicators(.visible)
                 }
             }
         }
@@ -310,7 +310,7 @@ private struct ScriptChatRevisionRow: View {
                     .font(.subheadline.bold())
                 Text(parentNumber.map { "From Chat \($0)" } ?? "From Original")
                     .font(.caption).foregroundStyle(.secondary)
-                Text(revision.createdAt, style: .time).font(.caption).foregroundStyle(.secondary)
+                Text(revision.createdAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button(isCurrent ? "Current" : "Use this version", action: onSelect)
                     .disabled(isCurrent || isDisabled)
