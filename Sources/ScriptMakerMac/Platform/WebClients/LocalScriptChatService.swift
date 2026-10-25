@@ -14,12 +14,11 @@ struct LocalScriptChatService: ScriptChatRefining {
         await runner.availability()
     }
 
-    func prewarm(for provider: LocalAgentProvider, model: String) async {
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode = .fastClean) async {
+        guard mode != .strictEphemeral else { return }
         let trimmed = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        var settings = LocalAgentSessionSettings()
+        var settings = mode.sessionSettings
         settings.model = trimmed
-        settings.persistence = .persistentStdio
-        settings.keepMemory = false
         let dummy = ScriptChat.Input(originalScript: "warmup", latestScript: "warmup", userInstruction: "warmup", instruction: "")
         let json = (try? String(decoding: JSONEncoder().encode(dummy), as: UTF8.self)) ?? "{}"
         let request = LocalAgentRequest(
@@ -42,11 +41,9 @@ struct LocalScriptChatService: ScriptChatRefining {
                                      userInstruction: request.userInstruction, instruction: request.draft.instruction)
         let json = String(decoding: try JSONEncoder().encode(input), as: UTF8.self)
         let model = request.model.trimmingCharacters(in: .whitespacesAndNewlines)
-        var settings = LocalAgentSessionSettings()
+        var settings = request.mode.sessionSettings
         settings.model = model
-        settings.persistence = .persistentStdio
-        settings.keepMemory = false
-        let resolvedSessionID = request.sessionID ?? defaultSessionID
+        let resolvedSessionID: String? = (request.mode == .strictEphemeral) ? nil : (request.sessionID ?? defaultSessionID)
         let result = try await runner.run(LocalAgentRequest(
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
             inputJSON: json, provider: request.provider, executable: request.provider.executable,

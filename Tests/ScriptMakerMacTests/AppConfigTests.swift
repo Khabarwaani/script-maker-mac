@@ -67,6 +67,19 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.newsSettings, NewsDiscoverySettings())
     }
 
+    func testScriptRefinementExecutionModeDefaultsAndPersistence() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfig(defaults: defaults)
+        XCTAssertEqual(config.scriptRefinementMode, .fastClean)
+
+        config.scriptRefinementMode = .strictEphemeral
+        let reopened = AppConfig(defaults: defaults)
+        XCTAssertEqual(reopened.scriptRefinementMode, .strictEphemeral)
+
+        config.resetToDefaults()
+        XCTAssertEqual(config.scriptRefinementMode, .fastClean)
+    }
+
     func testNormalizeBareHostAssumesHTTP() throws {
         XCTAssertEqual(try AppConfig.normalize(raw: "localhost:8000"), "http://localhost:8000")
     }

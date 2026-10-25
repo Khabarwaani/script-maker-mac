@@ -8,10 +8,14 @@ private actor ChatRefinerStub: ScriptChatRefining {
     var shouldFail = false
     var shouldReturnBlank = false
     var failOnRequest: Int?
+    var prewarmedModes: [ScriptRefinementExecutionMode] = []
     func configure(fail: Bool = false, blank: Bool = false) { shouldFail = fail; shouldReturnBlank = blank }
     func fail(onRequest number: Int) { failOnRequest = number }
     func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [.codex: .init(isAvailable: true, reason: "Ready")] }
-    func prewarm(for provider: LocalAgentProvider, model: String) { prewarmCount += 1 }
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) {
+        prewarmCount += 1
+        prewarmedModes.append(mode)
+    }
     func closeSession() { closeSessionCount += 1 }
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft {
         requests.append(request)
@@ -93,7 +97,7 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertFalse(vm.isRefining)
     }
 
-    func testSaveCreatesNewEntryAndPreservesOriginal() async throws {
+    func testSaveReplacesOriginalAndKeepsOnlyLatestScript() async throws {
         let repository = ChatRepository()
         let original = Story(title: "A story", videoURL: "https://example.com/old.mp4", scriptText: "Original script", stageOutputs: ["script": "old output"])
         await repository.save(original)
@@ -110,16 +114,27 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertNotEqual(copy.id, original.id)
         XCTAssertEqual(copy.sourceStoryID, original.id)
         XCTAssertEqual(copy.scriptText, "Draft 1")
-        XCTAssertEqual(copy.instruction, "Active instructions 1")
-        XCTAssertEqual(copy.scriptVersions?.map(\.text), ["Original script", "Draft 1"])
+        XCTAssertNil(copy.instruction)
+        XCTAssertNil(copy.scriptVersions?.first?.instruction)
+        XCTAssertNil(chat.source)
+        XCTAssertEqual(chat.originalScript, "")
+        XCTAssertEqual(chat.consolidatedInstruction, "")
+        XCTAssertEqual(chat.draft.latestScript, "")
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertEqual(copy.scriptVersions?.map(\.text), ["Draft 1"])
         XCTAssertNil(copy.stageOutputs)
         XCTAssertNil(copy.videoURL)
         XCTAssertNil(copy.uploadReceipt)
-        XCTAssertEqual(library.stories.first(where: { $0.id == original.id }), original)
+        XCTAssertNil(library.stories.first(where: { $0.id == original.id }))
+        XCTAssertEqual(library.stories.count, 1)
+        XCTAssertEqual(copy.currentScriptVersionID, copy.scriptVersions?.first?.id)
         let duplicate = await library.saveRefinedScript()
         XCTAssertFalse(duplicate)
         let persisted = await repository.all()
-        XCTAssertEqual(persisted.count, 2)
+        XCTAssertEqual(persisted.map(\.id), [copy.id])
+        await library.refresh()
+        XCTAssertEqual(library.stories.map(\.id), [copy.id])
+        XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Draft 1"])
     }
 
     func testEmptyOriginalAndNoSuccessfulTurnCannotSave() async throws {
@@ -187,6 +202,43 @@ final class ScriptChatServiceTests: XCTestCase {
         await service.closeSession()
         let closed = await runner.closedSessionID
         XCTAssertEqual(closed, "test-session")
+    }
+
+    func testScriptRefinementExecutionModesConfigureSessionCorrectly() async throws {
+        let runner = ChatRunnerStub()
+        let service = LocalScriptChatService(runner: runner, sessionID: "custom-session")
+
+        // Fast & Clean
+        _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .fastClean))
+        var last = await runner.lastRequest
+        var req = try XCTUnwrap(last)
+        XCTAssertEqual(req.sessionID, "custom-session")
+        XCTAssertEqual(req.session.persistence, .persistentStdio)
+        XCTAssertFalse(req.session.keepMemory)
+
+        // Strict Ephemeral
+        _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .strictEphemeral))
+        last = await runner.lastRequest
+        req = try XCTUnwrap(last)
+        XCTAssertNil(req.sessionID)
+        XCTAssertEqual(req.session.persistence, .ephemeral)
+        XCTAssertFalse(req.session.keepMemory)
+
+        // Retained Memory
+        _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .retainedMemory))
+        last = await runner.lastRequest
+        req = try XCTUnwrap(last)
+        XCTAssertEqual(req.sessionID, "custom-session")
+        XCTAssertEqual(req.session.persistence, .persistentStdio)
+        XCTAssertTrue(req.session.keepMemory)
+
+        // Daemon
+        _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"), userInstruction: "Shorten", provider: .codex, model: "m", mode: .daemon))
+        last = await runner.lastRequest
+        req = try XCTUnwrap(last)
+        XCTAssertEqual(req.sessionID, "custom-session")
+        XCTAssertEqual(req.session.persistence, .daemon)
+        XCTAssertFalse(req.session.keepMemory)
     }
 }
 
@@ -521,5 +573,48 @@ extension ScriptChatTests {
         await chat.refine()
         let requests = await service.requests
         XCTAssertEqual(requests.last?.sessionID, "script-chat-\(story.id)")
+    }
+
+    func testScriptRefinementModePassesToRefineRequest() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Baseline story"))
+        await chat.refreshProviders()
+
+        chat.mode = .strictEphemeral
+        chat.userInstruction = "Instruction 1"
+        await chat.refine()
+        var requests = await service.requests
+        XCTAssertEqual(requests.last?.mode, .strictEphemeral)
+
+        chat.mode = .retainedMemory
+        chat.userInstruction = "Instruction 2"
+        await chat.refine()
+        requests = await service.requests
+        XCTAssertEqual(requests.last?.mode, .retainedMemory)
+    }
+
+    func testScriptRefinementModeInitializedFromConfig() async throws {
+        let defaults = UserDefaults(suiteName: "test-script-refinement-mode-\(UUID())")!
+        let config = AppConfig(defaults: defaults)
+        config.scriptRefinementMode = .daemon
+
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service, config: config)
+        XCTAssertEqual(chat.mode, .daemon)
+
+        config.scriptRefinementMode = .retainedMemory
+        chat.begin(Story(scriptText: "New story"))
+        XCTAssertEqual(chat.mode, .retainedMemory)
+    }
+
+    func testPrewarmPassesSelectedMode() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Script text"))
+        chat.mode = .daemon
+        await chat.prewarm()
+        let modes = await service.prewarmedModes
+        XCTAssertEqual(modes.last, .daemon)
     }
 }

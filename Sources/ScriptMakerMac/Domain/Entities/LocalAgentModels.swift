@@ -32,6 +32,56 @@ struct LocalAgentSessionSettings: Sendable {
     var recordTokens = false
 }
 
+enum ScriptRefinementExecutionMode: String, CaseIterable, Identifiable, Codable, Sendable {
+    case fastClean = "fastClean"
+    case strictEphemeral = "strictEphemeral"
+    case retainedMemory = "retainedMemory"
+    case daemon = "daemon"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .fastClean: return "Fast & Clean (Recommended)"
+        case .strictEphemeral: return "Strict Ephemeral"
+        case .retainedMemory: return "Retained Memory"
+        case .daemon: return "Daemon"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .fastClean:
+            return "App-launch workspace with memory cleared on every request. Fastest follow-up response with clean state."
+        case .strictEphemeral:
+            return "Creates and deletes an isolated temporary directory per request. Maximum isolation."
+        case .retainedMemory:
+            return "Keeps the subprocess session memory intact across turns."
+        case .daemon:
+            return "Executes against a persistent background agent daemon process."
+        }
+    }
+
+    var sessionSettings: LocalAgentSessionSettings {
+        var s = LocalAgentSessionSettings()
+        switch self {
+        case .fastClean:
+            s.persistence = .persistentStdio
+            s.keepMemory = false
+        case .strictEphemeral:
+            s.persistence = .ephemeral
+            s.keepMemory = false
+        case .retainedMemory:
+            s.persistence = .persistentStdio
+            s.keepMemory = true
+        case .daemon:
+            s.persistence = .daemon
+            s.keepMemory = false
+        }
+        return s
+    }
+}
+
 struct LocalAgentAvailability: Sendable {
     var isAvailable: Bool
     var reason: String

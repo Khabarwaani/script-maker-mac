@@ -24,6 +24,17 @@ struct PreferencesView: View {
                     StudioChoiceGroup(title: "Theme", selection: $viewModel.appearance, options: AppAppearance.allCases, label: { $0.rawValue })
                 }
                 VStack(alignment: .leading, spacing: 10) {
+                    Text("SCRIPT REFINEMENT").font(.caption.weight(.bold)).tracking(0.7)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                    Picker("Execution mode", selection: $viewModel.scriptRefinementMode) {
+                        ForEach(ScriptRefinementExecutionMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    Text(viewModel.scriptRefinementMode.summary)
+                        .font(.callout).foregroundStyle(AppTheme.secondaryInk)
+                }
+                VStack(alignment: .leading, spacing: 10) {
                     Text("SOURCE").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
                     StudioChoiceGroup(title: "Source", selection: $viewModel.dataSource, options: [.offline, .server], label: { $0.label })
                     if viewModel.dataSource == .offline {

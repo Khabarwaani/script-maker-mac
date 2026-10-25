@@ -3,35 +3,31 @@ import SwiftUI
 /// Shared header and stable workspace view models.
 struct ContentView: View {
     @Bindable var viewModel: ContentViewModel
-    @State private var generateViewModel: GenerateViewModel
+    @State private var researcherViewModel: ResearcherViewModel
     @State private var libraryViewModel: LibraryViewModel
     @State private var localAgentViewModel: LocalAgentViewModel
     @State private var pipelineViewModel: PipelineTabViewModel
+    @State private var scriptDetailViewModel: ScriptDetailViewModel
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        let genVM = viewModel.generateViewModel
-        genVM.onNavigateToLibrary = { [weak viewModel] in
-            viewModel?.selectedTab = .library
-            Task {
-                await viewModel?.libraryViewModel.refresh()
-            }
-        }
-        genVM.onNavigateToPipeline = { [weak viewModel] topic, location in
+        let resVM = viewModel.researcherViewModel
+        resVM.onNavigateToPipeline = { [weak viewModel] topic, location in
             viewModel?.selectedTab = .pipeline
             viewModel?.pipelineViewModel.applyStudioTopic(topic, location: location)
         }
-        _generateViewModel = State(
-            wrappedValue: genVM
+        _researcherViewModel = State(
+            wrappedValue: resVM
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
         )
         _localAgentViewModel = State(wrappedValue: viewModel.localAgentViewModel)
         _pipelineViewModel = State(wrappedValue: viewModel.pipelineViewModel)
+        _scriptDetailViewModel = State(wrappedValue: viewModel.scriptDetailViewModel)
         _preferencesViewModel = State(
             wrappedValue: viewModel.preferencesViewModel
         )
@@ -69,10 +65,11 @@ struct ContentView: View {
             Divider().overlay(AppTheme.line)
             Group {
                 switch viewModel.selectedTab {
-                case .studio: GenerateView(viewModel: generateViewModel)
+                case .researcher: ResearcherView(viewModel: researcherViewModel)
                 case .library: LibraryView(viewModel: libraryViewModel)
                 case .localAgent: LocalAgentView(viewModel: localAgentViewModel)
                 case .pipeline: PipelineTabView(viewModel: pipelineViewModel)
+                case .scriptDetail: ScriptDetailTabView(viewModel: scriptDetailViewModel)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

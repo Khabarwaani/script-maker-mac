@@ -176,6 +176,34 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
                     mappedDraft: mapped
                 ))
             }
+            // -> ScriptDetail
+            if let target = catalog.first(where: { $0.agentID == "ScriptDetail" && $0.isExecutable }) {
+                let mapped = await mapStoryCreatorToScriptDetail(parsed: parsed, target: target)
+                options.append(PipelineTransitionOption(
+                    id: "story-to-script-detail",
+                    targetAgentID: target.agentID,
+                    targetAgentName: target.name,
+                    title: "Script Detail",
+                    description: "Expand scene into continuous-shot visual direction for AI video generation.",
+                    badge: nil,
+                    mappedDraft: mapped
+                ))
+            }
+
+        case "ScriptDetail":
+            // -> Loop back to ScriptDetail
+            if let target = catalog.first(where: { $0.agentID == "ScriptDetail" && $0.isExecutable }) {
+                let mapped = await mapScriptDetailLoop(parsed: parsed, target: target)
+                options.append(PipelineTransitionOption(
+                    id: "script-detail-loop",
+                    targetAgentID: target.agentID,
+                    targetAgentName: target.name,
+                    title: "Refine Visual Detail",
+                    description: "Apply additional camera, lighting, or staging instructions.",
+                    badge: "Loop",
+                    mappedDraft: mapped
+                ))
+            }
 
         case "ScriptChat", "ScriptRefiner":
             // -> Loop back to ScriptChat
@@ -219,8 +247,12 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
         case ("ThreeSceneStoryCreator", "ScriptChat"), ("ThreeSceneStoryCreator", "ScriptRefiner"),
              ("TwoSceneStoryCreator", "ScriptChat"), ("TwoSceneStoryCreator", "ScriptRefiner"):
             return await mapStoryCreatorToScriptChat(parsed: parsed, target: targetDefinition)
+        case ("ThreeSceneStoryCreator", "ScriptDetail"), ("TwoSceneStoryCreator", "ScriptDetail"):
+            return await mapStoryCreatorToScriptDetail(parsed: parsed, target: targetDefinition)
         case ("ScriptChat", "ScriptChat"), ("ScriptRefiner", "ScriptChat"), ("ScriptChat", "ScriptRefiner"):
             return await mapScriptChatLoop(parsed: parsed, target: targetDefinition)
+        case ("ScriptDetail", "ScriptDetail"):
+            return await mapScriptDetailLoop(parsed: parsed, target: targetDefinition)
         default:
             return mapGenericJSON(parsed: parsed, target: targetDefinition)
         }
@@ -416,6 +448,37 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
         let latest = (parsed["latestScript"] as? String) ?? (parsed["script"] as? String) ?? ""
         fields["originalScript"] = .string(latest)
         fields["latestScript"] = .string(latest)
+        fields["userInstruction"] = .string("")
+        return AgentInputDraft(schema: target.schema, required: true, value: .object(fields))
+    }
+
+    private func mapStoryCreatorToScriptDetail(
+        parsed: [String: Any],
+        target: LocalAgentDefinition
+    ) async -> AgentInputDraft {
+        let scriptChatDraft = await mapStoryCreatorToScriptChat(parsed: parsed, target: target)
+        var fields: [String: AgentJSON] = [:]
+        let text = scriptChatDraft.fields["originalScript"]?.text ?? ""
+        fields["originalScript"] = .string(text)
+        fields["userInstruction"] = .string("")
+        fields["instruction"] = .string("")
+        return AgentInputDraft(schema: target.schema, required: true, value: .object(fields))
+    }
+
+    private func mapScriptDetailLoop(
+        parsed: [String: Any],
+        target: LocalAgentDefinition
+    ) async -> AgentInputDraft {
+        var fields: [String: AgentJSON] = [:]
+        if let original = parsed["originalScript"] as? String {
+            fields["originalScript"] = .string(original)
+        }
+        if let latest = parsed["latestScript"] as? String {
+            fields["latestScript"] = .string(latest)
+        }
+        if let instruction = parsed["instruction"] as? String {
+            fields["instruction"] = .string(instruction)
+        }
         fields["userInstruction"] = .string("")
         return AgentInputDraft(schema: target.schema, required: true, value: .object(fields))
     }
