@@ -192,6 +192,7 @@ final class LibraryViewModel {
         appendVersion(chat.draft.latestScript, instruction: nil, to: &refined)
         refined.scriptVersions = refined.scriptVersions.map { Array($0.suffix(1)) }
         refined.instruction = nil
+        refined.scriptChatHistory = chat.historyForSaving
         refined.uploadReceipt = nil
         refined.videoURL = nil
         await saveEditedCopy(refined, originalID: original.id, replacingOriginal: true)

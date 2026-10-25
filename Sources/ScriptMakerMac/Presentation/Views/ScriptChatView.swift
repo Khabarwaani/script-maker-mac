@@ -130,7 +130,7 @@ struct ScriptChatView: View {
             Button("Reset chat", role: .destructive) { Task { await viewModel.reset() } }
             Button("Keep editing", role: .cancel) { }
         } message: {
-            Text("To return to the original without discarding revisions, select Original script in Working revision instead.")
+            Text("To return to the original without discarding revisions, select Original script in Working version instead.")
         }
     }
 }
@@ -231,30 +231,48 @@ private struct ScriptChatInstructions: View {
 private struct ScriptChatRevisionPicker: View {
     @Bindable var viewModel: ScriptChatViewModel
     let isSaving: Bool
+    @State private var showingHistory = true
     @State private var pendingRevisionID: UUID?
     @State private var showingDiscardConfirmation = false
 
     var body: some View {
-        HStack {
-            Button {
-                requestSelection(viewModel.previousRevisionID)
-            } label: {
-                Label("Previous revision", systemImage: "chevron.left")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button {
+                    requestSelection(viewModel.previousRevisionID)
+                } label: {
+                    Label("Previous chat", systemImage: "chevron.left")
+                }
+                .disabled(!viewModel.canSelectPreviousRevision || isSaving)
+                Picker("Working version", selection: Binding(
+                    get: { viewModel.selectedRevisionID },
+                    set: { requestSelection($0) })) {
+                    Text("Original script").tag(Optional<UUID>.none)
+                    ForEach(Array(viewModel.revisions.enumerated()), id: \.element.id) { index, revision in
+                        Text("\(revision.isManualEdit ? "Edit" : "Chat") \(index + 1)").tag(Optional(revision.id))
+                    }
+                }
+                .frame(maxWidth: 240)
+                .disabled(viewModel.isRefining || isSaving)
+                Spacer()
+                Text("Continue from any chat. Later results remain in history.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            .disabled(!viewModel.canSelectPreviousRevision || isSaving)
-            Picker("Working revision", selection: Binding(
-                get: { viewModel.selectedRevisionID },
-                set: { requestSelection($0) })) {
-                Text("Original script").tag(Optional<UUID>.none)
-                ForEach(Array(viewModel.revisions.enumerated()), id: \.element.id) { index, revision in
-                    Text("Revision \(index + 1)").tag(Optional(revision.id))
+            if !viewModel.revisions.isEmpty {
+                DisclosureGroup("Version history · \(viewModel.revisions.count) chats", isExpanded: $showingHistory) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(viewModel.revisions.enumerated()), id: \.element.id) { index, revision in
+                                ScriptChatRevisionRow(revision: revision, number: index + 1,
+                                    parentNumber: viewModel.revisions.firstIndex { $0.id == revision.parentID }.map { $0 + 1 },
+                                    isCurrent: revision.id == viewModel.selectedRevisionID,
+                                    isDisabled: viewModel.isRefining || isSaving,
+                                    onSelect: { requestSelection(revision.id) })
+                            }
+                        }
+                    }.frame(maxHeight: 200)
                 }
             }
-            .frame(maxWidth: 280)
-            .disabled(viewModel.isRefining || isSaving)
-            Spacer()
-            Text("Refine from any revision. Other revisions stay available until you save.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .confirmationDialog("Discard unsaved edits and switch revisions?", isPresented: $showingDiscardConfirmation) {
             Button("Discard edits and switch", role: .destructive) {
@@ -262,7 +280,7 @@ private struct ScriptChatRevisionPicker: View {
             }
             Button("Keep editing", role: .cancel) { }
         } message: {
-            Text("Your current script edits, pending instruction, and instruction edits will be discarded. Generated revisions will remain available.")
+            Text("Your current script edits, pending instruction, and instruction edits will be discarded. Generated revisions will remain available in this story.")
         }
     }
 
@@ -274,5 +292,40 @@ private struct ScriptChatRevisionPicker: View {
         } else {
             Task { await viewModel.selectRevision(id) }
         }
+    }
+}
+
+private struct ScriptChatRevisionRow: View {
+    let revision: ScriptChatRevision
+    let number: Int
+    let parentNumber: Int?
+    let isCurrent: Bool
+    let isDisabled: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("\(revision.isManualEdit ? "Edit" : "Chat") \(number)", systemImage: isCurrent ? "checkmark.circle.fill" : "circle")
+                    .font(.subheadline.bold())
+                Text(parentNumber.map { "From Chat \($0)" } ?? "From Original")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text(revision.createdAt, style: .time).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(isCurrent ? "Current" : "Use this version", action: onSelect)
+                    .disabled(isCurrent || isDisabled)
+            }
+            Text(revision.isManualEdit ? "Manual script edit" : revision.turns.last?.userInstruction ?? "")
+                .font(.callout).textSelection(.enabled)
+            DisclosureGroup("Script and consolidated instructions") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(revision.draft.latestScript).textSelection(.enabled)
+                    Text("Consolidated instructions").font(.caption.bold())
+                    Text(revision.draft.instruction).textSelection(.enabled)
+                }.font(.callout).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .background(isCurrent ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
     }
 }

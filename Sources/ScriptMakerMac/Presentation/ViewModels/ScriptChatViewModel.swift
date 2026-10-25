@@ -35,16 +35,25 @@ final class ScriptChatViewModel {
         self.mode = config?.scriptRefinementMode ?? initialMode
     }
 
-    var originalScript: String { source?.scriptText ?? "" }
-    var originalInstruction: String { source?.instruction ?? "" }
+    var originalScript: String { source?.scriptChatHistory?.originalScript ?? source?.scriptText ?? "" }
+    var originalInstruction: String { source?.scriptChatHistory?.originalInstruction ?? source?.instruction ?? "" }
+    var historyForSaving: ScriptChatHistory {
+        var saved = revisions
+        var selectedID = selectedRevisionID
+        let baseline = selectedRevision?.draft ?? ScriptChatDraft(latestScript: originalScript, instruction: originalInstruction)
+        if draft != baseline {
+            let manual = ScriptChatRevision(draft: draft, turns: turns, parentID: selectedRevisionID, isManualEdit: true)
+            saved.append(manual)
+            selectedID = manual.id
+        }
+        return ScriptChatHistory(originalScript: originalScript, originalInstruction: originalInstruction,
+                                 revisions: saved, selectedRevisionID: selectedID)
+    }
     var hasHistoryEdits: Bool { !historyEdits.isEmpty }
     var hasScriptEdits: Bool { draft.latestScript != (selectedRevision?.draft.latestScript ?? originalScript) }
     private var selectedRevision: ScriptChatRevision? { revisions.first { $0.id == selectedRevisionID } }
     var canSelectPreviousRevision: Bool { !isRefining && selectedRevisionID != nil }
-    var previousRevisionID: UUID? {
-        guard let index = revisions.firstIndex(where: { $0.id == selectedRevisionID }), index > 0 else { return nil }
-        return revisions[index - 1].id
-    }
+    var previousRevisionID: UUID? { selectedRevision?.parentID }
     var hasUnsavedRevisionEdits: Bool {
         hasScriptEdits || hasConsolidatedInstructionEdits || hasHistoryEdits || !StringFormatting.isBlank(userInstruction)
     }
@@ -113,7 +122,7 @@ final class ScriptChatViewModel {
 
     func begin(_ story: Story) {
         if source?.id == story.id, source?.scriptText == story.scriptText,
-           source?.currentScriptVersionID == story.currentScriptVersionID, source?.instruction == story.instruction,
+           source?.currentScriptVersionID == story.currentScriptVersionID, source?.instruction == story.instruction, source?.scriptChatHistory == story.scriptChatHistory,
            (!turns.isEmpty || !StringFormatting.isBlank(draft.latestScript)) {
             return
         }
@@ -132,6 +141,25 @@ final class ScriptChatViewModel {
         }
         source = story
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
+        if let history = story.scriptChatHistory {
+            revisions = history.revisions
+            selectedRevisionID = history.selectedRevisionID
+            let selected = revisions.first { $0.id == history.selectedRevisionID }
+            guard history.selectedRevisionID == nil || selected != nil else {
+                errorMessage = "The saved chat revision is missing. The saved script is still available."
+                return
+            }
+            let restored = selected?.draft ?? ScriptChatDraft(latestScript: originalScript, instruction: originalInstruction)
+            turns = selected?.turns ?? []
+            if restored.latestScript == script {
+                draft = restored
+            } else {
+                draft = ScriptChatDraft(latestScript: script, instruction: selected?.draft.instruction ?? originalInstruction)
+                let edited = ScriptChatRevision(draft: draft, turns: turns, parentID: selectedRevisionID, isManualEdit: true)
+                revisions.append(edited)
+                selectedRevisionID = edited.id
+            }
+        }
         instructionDraft = draft.instruction
     }
 
@@ -188,6 +216,7 @@ final class ScriptChatViewModel {
 
     private func run(instruction: String, prefix: [ScriptChatTurn], startingDraft: ScriptChatDraft,
                      turnID: UUID, instructionOverride: String?, clearInput: Bool) async {
+        let parentRevisionID = clearInput ? selectedRevisionID : revisions.last { $0.turns == prefix }?.id
         let original = originalScript
         let selectedProvider = provider
         let selectedModel = model
@@ -217,7 +246,7 @@ final class ScriptChatViewModel {
                 self.draft = result
                 self.instructionDraft = result.instruction
                 self.turns = completed
-                let revision = ScriptChatRevision(draft: result, turns: completed)
+                let revision = ScriptChatRevision(draft: result, turns: completed, parentID: parentRevisionID)
                 self.revisions.append(revision)
                 self.selectedRevisionID = revision.id
                 self.historyEdits = [:]

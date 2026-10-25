@@ -1,6 +1,6 @@
 import Foundation
 
-struct ScriptChatDraft: Equatable, Sendable {
+struct ScriptChatDraft: Hashable, Codable, Sendable {
     let latestScript: String
     let instruction: String
 }
@@ -30,7 +30,7 @@ extension ScriptChatRefining {
     func closeSession() async {}
 }
 
-struct ScriptChatTurn: Identifiable, Equatable, Sendable {
+struct ScriptChatTurn: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let userInstruction: String
     let script: String
@@ -46,14 +46,27 @@ struct ScriptChatTurn: Identifiable, Equatable, Sendable {
     }
 }
 
-struct ScriptChatRevision: Identifiable, Equatable, Sendable {
+struct ScriptChatRevision: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let draft: ScriptChatDraft
     let turns: [ScriptChatTurn]
+    let parentID: UUID?
+    let createdAt: Date
+    let isManualEdit: Bool
 
-    init(draft: ScriptChatDraft, turns: [ScriptChatTurn]) {
+    init(draft: ScriptChatDraft, turns: [ScriptChatTurn], parentID: UUID? = nil, isManualEdit: Bool = false) {
         id = UUID()
         self.draft = draft
         self.turns = turns
+        self.parentID = parentID
+        createdAt = Date()
+        self.isManualEdit = isManualEdit
     }
+}
+
+struct ScriptChatHistory: Hashable, Codable, Sendable {
+    let originalScript: String
+    let originalInstruction: String
+    let revisions: [ScriptChatRevision]
+    let selectedRevisionID: UUID?
 }

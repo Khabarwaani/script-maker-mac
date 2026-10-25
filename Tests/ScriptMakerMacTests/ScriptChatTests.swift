@@ -730,6 +730,8 @@ extension ScriptChatTests {
         XCTAssertEqual(request?.draft.latestScript, "Draft 1")
         XCTAssertEqual(request?.draft.instruction, "Active instructions 1")
         XCTAssertEqual(chat.revisions.count, 3)
+        XCTAssertEqual(chat.revisions.last?.parentID, first)
+        XCTAssertEqual(chat.previousRevisionID, first)
         XCTAssertEqual(chat.turns.count, 2)
         await chat.selectRevision(second)
         XCTAssertEqual(chat.draft.latestScript, "Draft 2")
@@ -784,5 +786,71 @@ extension ScriptChatTests {
         chat.markSaved()
         XCTAssertTrue(chat.revisions.isEmpty)
         XCTAssertNil(chat.selectedRevisionID)
+    }
+}
+
+extension ScriptChatTests {
+    func testSavedStoryKeepsChatHistoryAndRestoresEarlierBranchesAfterReopening() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let repository = ChatRepository()
+        let original = Story(scriptText: "Original", instruction: "Baseline")
+        await repository.save(original)
+        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        await library.refresh()
+        chat.begin(original)
+        await chat.refreshProviders()
+        chat.userInstruction = "First instruction"
+        await chat.refine()
+        let first = try XCTUnwrap(chat.selectedRevisionID)
+        chat.userInstruction = "Second instruction"
+        await chat.refine()
+        let second = try XCTUnwrap(chat.selectedRevisionID)
+        await chat.selectRevision(first)
+        chat.userInstruction = "Fix Chat 1"
+        await chat.refine()
+        let savedSuccessfully = await library.saveRefinedScript()
+        XCTAssertTrue(savedSuccessfully)
+        let stored = await repository.all()
+        XCTAssertEqual(stored.count, 1)
+        let saved = try XCTUnwrap(stored.first)
+        XCTAssertEqual(saved.scriptText, "Draft 3")
+        XCTAssertEqual(saved.scriptVersions?.count, 1)
+        let decoded = try JSONDecoder().decode(Story.self, from: JSONEncoder().encode(saved))
+        let reopened = ScriptChatViewModel(service: service)
+        reopened.begin(decoded)
+        XCTAssertEqual(reopened.revisions.count, 3)
+        XCTAssertEqual(reopened.originalScript, "Original")
+        XCTAssertEqual(reopened.draft.latestScript, "Draft 3")
+        XCTAssertEqual(reopened.revisions.last?.parentID, first)
+        await reopened.selectRevision(second)
+        XCTAssertEqual(reopened.draft.latestScript, "Draft 2")
+        XCTAssertEqual(reopened.consolidatedInstruction, "Active instructions 2")
+        XCTAssertEqual(reopened.turns.last?.userInstruction, "Second instruction")
+    }
+
+    func testManualLibraryEditIsCurrentWithoutLosingSavedChatHistory() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "Improve dialogue"
+        await chat.refine()
+        let history = chat.historyForSaving
+        let edited = Story(scriptText: "Edited in Library", scriptChatHistory: history)
+        let reopened = ScriptChatViewModel(service: service)
+        reopened.begin(edited)
+        XCTAssertEqual(reopened.draft.latestScript, "Edited in Library")
+        XCTAssertEqual(reopened.originalScript, "Original")
+        XCTAssertEqual(reopened.revisions.count, 2)
+        XCTAssertTrue(reopened.revisions.last?.isManualEdit == true)
+        await reopened.selectRevision(history.selectedRevisionID)
+        XCTAssertEqual(reopened.draft.latestScript, "Draft 1")
+    }
+
+    func testOlderStoriesDecodeWithoutChatHistory() throws {
+        let story = try JSONDecoder().decode(Story.self, from: Data(#"{"id":"old","title":"Old story","summary":"","headline":"","createdAt":"2026-10-25","status":"saved","emotion":"","format":"","scriptText":"Saved script"}"#.utf8))
+        XCTAssertNil(story.scriptChatHistory)
+        XCTAssertEqual(story.scriptText, "Saved script")
     }
 }
