@@ -364,3 +364,48 @@ extension ScriptDetailTests {
         XCTAssertEqual(saved.first?.detailedScript, "")
     }
 }
+
+private actor PendingDetailRefiner: ScriptDetailRefining {
+    private var pending: CheckedContinuation<ScriptDetailDraft, Never>?
+    private var started: CheckedContinuation<Void, Never>?
+
+    func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [:] }
+    func detail(_ request: ScriptDetailRequest) async throws -> ScriptDetailDraft {
+        await withCheckedContinuation { continuation in
+            pending = continuation
+            started?.resume()
+            started = nil
+        }
+    }
+    func waitForRequest() async {
+        if pending != nil { return }
+        await withCheckedContinuation { started = $0 }
+    }
+    func finish() {
+        pending?.resume(returning: ScriptDetailDraft(latestScript: "Late result", instruction: "Old context"))
+        pending = nil
+    }
+}
+
+extension ScriptDetailTests {
+    func testSwitchingSceneIgnoresLateUpdateFromPreviousChat() async {
+        let service = PendingDetailRefiner()
+        let repository = DetailItemRepository()
+        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: AppConfig())
+        await vm.loadItems()
+        vm.editingOriginalScript = "First scene"
+        let run = Task { await vm.runDetail() }
+        await service.waitForRequest()
+        vm.createNewItem()
+        vm.editingOriginalScript = "Second scene"
+        await service.finish()
+        await run.value
+        XCTAssertEqual(vm.editingOriginalScript, "Second scene")
+        XCTAssertTrue(vm.editingDetailedScript.isEmpty)
+        XCTAssertTrue(vm.editingConsolidatedInstruction.isEmpty)
+        XCTAssertTrue(vm.turns.isEmpty)
+        XCTAssertFalse(vm.isDetailing)
+        let saved = await repository.all()
+        XCTAssertTrue(saved.isEmpty)
+    }
+}
