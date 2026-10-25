@@ -5,6 +5,7 @@ struct ScriptChatView: View {
     let onSave: () async -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var isSaving = false
+    @State private var showingResetConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -15,7 +16,7 @@ struct ScriptChatView: View {
                 }
                 Spacer()
                 if !viewModel.turns.isEmpty {
-                    Button("Reset") { Task { await viewModel.reset() } }
+                    Button("Reset") { showingResetConfirmation = true }
                         .disabled(viewModel.isRefining || isSaving)
                 }
                 Button("Close") { viewModel.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
@@ -125,6 +126,12 @@ struct ScriptChatView: View {
             await viewModel.prewarm()
         }
         .onDisappear { viewModel.cancel() }
+        .confirmationDialog("Reset chat and discard all revisions?", isPresented: $showingResetConfirmation) {
+            Button("Reset chat", role: .destructive) { Task { await viewModel.reset() } }
+            Button("Keep editing", role: .cancel) { }
+        } message: {
+            Text("To return to the original without discarding revisions, select Original script in Working revision instead.")
+        }
     }
 }
 
