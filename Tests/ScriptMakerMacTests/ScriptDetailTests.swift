@@ -294,3 +294,73 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertFalse(stories.contains { $0.id == "detail-1" })
     }
 }
+
+extension ScriptDetailTests {
+    func testChatLoopUsesLatestEditsAndConsolidatedInstructions() async {
+        let service = DetailRefinerStub()
+        let repository = DetailItemRepository()
+        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: AppConfig())
+        await vm.loadItems()
+        vm.editingOriginalScript = "Original dialogue"
+        vm.editingUserInstruction = "Start wide"
+        await vm.runDetail()
+        vm.editingDetailedScript = "Manually revised current script"
+        vm.editingConsolidatedInstruction = "Keep the wide opening and warmer lighting"
+        await vm.runDetail()
+        vm.editingUserInstruction = "Move closer at the end"
+        await vm.runDetail()
+        let requests = await service.requests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertEqual(requests[1].originalScript, "Original dialogue")
+        XCTAssertEqual(requests[1].draft.latestScript, "Manually revised current script")
+        XCTAssertEqual(requests[1].draft.instruction, "Keep the wide opening and warmer lighting")
+        XCTAssertEqual(requests[1].userInstruction, "Keep the wide opening and warmer lighting")
+        XCTAssertEqual(requests[2].userInstruction, "Move closer at the end")
+        XCTAssertEqual(vm.turns.count, 3)
+        XCTAssertTrue(vm.editingUserInstruction.isEmpty)
+        let saved = await repository.all()
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(saved.first?.detailedScript, vm.editingDetailedScript)
+    }
+
+    func testFailedUpdatePreservesCurrentScriptInstructionsAndHistory() async {
+        let service = DetailRefinerStub()
+        let vm = ScriptDetailViewModel(service: service, repository: DetailItemRepository(), clipboard: StubClipboardWriter(), config: AppConfig())
+        await vm.loadItems()
+        vm.editingOriginalScript = "Original dialogue"
+        await vm.runDetail()
+        vm.editingDetailedScript = "Manual rewrite"
+        vm.editingConsolidatedInstruction = "Edited context"
+        vm.editingUserInstruction = "Make it warmer"
+        await service.configure(fail: true)
+        await vm.runDetail()
+        XCTAssertEqual(vm.editingDetailedScript, "Manual rewrite")
+        XCTAssertEqual(vm.editingConsolidatedInstruction, "Edited context")
+        XCTAssertEqual(vm.editingUserInstruction, "Make it warmer")
+        XCTAssertEqual(vm.turns.count, 1)
+        XCTAssertNotNil(vm.errorMessage)
+        XCTAssertFalse(vm.isDetailing)
+    }
+
+    func testRefreshPreservesOpenChatEditsAndResetClearsCurrentDetail() async {
+        let service = DetailRefinerStub()
+        let repository = DetailItemRepository()
+        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: AppConfig())
+        await vm.loadItems()
+        vm.editingOriginalScript = "Original dialogue"
+        await vm.runDetail()
+        vm.editingDetailedScript = "Unsaved manual rewrite"
+        vm.editingUserInstruction = "Pending instruction"
+        await vm.refresh()
+        XCTAssertEqual(vm.editingDetailedScript, "Unsaved manual rewrite")
+        XCTAssertEqual(vm.editingUserInstruction, "Pending instruction")
+        XCTAssertEqual(vm.turns.count, 1)
+        await vm.resetDetail()
+        XCTAssertEqual(vm.editingOriginalScript, "Original dialogue")
+        XCTAssertTrue(vm.editingDetailedScript.isEmpty)
+        XCTAssertTrue(vm.editingConsolidatedInstruction.isEmpty)
+        XCTAssertTrue(vm.turns.isEmpty)
+        let saved = await repository.all()
+        XCTAssertEqual(saved.first?.detailedScript, "")
+    }
+}
