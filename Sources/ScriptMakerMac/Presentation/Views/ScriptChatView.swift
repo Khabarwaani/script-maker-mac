@@ -59,14 +59,23 @@ struct ScriptChatView: View {
                                         .font(.callout).foregroundStyle(.secondary)
                                         .accessibilityIdentifier("script-refinement-result")
                                 }
-                                ScriptChatScriptPanel(title: viewModel.turns.isEmpty ? "Current script" : "Refined script", icon: "doc.text", script: viewModel.draft.latestScript)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label("Working script", systemImage: "doc.text").font(.headline)
+                                    TextEditor(text: $viewModel.editableScript)
+                                        .font(.body).scrollContentBackground(.hidden)
+                                        .frame(minHeight: 260)
+                                        .accessibilityLabel("Working script")
+                                        .disabled(viewModel.isRefining || viewModel.hasHistoryEdits || isSaving)
+                                    Text("Edit this script, then refine. Each run uses the latest text.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }.padding(12)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id("refined-script")
                         }
                         ScriptChatInstructions(viewModel: viewModel).disabled(isSaving)
                         ScriptChatHistory(viewModel: viewModel).frame(height: 150)
-                            .disabled(isSaving || viewModel.hasConsolidatedInstructionEdits)
+                            .disabled(isSaving || viewModel.hasScriptEdits || viewModel.hasConsolidatedInstructionEdits)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .onChange(of: viewModel.draft) { _, _ in
