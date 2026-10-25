@@ -101,10 +101,15 @@ final class ScriptChatViewModel {
         canUseProvider && !hasScriptEdits && !hasConsolidatedInstructionEdits && hasHistoryEdits
             && turns.allSatisfy { !StringFormatting.isBlank(historyInstruction(for: $0.id)) }
     }
+    private var hasHistoryChanges: Bool {
+        let saved = source?.scriptChatHistory
+        guard saved != nil || !revisions.isEmpty else { return false }
+        return revisions != (saved?.revisions ?? []) || selectedRevisionID != saved?.selectedRevisionID
+    }
     var canSave: Bool {
         !isRefining && !hasHistoryEdits && !hasConsolidatedInstructionEdits && !hasSavedDraft
             && source != nil && !StringFormatting.isBlank(draft.latestScript)
-            && draft.latestScript != source?.scriptText
+            && (draft.latestScript != source?.scriptText || hasHistoryChanges)
     }
 
     func historyInstruction(for id: UUID) -> String {
@@ -164,10 +169,10 @@ final class ScriptChatViewModel {
     }
 
     func reset() async {
-        guard let story = source else { return }
+        guard source != nil else { return }
         cancel()
         turns = []; revisions = []; selectedRevisionID = nil; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
-        let script = story.scriptText ?? ""
+        let script = originalScript
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
         instructionDraft = draft.instruction
         await service.closeSession()
