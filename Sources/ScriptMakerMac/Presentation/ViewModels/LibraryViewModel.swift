@@ -267,6 +267,10 @@ final class LibraryViewModel {
         story.scriptText = version.text
         story.currentScriptVersionID = version.id
         await persist(story)
+        if let chat = scriptChat, chat.source?.id == storyID {
+            await chat.closeSession()
+            chat.begin(story)
+        }
         actionNotice = "Version \(version.number) is the current script"
     }
 
