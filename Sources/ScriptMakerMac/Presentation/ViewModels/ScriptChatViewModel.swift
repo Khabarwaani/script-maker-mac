@@ -75,7 +75,9 @@ final class ScriptChatViewModel {
     func discardConsolidatedInstructionEdits() { if !isRefining { instructionDraft = draft.instruction } }
 
     func begin(_ story: Story) {
-        if source?.id == story.id, (!turns.isEmpty || !StringFormatting.isBlank(draft.latestScript)) {
+        if source?.id == story.id, source?.scriptText == story.scriptText,
+           source?.currentScriptVersionID == story.currentScriptVersionID, source?.instruction == story.instruction,
+           (!turns.isEmpty || !StringFormatting.isBlank(draft.latestScript)) {
             return
         }
         let previousStoryID = source?.id

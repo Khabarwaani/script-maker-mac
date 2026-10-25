@@ -618,3 +618,34 @@ extension ScriptChatTests {
         XCTAssertEqual(modes.last, .daemon)
     }
 }
+
+extension ScriptChatTests {
+    func testRefinementStartsFromSelectedLibraryVersion() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let repository = ChatRepository()
+        let selected = StoryScriptVersion(number: 2, text: "Selected script", createdAt: "2026-10-25", instruction: nil)
+        let original = Story(scriptText: "Previous script", scriptVersions: [selected])
+        await repository.save(original)
+        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        await library.refresh()
+        chat.begin(original)
+        await chat.refreshProviders()
+        chat.userInstruction = "Refine previous script"
+        await chat.refine()
+
+        await library.useVersion(selected, storyID: original.id)
+        let current = try XCTUnwrap(library.stories.first { $0.id == original.id })
+        chat.begin(current)
+        XCTAssertEqual(chat.originalScript, selected.text)
+        XCTAssertEqual(chat.draft.latestScript, selected.text)
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertTrue(chat.consolidatedInstruction.isEmpty)
+        chat.userInstruction = "Refine selected script"
+        await chat.refine()
+        let request = await service.requests.last
+        XCTAssertEqual(request?.originalScript, selected.text)
+        XCTAssertEqual(request?.draft.latestScript, selected.text)
+        XCTAssertEqual(request?.userInstruction, "Refine selected script")
+    }
+}
