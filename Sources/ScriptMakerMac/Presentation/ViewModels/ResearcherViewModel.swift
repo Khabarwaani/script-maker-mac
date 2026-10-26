@@ -279,7 +279,7 @@ final class ResearcherViewModel {
 
     func openInPipeline() {
         guard !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let loc = researchResult?.location ?? config.newsSettings.location
+        let loc = researchResult?.location.flatMap { RegionGeo.resolve($0)?.name } ?? config.newsSettings.location
         onNavigateToPipeline?(topic, loc)
     }
 
