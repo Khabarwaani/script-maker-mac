@@ -217,17 +217,18 @@ final class LibraryViewModel {
             }
             isSavingEdits = true
             defer { isSavingEdits = false }
-            var refined = original
-            appendVersion(chat.draft.latestScript, instruction: nil, to: &refined)
-            refined.scriptVersions = refined.scriptVersions.map { Array($0.suffix(1)) }
-            refined.instruction = nil
-            refined.scriptChatHistory = chat.historyForSaving
-            refined.uploadReceipt = nil
-            refined.videoURL = nil
-            try await saveEditedCopy(refined, originalID: original.id, replacingOriginal: true)
+            let newScript = Story(
+                title: original.title,
+                headline: original.title,
+                status: "saved",
+                scriptText: chat.draft.latestScript
+            )
+            try await repository.save(newScript)
+            stories.insert(newScript, at: 0)
+            selectedStoryID = newScript.id
             chat.markSaved()
             await chat.closeSession()
-            actionNotice = "Latest script saved"
+            actionNotice = "New script saved"
             return true
         } catch {
             actionNotice = StringFormatting.errorMessage(error)
@@ -348,7 +349,7 @@ final class LibraryViewModel {
         if let index = stories.firstIndex(where: { $0.id == story.id }) { stories[index] = story }
     }
 
-    private func saveEditedCopy(_ edited: Story, originalID: String, replacingOriginal: Bool = false) async throws {
+    private func saveEditedCopy(_ edited: Story, originalID: String) async throws {
         var copy = edited
         copy.id = UUID().uuidString
         copy.createdAt = DateFormatting.iso8601Now()
@@ -356,12 +357,7 @@ final class LibraryViewModel {
         copy.sourceStoryID = edited.sourceStoryID ?? originalID
         copy.stageOutputs = nil
         copy.status = "saved"
-        if replacingOriginal {
-            try await repository.replace(copy, removingID: originalID)
-            stories.removeAll { $0.id == originalID }
-        } else {
-            try await repository.save(copy)
-        }
+        try await repository.save(copy)
         stories.insert(copy, at: 0)
         selectedStoryID = copy.id
         actionNotice = "Edited copy saved as a new story"
