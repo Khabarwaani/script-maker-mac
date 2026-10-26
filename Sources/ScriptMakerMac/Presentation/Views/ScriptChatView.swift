@@ -22,6 +22,7 @@ struct ScriptChatView: View {
                 Button("Close") { viewModel.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
             }
             HStack {
+            Toggle("Use app default", isOn: $viewModel.usesAppDefault)
                 Picker("Provider", selection: $viewModel.provider) {
                     ForEach(LocalAgentProvider.allCases) { provider in
                         Text(provider.title).tag(provider)

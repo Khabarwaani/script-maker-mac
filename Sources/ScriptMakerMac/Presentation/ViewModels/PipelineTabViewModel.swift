@@ -7,7 +7,7 @@ import Observation
 final class PipelineTabViewModel {
     var mode: PipelineMode = .preset
     var executionMode: PipelineExecutionMode = .continuous
-    var refinementInstruction = "Polish dialogue pacing and punchlines while preserving the facts, scene structure and script language."
+    var refinementInstruction = "Polish dialogue pacing and punchlines while preserving the facts, scene structure and script language. Preserve each scene's duration and word budget; do not increase its spoken word count."
     var editedOutput = ""
     private(set) var isPauseRequested = false
     private(set) var presets: [PipelinePresetTemplate] = []
@@ -45,8 +45,21 @@ final class PipelineTabViewModel {
     private(set) var availableTransitions: [PipelineTransitionOption] = []
     private(set) var catalog: [LocalAgentDefinition] = []
     private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
-    var provider: LocalAgentProvider = .codex
-    var modelOverride: String = ""
+    private var providerOverride: LocalAgentProvider = .codex
+    private var modelOverrideValue = ""
+    private let agentSelection: (any WorkspaceAgentSelecting)?
+    var usesAppDefault: Bool {
+        get { agentSelection?.usesAppDefault ?? false }
+        set { agentSelection?.usesAppDefault = newValue }
+    }
+    var provider: LocalAgentProvider {
+        get { agentSelection?.provider ?? providerOverride }
+        set { if let agentSelection { agentSelection.provider = newValue } else { providerOverride = newValue } }
+    }
+    var modelOverride: String {
+        get { agentSelection?.model ?? modelOverrideValue }
+        set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
+    }
 
     private(set) var isRefreshing = false
     private(set) var isRunning = false
@@ -55,6 +68,9 @@ final class PipelineTabViewModel {
     private(set) var statusMessage: String = "Ready"
     var savedStoryNotice: String?
 
+    @ObservationIgnored private let executor: any AgentPipelineExecuting
+    @ObservationIgnored private let storyMapper: any PipelineStoryMapping
+    private var executionModel = ""
     @ObservationIgnored private let service: any LocalAgentRunning
     @ObservationIgnored private let flowResolver: any PipelineFlowResolving
     @ObservationIgnored private let storyRepository: any StoryRepository
@@ -63,11 +79,17 @@ final class PipelineTabViewModel {
 
     init(
         service: any LocalAgentRunning,
+        executor: any AgentPipelineExecuting,
+        storyMapper: any PipelineStoryMapping,
         flowResolver: any PipelineFlowResolving,
         storyRepository: any StoryRepository,
         newsProvider: any StudioNewsProviding,
-        defaultLocation: String = "India"
+        defaultLocation: String = "India",
+        agentSelection: (any WorkspaceAgentSelecting)? = nil
     ) {
+        self.agentSelection = agentSelection
+        self.executor = executor
+        self.storyMapper = storyMapper
         self.service = service
         self.flowResolver = flowResolver
         self.storyRepository = storyRepository
@@ -86,13 +108,12 @@ final class PipelineTabViewModel {
     var activeDefinition: LocalAgentDefinition? {
         guard let step = activeStep else { return nil }
         return catalog.first { $0.agentID == step.agentID && $0.version == step.version }
-            ?? catalog.first { $0.agentID == step.agentID && $0.isExecutable }
     }
 
     var canRunActiveStep: Bool {
         guard !isRunning, !isRefreshing, let step = activeStep else { return false }
         guard isAvailable(step.provider) else { return false }
-        guard let def = activeDefinition, def.isExecutable else { return false }
+        guard let def = activeDefinition, def.isExecutable, def.supports(step.provider) else { return false }
         return (try? preparedInputJSON(for: step, definition: def)) != nil
     }
 
@@ -126,7 +147,8 @@ final class PipelineTabViewModel {
     }
 
     func availabilityReason(_ provider: LocalAgentProvider) -> String {
-        providers[provider]?.reason ?? "Checking availability…"
+        if activeDefinition?.supports(provider) == false { return "This agent needs web research. Choose a terminal provider." }
+        return providers[provider]?.reason ?? "Checking availability…"
     }
 
     // MARK: - Lifecycle & Setup
@@ -144,11 +166,6 @@ final class PipelineTabViewModel {
             self.presets = flowResolver.availablePresets()
             self.errorMessage = nil
 
-            if let firstAvailable = LocalAgentProvider.allCases.first(where: { isAvailable($0) }) {
-                if !isAvailable(provider) {
-                    provider = firstAvailable
-                }
-            }
 
             if steps.isEmpty {
                 if mode == .preset, let firstPreset = presets.first {
@@ -217,12 +234,14 @@ final class PipelineTabViewModel {
 
     func selectHeadline(_ headline: String) {
         selectedHeadline = headline
+        guard !isRunning, selectedStudioSource == .categories else { return }
         studioTopic = headline
         applyTopicToFirstStep(headline)
     }
 
     func selectHashtag(_ tag: String) {
         selectedHashtag = tag
+        guard !isRunning, selectedStudioSource == .trendingHashtags else { return }
         if let match = trendingHashtags.first(where: { $0.tag == tag }) {
             let topicText = match.headline ?? match.tag
             studioTopic = topicText
@@ -453,7 +472,7 @@ final class PipelineTabViewModel {
     func selectProvider(_ selected: LocalAgentProvider) {
         guard !isRunning else { return }
         provider = selected
-        for index in steps.indices { steps[index].provider = selected }
+        if steps.indices.contains(activeStepIndex) { steps[activeStepIndex].provider = selected }
     }
 
     // MARK: - Execution
@@ -479,6 +498,7 @@ final class PipelineTabViewModel {
 
     private func startExecution(continuous: Bool, advanceFirst: Bool) {
         guard !isRunning, !hasOutputEdits, advanceFirst ? canContinue : canRunActiveStep else { return }
+        executionModel = modelOverride
         isRunning = true
         isCancelling = false
         isPauseRequested = false
@@ -536,7 +556,6 @@ final class PipelineTabViewModel {
         guard isAvailable(step.provider), definition.supports(step.provider) else {
             throw LocalAgentError.invalidInput("Choose an available provider that supports \(step.agentName).")
         }
-        let input = try preparedInputJSON(for: step, definition: definition)
         invalidateFollowingStages()
         let index = activeStepIndex
         steps[index].status = .running
@@ -547,10 +566,7 @@ final class PipelineTabViewModel {
         steps[index].errorMessage = nil
         editedOutput = ""
         statusMessage = "Running \(step.agentName)…"
-        let model = modelOverride.trimmingCharacters(in: .whitespacesAndNewlines)
-        let output = try await service.run(LocalAgentRequest(agentID: step.agentID, version: step.version,
-            inputJSON: input, provider: step.provider, executable: step.provider.executable,
-            model: model.isEmpty ? nil : model))
+        let output = try await executor.execute(step: step, definition: definition, model: executionModel)
         try Task.checkCancellation()
         steps[index].status = .completed
         steps[index].completedAt = Date()
@@ -654,76 +670,20 @@ final class PipelineTabViewModel {
 
     // MARK: - Library Export
 
+    var isSavingStory = false
     func saveStoryToLibrary() {
-        // Find best candidate step
-        guard let storyStep = steps.last(where: {
-            $0.status == .completed && ($0.agentID == "ThreeSceneStoryCreator" || $0.agentID == "TwoSceneStoryCreator" || $0.agentID == "ScriptChat" || $0.agentID == "ScriptRefiner")
-        }) else {
-            errorMessage = "No completed story found to save to Library."
-            return
-        }
-
-        let raw = storyStep.result?.text.isEmpty == false ? (storyStep.result?.text ?? "") : storyStep.rawOutput
-        guard let data = raw.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            errorMessage = "Could not parse story output to save to Library."
-            return
-        }
-
-        var title = "Pipeline Generated Story"
-        var scriptText = ""
-        var summary = ""
-        var hashtags: [String] = []
-
-        if let items = json["items"] as? [[String: Any]], let first = items.first {
-            title = first["title"] as? String ?? title
-            summary = "Generated through Pipeline flow from \(steps.first?.agentName ?? "Pipeline")."
-            var lines = ["Title: \(title)", ""]
-            if let scenes = first["scenes"] as? [[String: Any]] {
-                for (i, sc) in scenes.enumerated() {
-                    let sTitle = sc["title"] as? String ?? "Scene \(i + 1)"
-                    let sGoal = sc["goal"] as? String ?? ""
-                    let sLoc = sc["location"] as? String ?? ""
-                    lines.append("--- Scene \(i + 1): \(sTitle) (\(sGoal)) - \(sLoc) ---")
-                    if let dialogues = sc["dialogues"] as? [[String: Any]] {
-                        for d in dialogues {
-                            let spk = d["speaker"] as? String ?? "Speaker"
-                            let txt = d["dialogue"] as? String ?? ""
-                            lines.append("\(spk): \(txt)")
-                        }
-                    }
-                    lines.append("")
-                }
-            }
-            scriptText = lines.joined(separator: "\n")
-        } else if let script = json["latestScript"] as? String ?? json["script"] as? String {
-            scriptText = script
-            summary = "Refined script from ScriptChat."
-        }
-
-        // Gather any hashtags from earlier steps (e.g. NewsResearcher)
-        for s in steps {
-            if let r = s.result, let d = r.text.data(using: .utf8),
-               let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-               let tags = j["hashtags"] as? [String] {
-                hashtags.append(contentsOf: tags)
-            }
-        }
-
-        let story = Story(
-            id: UUID().uuidString,
-            title: title,
-            summary: summary,
-            headline: title,
-            createdAt: DateFormatting.iso8601Now(),
-            status: "completed",
-            hashtags: hashtags.isEmpty ? nil : Array(Set(hashtags)),
-            scriptText: scriptText.isEmpty ? raw : scriptText
-        )
-
-        Task { [weak self, storyRepository] in
-            await storyRepository.save(story)
-            self?.savedStoryNotice = "Saved \"\(title)\" to your Library!"
+        guard !isSavingStory else { return }
+        isSavingStory = true
+        savedStoryNotice = nil
+        errorMessage = nil
+        let snapshot = steps
+        Task { [weak self, storyRepository, storyMapper] in
+            defer { self?.isSavingStory = false }
+            do {
+                let story = try storyMapper.story(from: snapshot)
+                try await storyRepository.save(story)
+                self?.savedStoryNotice = "Saved \"\(story.title)\" to your Library!"
+            } catch { self?.errorMessage = StringFormatting.errorMessage(error) }
         }
     }
 

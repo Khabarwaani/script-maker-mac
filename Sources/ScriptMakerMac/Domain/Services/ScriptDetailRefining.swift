@@ -46,6 +46,8 @@ protocol ScriptDetailRefining: Sendable {
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability]
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) async
     func closeSession() async
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async
+    func closeSession(id: String) async
 }
 
 extension ScriptDetailRefining {
@@ -54,4 +56,8 @@ extension ScriptDetailRefining {
     }
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) async {}
     func closeSession() async {}
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async {
+        await prewarm(for: provider, model: model, mode: mode)
+    }
+    func closeSession(id: String) async { await closeSession() }
 }

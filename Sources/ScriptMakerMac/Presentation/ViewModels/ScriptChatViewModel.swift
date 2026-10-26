@@ -19,17 +19,31 @@ final class ScriptChatViewModel {
     private(set) var errorMessage: String?
     private(set) var hasSavedDraft = false
     var userInstruction = ""
-    var provider: LocalAgentProvider = .codex
-    var model = ""
+    private var providerOverride: LocalAgentProvider = .codex
+    private var modelOverrideValue = ""
+    private let agentSelection: (any WorkspaceAgentSelecting)?
+    var usesAppDefault: Bool {
+        get { agentSelection?.usesAppDefault ?? false }
+        set { agentSelection?.usesAppDefault = newValue }
+    }
+    var provider: LocalAgentProvider {
+        get { agentSelection?.provider ?? providerOverride }
+        set { if let agentSelection { agentSelection.provider = newValue } else { providerOverride = newValue } }
+    }
+    var model: String {
+        get { agentSelection?.model ?? modelOverrideValue }
+        set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
+    }
     var mode: ScriptRefinementExecutionMode
-    private let config: AppConfig?
+    private let config: (any AgentSettingsProviding)?
 
     private var sessionID: String {
         if let id = source?.id { return "script-chat-\(id)" }
         return "script-chat-default"
     }
 
-    init(service: any ScriptChatRefining, config: AppConfig? = nil, initialMode: ScriptRefinementExecutionMode = .fastClean) {
+    init(service: any ScriptChatRefining, config: (any AgentSettingsProviding)? = nil, initialMode: ScriptRefinementExecutionMode = .fastClean, agentSelection: (any WorkspaceAgentSelecting)? = nil) {
+        self.agentSelection = agentSelection
         self.service = service
         self.config = config
         self.mode = config?.scriptRefinementMode ?? initialMode
@@ -65,7 +79,7 @@ final class ScriptChatViewModel {
         cancel()
         let id = operationID
         isRefining = true
-        await service.closeSession()
+        await service.closeSession(id: sessionID)
         guard operationID == id else { return }
         selectedRevisionID = revisionID
         draft = revision?.draft ?? ScriptChatDraft(latestScript: originalScript, instruction: originalInstruction)
@@ -132,13 +146,14 @@ final class ScriptChatViewModel {
             return
         }
         let previousStoryID = source?.id
+        let previousSessionID = sessionID
         cancel()
         source = nil; turns = []; revisions = []; selectedRevisionID = nil; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
         instructionDraft = ""
         if let config { mode = config.scriptRefinementMode }
-        if let previousStoryID, previousStoryID != story.id {
-            Task { [service] in await service.closeSession() }
+        if previousStoryID != nil {
+            Task { [service] in await service.closeSession(id: previousSessionID) }
         }
         guard let script = story.scriptText, !StringFormatting.isBlank(script) else {
             errorMessage = "This story has no script to refine."
@@ -175,17 +190,17 @@ final class ScriptChatViewModel {
         let script = originalScript
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
         instructionDraft = draft.instruction
-        await service.closeSession()
+        await service.closeSession(id: sessionID)
     }
 
     func closeSession() async {
         cancel()
-        await service.closeSession()
+        await service.closeSession(id: sessionID)
     }
 
     func prewarm() async {
         guard canUseProvider || (source != nil && !isRefining) else { return }
-        await service.prewarm(for: provider, model: model, mode: mode)
+        await service.prewarm(for: provider, model: model, mode: mode, sessionID: sessionID)
     }
 
     func refreshProviders() async {
@@ -194,8 +209,6 @@ final class ScriptChatViewModel {
         let available = await service.availability()
         guard !Task.isCancelled else { return }
         providers = available
-        if providers[provider]?.isAvailable != true,
-           let first = LocalAgentProvider.allCases.first(where: { providers[$0]?.isAvailable == true }) { provider = first }
     }
 
     func refine() async {

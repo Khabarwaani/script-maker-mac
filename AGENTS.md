@@ -27,18 +27,18 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
 
 - `Sources/ScriptMakerMac/App/` — `@main` entry + `CompositionRoot.swift` (the ONLY
   place that creates concrete types; everything else depends on protocols).
-- `Sources/ScriptMakerMac/Domain/` — `Entities/` (`Story`, `PipelineModels`),
-  `Services/` (business logic + protocols: `PipelineService`, `ImageService`,
-  `StoryRepository`, `WebClient`). Never touches URLSession/UserDefaults directly.
+- `Sources/ScriptMakerMac/Domain/` — `Entities/` (`Story`, agent/pipeline models),
+  `Services/` (business logic + protocols: `PipelineExecutionService`,
+  `StoryRepository`, `LocalAgentRunning`). Never touches URLSession/UserDefaults directly.
 - `Sources/ScriptMakerMac/Core/` — dependency-free shared utilities
   (`DateFormatting`, `StringFormatting`, `AppLog`). Foundation only.
 - `Sources/ScriptMakerMac/Platform/` — `Repositories/`, `DataSources/`, `WebClients/`,
   `Mappers/`. Stateful implementations (caching, sessions).
 - `Sources/ScriptMakerMac/Infra/` — `InfraStore.swift` (`HTTPClient`, `KeyValueStore`,
-  `FileStore`), `AppConfig`. Stateless execution primitives.
+  `FileStore`). Stateless execution primitives; AppConfig is in Platform.
 - `Sources/ScriptMakerMac/Presentation/ViewModels/` — `@Observable @MainActor final class`.
   Owns state, calls services via protocols. Plain `var` (no `@Published`).
-  Created once in `ContentView` (`@State`), passed down as `@Bindable`.
+  Created once by CompositionRoot, retained by App/ContentView state, passed as `@Bindable`.
   Never recreated. No layout code.
 - `Sources/ScriptMakerMac/Presentation/Views/` — dumb SwiftUI. No business logic, no direct
   service calls — everything through the view model. Each section its own struct.
@@ -53,17 +53,14 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
    Keep the primary checkout on current `develop`. Make implementation changes
    in a separate Git worktree; do not switch the user's primary checkout.
    Remove the worktree after merging and verifying the integration.
-2. **Thin client:** pipeline generation goes through `PipelineAPI`. The
-   `LocalAgent` workspace may execute KhabarwaaniAgent through installed CLI
-   providers or AgentAtom's on-device session via its injected service.
-   Views never import agent packages.
+2. **Agent execution:** use injected local agent services and package executors.
+   Views never import agent packages. News/media/uploads use direct HTTP adapters.
 3. **Fail-loud:** typed errors (`APIError`, `ConfigError`) with `LocalizedError`.
    Surfaces to the user; the UI stays usable offline.
 4. **Concurrency:** async/await only — no completion handlers, no Combine for
-   networking. `PipelineAPI` is an actor. ViewModels are `@MainActor`.
-5. **Server URL:** top-level setting in Preferences (Cmd+, via Settings scene),
-   defaults to `http://localhost:8000`. IPv6-aware normalization in `AppConfig`.
-   Never hardcode another default.
+   networking. Repositories and retained session coordination are actors. ViewModels are `@MainActor`.
+5. **Settings:** shared typed agent default with workspace overrides. No server/sample
+   mode. Unknown or incompatible provider selections block Run without substitution.
 6. **UX:** same use cases as the classic app. Apple HIG throughout.
 7. **Testing:** Remote CI-first (`xcodebuild` on GitHub Actions). Rely on CI
    for test verification; run local tests only upon CI failure. Unit tests target
@@ -80,3 +77,9 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
 12. **Local builds:** use Xcode's default DerivedData location. Do not create
     repo-local `build/` output or temporary custom build directories. When asked
     to launch or verify, build and run the integrated `develop` checkout.
+
+## 2.0 revamp exception (#147)
+
+Implementation PRs target revamp/2.0. Keep develop/main free of partial revamp work.
+Finish every work package and testing before creating a new version, preview or release.
+The develop integration remains draft until full acceptance and explicit user approval.

@@ -4,6 +4,7 @@ import KhabarwaaniAgent
 struct LocalScriptChatService: ScriptChatRefining {
     let runner: any LocalAgentRunning
     private let defaultSessionID: String
+    private static let responseInstructions = "Write the consolidated instruction field in English only. Keep latestScript in the original script's language unless the user explicitly requests a different script language. This language rule applies to instruction metadata, not to the script dialogue."
 
     init(runner: any LocalAgentRunning, sessionID: String = "script-chat") {
         self.runner = runner
@@ -15,6 +16,10 @@ struct LocalScriptChatService: ScriptChatRefining {
     }
 
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode = .fastClean) async {
+        await prewarm(for: provider, model: model, mode: mode, sessionID: defaultSessionID)
+    }
+
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async {
         guard mode != .strictEphemeral else { return }
         let trimmed = model.trimmingCharacters(in: .whitespacesAndNewlines)
         var settings = mode.sessionSettings
@@ -25,12 +30,16 @@ struct LocalScriptChatService: ScriptChatRefining {
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
             inputJSON: json, provider: provider, executable: provider.executable,
             model: trimmed.isEmpty ? nil : trimmed, session: settings,
-            responseInstructions: "", sessionID: defaultSessionID)
-        await runner.prewarm(sessionID: defaultSessionID, request: request)
+            responseInstructions: Self.responseInstructions, sessionID: sessionID)
+        await runner.prewarm(sessionID: sessionID, request: request)
     }
 
     func closeSession() async {
-        await runner.closeSession(id: defaultSessionID)
+        await closeSession(id: defaultSessionID)
+    }
+
+    func closeSession(id: String) async {
+        await runner.closeSession(id: id)
     }
 
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft {
@@ -48,7 +57,7 @@ struct LocalScriptChatService: ScriptChatRefining {
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
             inputJSON: json, provider: request.provider, executable: request.provider.executable,
             model: model.isEmpty ? nil : model, session: settings,
-            responseInstructions: "Write the consolidated instruction field in English only. Keep latestScript in the original script's language unless the user explicitly requests a different script language. This language rule applies to instruction metadata, not to the script dialogue.",
+            responseInstructions: Self.responseInstructions,
             sessionID: resolvedSessionID))
         try Task.checkCancellation()
         let output: ScriptChat.Output

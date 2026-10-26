@@ -1,26 +1,15 @@
 # Feature
 
-New use case, view, view model, or service capability. Need an approved spec
-(GitHub issue) and a plan before code. Output: `feature/` branch, fail-loud
-code, PR (CI runs on the server).
+Use an approved GitHub issue/spec and plan. Identify each change's layer before coding.
 
-1. No feature commits without that spec + plan.
-2. Missing data throws. No silent fallback or invented default.
-3. MVVM placement:
-   - Models → `Sources/ScriptMakerMac/Models/` (Codable, enums, no logic).
-   - Services → `Sources/ScriptMakerMac/Services/` (actors, async/await, no UI imports).
-   - ViewModels → `Sources/ScriptMakerMac/ViewModels/` (`@MainActor final class : ObservableObject`).
-   - Views → `Sources/ScriptMakerMac/Views/` (dumb SwiftUI, no business logic).
-4. New files go in the Xcode project (project.pbxproj) — the target must compile.
-5. Server API changes come first: the thin client never computes pipeline work.
+1. Start a separate worktree from origin/develop; never switch the primary checkout.
+2. Use Observable MainActor view models and Domain protocol injection. CompositionRoot
+   creates services; Views never import agent packages or call services directly.
+3. Preserve user content and surface typed errors. Never invent successful results.
+4. Register source/resources in the Xcode project and add meaningful service/view-model tests.
+5. Push a draft PR and use remote CI. Diagnose failures under failure.md.
+6. Merge only after green CI and user approval; update develop and clean merged worktrees.
 
-```bash
-git checkout develop && git pull
-git checkout -b feature/<name>
-# ... work, commit ...
-git push -u origin feature/<name>
-gh pr create --draft --base develop --title "feat: (#<issue>) <desc>"
-# verify server CI: gh pr checks
-# green -> gh pr ready; red -> report (needs a Mac to reproduce)
-# merge only after user approval
-```
+For #147, implementation PRs target revamp/2.0. Keep the develop integration PR draft until
+the complete revamp and acceptance testing pass. Do not create a version/preview/release
+for partial work. Issue #147 stays open until every required work package is verified.

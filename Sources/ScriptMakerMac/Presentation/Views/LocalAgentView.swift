@@ -21,7 +21,8 @@ private struct LocalAgentInputForm: View {
             Text("Choose an agent from the local package catalog.").foregroundStyle(.secondary)
             Group {
                 LocalAgentSelectionRow(viewModel: viewModel)
-                Text("Provider").font(.headline)
+                Toggle("Use app default", isOn: $viewModel.usesAppDefault)
+            Text("Provider").font(.headline)
                 ForEach(LocalAgentProvider.allCases) { provider in
                     Button { viewModel.selectProvider(provider) } label: {
                         Label(provider.title, systemImage: viewModel.provider == provider ? "largecircle.fill.circle" : "circle")
@@ -66,7 +67,7 @@ private struct LocalAgentInputForm: View {
                 }
             }
             Text(viewModel.status).font(.callout).foregroundStyle(.secondary)
-            Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model." : "Uses your installed CLI and account. Studio server settings do not apply.")
+            Text(viewModel.provider == .appleLocal ? "Uses the on-device Apple Intelligence model." : "Uses your installed CLI and account. Generation runs on this Mac.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

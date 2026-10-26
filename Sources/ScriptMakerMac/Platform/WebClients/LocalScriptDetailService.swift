@@ -4,6 +4,7 @@ import KhabarwaaniAgent
 struct LocalScriptDetailService: ScriptDetailRefining {
     let runner: any LocalAgentRunning
     private let defaultSessionID: String
+    private static let responseInstructions = "Detail the scene in English visual direction (Setting, Characters and Positions, Continuous Shot Timeline) while preserving verbatim dialogues in their original language. Write consolidated instruction metadata in English."
 
     init(runner: any LocalAgentRunning, sessionID: String = "script-detail") {
         self.runner = runner
@@ -15,6 +16,10 @@ struct LocalScriptDetailService: ScriptDetailRefining {
     }
 
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode = .fastClean) async {
+        await prewarm(for: provider, model: model, mode: mode, sessionID: defaultSessionID)
+    }
+
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async {
         guard mode != .strictEphemeral else { return }
         let trimmed = model.trimmingCharacters(in: .whitespacesAndNewlines)
         var settings = mode.sessionSettings
@@ -25,12 +30,16 @@ struct LocalScriptDetailService: ScriptDetailRefining {
             agentID: ScriptDetail.Spec.identity.id, version: ScriptDetail.Spec.identity.version,
             inputJSON: json, provider: provider, executable: provider.executable,
             model: trimmed.isEmpty ? nil : trimmed, session: settings,
-            responseInstructions: "", sessionID: defaultSessionID)
-        await runner.prewarm(sessionID: defaultSessionID, request: request)
+            responseInstructions: Self.responseInstructions, sessionID: sessionID)
+        await runner.prewarm(sessionID: sessionID, request: request)
     }
 
     func closeSession() async {
-        await runner.closeSession(id: defaultSessionID)
+        await closeSession(id: defaultSessionID)
+    }
+
+    func closeSession(id: String) async {
+        await runner.closeSession(id: id)
     }
 
     func detail(_ request: ScriptDetailRequest) async throws -> ScriptDetailDraft {
@@ -53,7 +62,7 @@ struct LocalScriptDetailService: ScriptDetailRefining {
             agentID: ScriptDetail.Spec.identity.id, version: ScriptDetail.Spec.identity.version,
             inputJSON: json, provider: request.provider, executable: request.provider.executable,
             model: model.isEmpty ? nil : model, session: settings,
-            responseInstructions: "Detail the scene in English visual direction (Setting, Characters and Positions, Continuous Shot Timeline) while preserving verbatim dialogues in their original language. Write consolidated instruction metadata in English.",
+            responseInstructions: Self.responseInstructions,
             sessionID: resolvedSessionID))
         try Task.checkCancellation()
         let output: ScriptDetail.Output

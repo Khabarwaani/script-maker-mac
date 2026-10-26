@@ -15,13 +15,8 @@ struct ContentView: View {
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        let resVM = viewModel.researcherViewModel
-        resVM.onNavigateToPipeline = { [weak viewModel] topic, location in
-            viewModel?.selectedTab = .pipeline
-            viewModel?.pipelineViewModel.applyStudioTopic(topic, location: location)
-        }
         _researcherViewModel = State(
-            wrappedValue: resVM
+            wrappedValue: viewModel.researcherViewModel
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
@@ -79,7 +74,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle(viewModel.config.buildTitle)
+        .navigationTitle(AppBuild.title)
         .font(.system(size: 14))
         .foregroundStyle(AppTheme.ink)
         .background(AppTheme.paper)

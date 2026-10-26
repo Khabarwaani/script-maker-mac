@@ -2,9 +2,6 @@ import XCTest
 import TrendingHashtag
 @testable import ScriptMakerMac
 
-private struct TrendSettingsChecker: ServerConnectionChecking {
-    func isReachable(at url: URL) async -> Bool { false }
-}
 
 private actor RecordingTrendClient: RefreshableTrendingSearching {
     var freshness: [Bool] = []
@@ -54,25 +51,6 @@ private actor DeferredTagDetails: StudioNewsProviding {
 }
 
 final class TrendingSettingsTests: XCTestCase {
-    @MainActor
-    func testLateTagDetailCannotOverwriteAnotherSource() async {
-        let config = AppConfig(defaults: UserDefaults(suiteName: "trends.detail.race.\(UUID().uuidString)")!)
-        config.dataSource = .server
-        let provider = DeferredTagDetails()
-        let vm = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: provider)
-        vm.selectedStorySource = GenerateViewModel.hashtagSourceLabel
-        await vm.onStorySourceChanged()
-        let loading = Task { await vm.loadHashtagDetail() }
-        await provider.waitUntilRequested()
-        vm.selectedStorySource = GenerateViewModel.manualSourceLabel
-        await vm.onStorySourceChanged()
-        vm.topic = "Manual topic"
-        await provider.complete()
-        await loading.value
-        XCTAssertEqual(vm.topic, "Manual topic")
-        XCTAssertNil(vm.selectedHashtagDetails)
-        XCTAssertNil(vm.hashtagDetailError)
-    }
 
     func testDefaultsMatchPublishedFrameworkAndProvidersValidate() throws {
         var settings = TrendingDiscoverySettings()
@@ -98,10 +76,10 @@ final class TrendingSettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testTrendSettingsPersistAndInvalidEditsPreserveConfiguration() {
+    func testTrendSettingsPersistAndInvalidEditsPreserveConfiguration() throws {
         let defaults = UserDefaults(suiteName: "trends.settings.\(UUID().uuidString)")!
-        let config = AppConfig(defaults: defaults)
-        let vm = PreferencesViewModel(config: config, connectionChecker: TrendSettingsChecker())
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
+        let vm = PreferencesViewModel(config: config)
         vm.draftTrendingSettings.platform = .twitter
         vm.draftTrendingSettings.twitterEndpoint = "https://example.com/trends"
         vm.draftTrendingSettings.region = " us "
@@ -113,7 +91,7 @@ final class TrendingSettingsTests: XCTestCase {
         vm.saveTrendingSettings()
         XCTAssertNil(vm.trendingSettingsError)
         XCTAssertNotNil(vm.trendingSettingsNotice)
-        let reopened = AppConfig(defaults: defaults)
+        let reopened = AppConfig(store: KeyValueStore(defaults: defaults))
         XCTAssertEqual(reopened.trendingSettings, config.trendingSettings)
         XCTAssertEqual(reopened.trendingSettings.cacheDuration, 7200)
         XCTAssertEqual(reopened.trendingSettings.region, "US")
@@ -130,7 +108,7 @@ final class TrendingSettingsTests: XCTestCase {
 
     @MainActor
     func testClientIsReusedForCachingAndRebuiltWhenSettingsChange() async throws {
-        let config = AppConfig(defaults: UserDefaults(suiteName: "trends.clients.\(UUID().uuidString)")!)
+        let config = AppConfig(store: KeyValueStore(defaults: UserDefaults(suiteName: "trends.clients.\(UUID().uuidString)")!))
         let probe = TrendFactoryProbe()
         let client = RecordingTrendClient()
         let factory = TrendingClientProvider(settings: { config.trendingSettings }, makeClient: { _ in
@@ -151,38 +129,32 @@ final class TrendingSettingsTests: XCTestCase {
         XCTAssertEqual(probe.creations, 2)
     }
 
-    @MainActor
-    func testSelectedTagLoadsFullDetailsAndHeadlineRefreshStaysOnTag() async {
-        let config = AppConfig(defaults: UserDefaults(suiteName: "trends.detail.\(UUID().uuidString)")!)
-        config.dataSource = .server
-        let vm = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
-        vm.selectedStorySource = GenerateViewModel.hashtagSourceLabel
-        await vm.onStorySourceChanged()
-        XCTAssertEqual(vm.topic, "Local trend")
-        await vm.refreshHeadlines(forceFresh: true)
-        XCTAssertEqual(vm.topic, "Full trend title")
-        XCTAssertEqual(vm.selectedHashtagDetails?.summary, "Trend description")
-        vm.onHashtagChanged("")
-        XCTAssertNil(vm.selectedHashtagDetails)
-        XCTAssertTrue(vm.headlines.isEmpty)
-        XCTAssertFalse(vm.isLoadingHashtagDetail)
-        let failing = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider(fails: true))
-        failing.selectedStorySource = GenerateViewModel.hashtagSourceLabel
-        failing.onHashtagChanged("#ISRO")
-        await failing.loadHashtagDetail()
-        XCTAssertNotNil(failing.hashtagDetailError)
-        XCTAssertEqual(failing.topic, "ISRO")
-        XCTAssertFalse(failing.isLoadingHashtagDetail)
-    }
 
+}
+
+@MainActor
+private struct TrendClipboard: ClipboardWriting {
+    func write(_ text: String) -> Bool { false }
+    func writeImage(_ data: Data) -> Bool { false }
+}
+private struct TrendResearcher: NewsResearching {
+    func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { [:] }
+    func research(_ request: NewsResearchRequest) async throws -> NewsResearchResult { throw CancellationError() }
+}
+extension TrendingSettingsTests {
     @MainActor
-    func testLegacySavedGoogleSourceMigratesToTrendingHashtags() {
-        let config = AppConfig(defaults: UserDefaults(suiteName: "trends.migrate.\(UUID().uuidString)")!)
-        let original = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
-        original.selectedStorySource = "#️⃣ Trending Hashtags (Google)"
-        original.saveStudioConfig()
-        let reopened = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
-        XCTAssertTrue(reopened.isHashtagSource)
-        XCTAssertEqual(reopened.selectedStorySource, GenerateViewModel.hashtagSourceLabel)
+    func testLateTagDetailsCannotReplaceANewerSelection() async {
+        let provider = DeferredTagDetails()
+        let vm = ResearcherViewModel(newsProvider: provider, researchService: TrendResearcher(), clipboard: TrendClipboard(), config: makeTestConfig())
+        vm.selectedStorySource = ResearcherViewModel.hashtagSourceLabel
+        vm.selectedHashtag = "#ISRO"
+        let task = Task { await vm.loadHashtagDetail() }
+        await provider.waitUntilRequested()
+        vm.selectedHashtag = "#Other"
+        vm.topic = "New selection"
+        await provider.complete()
+        await task.value
+        XCTAssertEqual(vm.topic, "New selection")
+        XCTAssertNil(vm.selectedTagDetail)
     }
 }

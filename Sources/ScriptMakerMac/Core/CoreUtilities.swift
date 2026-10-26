@@ -56,3 +56,12 @@ enum AppLog {
         print("[ScriptMaker] \(message)")
     }
 }
+
+enum AppBuild {
+    static var title: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let commit = Bundle.main.url(forResource: "BuildCommit", withExtension: "txt")
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
+        return "Script Maker (v\(version) - \(commit))"
+    }
+}

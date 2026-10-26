@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Owns top-level navigation state and server connectivity.
+/// Owns navigation and stable workspace models.
 @Observable
 @MainActor
 final class ContentViewModel {
@@ -19,7 +19,7 @@ final class ContentViewModel {
         }
     }
 
-    let config: AppConfig
+    let config: any AppearanceSettingsProviding
     let preferencesViewModel: PreferencesViewModel
     let researcherViewModel: ResearcherViewModel
     let libraryViewModel: LibraryViewModel
@@ -31,7 +31,7 @@ final class ContentViewModel {
     var selectedTab: Tab = .researcher
 
     init(
-        config: AppConfig,
+        config: any AppearanceSettingsProviding,
         preferencesViewModel: PreferencesViewModel,
         researcherViewModel: ResearcherViewModel,
         libraryViewModel: LibraryViewModel,

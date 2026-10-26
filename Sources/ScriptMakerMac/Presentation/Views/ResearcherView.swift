@@ -237,6 +237,7 @@ struct ResearcherView: View {
         StudioSection("Agent Configuration") {
             EmptyView()
         } content: {
+            Toggle("Use app default", isOn: $viewModel.usesAppDefault)
             StudioRow("Provider", inset: 0) {
                 StudioOptionPicker(
                     "Provider",
@@ -254,6 +255,7 @@ struct ResearcherView: View {
                 )
             }
 
+            Text(viewModel.providerNotice).font(.caption).foregroundStyle(AppTheme.secondaryInk)
             StudioRow("Model Override") {
                 TextField("Default / Override (optional)", text: $viewModel.customModel)
             }

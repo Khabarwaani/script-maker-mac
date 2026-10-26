@@ -13,11 +13,7 @@ private actor LocalLibraryUpdaterStub: LibraryUpdating {
     var titles: [String] = []
     var failSearch = false
     init(failSearch: Bool = false) { self.failSearch = failSearch }
-    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
-                localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
-        XCTAssertEqual(engine, "None")
-        XCTAssertNil(serverURL)
-        XCTAssertFalse(localJSON)
+    func update(_ kind: LibraryUpdate, story: Story) async throws -> LibraryUpdateResult {
         titles.append(story.title)
         if kind == .hashtags { return LibraryUpdateResult(hashtags: ["#LocalNews"]) }
         if failSearch { throw APIError.transport("Publisher unavailable") }
@@ -54,9 +50,6 @@ private actor CapturingUploader: StoryUploading {
     }
 }
 
-private struct UploadSettingsChecker: ServerConnectionChecking {
-    func isReachable(at url: URL) async -> Bool { false }
-}
 
 private actor LibrarySearchProbe: NewsSearching {
     var limits: [Int] = []
@@ -69,37 +62,37 @@ private actor LibrarySearchProbe: NewsSearching {
 
 @MainActor
 final class LocalLibraryWorkflowTests: XCTestCase {
-    private func config() -> AppConfig { AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!) }
+    private func config() -> AppConfig { AppConfig(store: KeyValueStore(defaults: UserDefaults(suiteName: UUID().uuidString)!)) }
 
     func testLibraryUsesConfiguredFrameworkAndCurrentResultLimit() async throws {
         let config = config()
         let probe = LibrarySearchProbe()
         let client = LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (probe, config.newsPageSize) })
         let story = Story(title: "ISRO mission")
-        let result = try await client.update(.news, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let result = try await client.update(.news, story: story)
         XCTAssertEqual(result.news?.first?.url, "https://publisher.test/article")
         config.newsPageSize = 42
-        _ = try await client.update(.news, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        _ = try await client.update(.news, story: story)
         let limits = await probe.limits
         XCTAssertEqual(limits, [20, 42])
     }
 
     func testUploadUsesLatestSavedSettingsWithoutAnUploadForm() async throws {
         let settings = UploadSettingsStub()
-        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let preferences = PreferencesViewModel(config: config(), uploadSettings: settings)
         preferences.loadUploadSettings()
         preferences.uploadOptions = .init(telegramToken: " 123:token ", telegramChatID: " 42 ", includeTelegramGroups: true,
                                           googleAccessToken: " access ", googleEndpoint: "https://script.google.com/macros/s/test/exec")
         preferences.saveUploadSettings()
         XCTAssertNil(preferences.uploadSettingsError)
         XCTAssertNotNil(preferences.uploadSettingsNotice)
-        let reopened = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let reopened = PreferencesViewModel(config: config(), uploadSettings: settings)
         reopened.loadUploadSettings()
         XCTAssertEqual(reopened.uploadOptions, settings.options)
         XCTAssertEqual(reopened.uploadOptions.telegramChatID, "42")
         let uploader = CapturingUploader()
         let story = Story(title: "One click")
-        let vm = LibraryViewModel(config: config(), repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
+        let vm = LibraryViewModel( repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
         vm.stories = [story]
         await vm.upload(story, to: .telegram)
         reopened.uploadOptions.telegramChatID = "84"
@@ -112,9 +105,9 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         XCTAssertFalse(vm.isUploading)
     }
 
-    func testUploadSettingsFailuresPreventUploadAndReportSaveFailure() async {
+    func testUploadSettingsFailuresPreventUploadAndReportSaveFailure() async throws {
         let settings = UploadSettingsStub()
-        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let preferences = PreferencesViewModel(config: config(), uploadSettings: settings)
         preferences.loadUploadSettings()
         settings.fails = true
         preferences.saveUploadSettings()
@@ -123,7 +116,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         preferences.loadUploadSettings()
         XCTAssertFalse(preferences.canSaveUploadSettings)
         let uploader = CapturingUploader()
-        let vm = LibraryViewModel(config: config(), repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
+        let vm = LibraryViewModel( repository: LocalLibraryRepository(), uploader: uploader, uploadSettings: settings)
         let story = Story(title: "Blocked")
         vm.stories = [story]
         vm.selectedStoryID = story.id
@@ -134,10 +127,10 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         XCTAssertFalse(vm.isUploading)
     }
 
-    func testInvalidUploadSettingsPreserveSavedValues() {
+    func testInvalidUploadSettingsPreserveSavedValues() throws {
         let settings = UploadSettingsStub()
         settings.options.telegramChatID = "42"
-        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let preferences = PreferencesViewModel(config: config(), uploadSettings: settings)
         preferences.loadUploadSettings()
         preferences.uploadOptions.telegramChatID = "invalid"
         preferences.saveUploadSettings()
@@ -153,7 +146,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
     func testTitleOnlySavesAndEnrichesWithoutGenerationMetadata() async throws {
         let repository = LocalLibraryRepository()
         let updater = LocalLibraryUpdaterStub()
-        let vm = LibraryViewModel(config: config(), repository: repository, updater: updater)
+        let vm = LibraryViewModel( repository: repository, updater: updater)
         vm.newStoryTitle = "   Local news headline   "
         XCTAssertTrue(vm.canAddStory)
         let added = await vm.addStory()
@@ -172,7 +165,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
 
     func testBlankTitleRejectedAndFailedSearchKeepsSavedTitleAndTags() async throws {
         let repository = LocalLibraryRepository()
-        let vm = LibraryViewModel(config: config(), repository: repository, updater: LocalLibraryUpdaterStub(failSearch: true))
+        let vm = LibraryViewModel( repository: repository, updater: LocalLibraryUpdaterStub(failSearch: true))
         vm.newStoryTitle = " \n "
         XCTAssertFalse(vm.canAddStory)
         let rejected = await vm.addStory()
@@ -196,7 +189,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         let updater = LocalLibraryUpdaterStub()
         let original = Story(title: "Old title", imageURLs: ["file:///tmp/imported.jpg", "https://old.test/old.jpg"])
         await repository.save(original)
-        let vm = LibraryViewModel(config: config(), repository: repository, updater: updater)
+        let vm = LibraryViewModel( repository: repository, updater: updater)
         await vm.refresh()
         vm.prepareEdits(original)
         vm.editedTitle = "New headline"
@@ -217,7 +210,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         let repository = LocalLibraryRepository()
         let story = Story(title: "Upload target")
         await repository.save(story)
-        let vm = LibraryViewModel(config: config(), repository: repository, uploader: LocalUploaderStub())
+        let vm = LibraryViewModel( repository: repository, uploader: LocalUploaderStub())
         await vm.refresh()
         await vm.upload(story, to: .googleSheets)
         XCTAssertEqual(vm.selectedStory?.uploadReceipt?.id, 7)
@@ -300,21 +293,21 @@ final class LocalLibraryNetworkTests: XCTestCase {
         }
         let client = updater()
         var story = Story(title: "ISRO mission")
-        let news = try await client.update(.news, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let news = try await client.update(.news, story: story)
         XCTAssertEqual(news.news?.first?.url, "https://publisher.test/article")
         story.sourceLinks = news.news
-        let images = try await client.update(.images, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let images = try await client.update(.images, story: story)
         XCTAssertEqual(images.images, ["https://publisher.test/photo.jpg?a=1&b=2"])
     }
 
     func testTagsNeedNoNetworkAndFailedNewsNeverUsesFixtures() async throws {
         LocalLibraryHTTPStub.handler = { _ in XCTFail("Hashtags must not use the network"); throw URLError(.notConnectedToInternet) }
         let client = updater()
-        let result = try await client.update(.hashtags, story: Story(title: "ISRO mission and ISRO crew"), engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let result = try await client.update(.hashtags, story: Story(title: "ISRO mission and ISRO crew"))
         XCTAssertEqual(result.hashtags, ["#ISRO", "#mission", "#crew"])
         LocalLibraryHTTPStub.handler = { _ in throw URLError(.notConnectedToInternet) }
         do {
-            _ = try await client.update(.news, story: Story(title: "ISRO mission"), engine: "None", instruction: "", localJSON: true, delay: 0, serverURL: nil)
+            _ = try await client.update(.news, story: Story(title: "ISRO mission"))
             XCTFail("Must fail rather than returning sample news")
         } catch { XCTAssertTrue(error.localizedDescription.contains("Could not find related news")) }
     }
@@ -417,14 +410,14 @@ final class LocalLibraryNetworkTests: XCTestCase {
         } catch { XCTAssertTrue(error.localizedDescription.contains("Attach a video")) }
     }
 
-    func testTelegramLongUnicodeTextPreservesContentWithinLimits() {
+    func testTelegramLongUnicodeTextPreservesContentWithinLimits() throws {
         let text = String(repeating: "📰News ", count: 1800)
         let chunks = LocalStoryUploadClient.textChunks(text)
         XCTAssertEqual(chunks.joined(), text)
         XCTAssertTrue(chunks.allSatisfy { $0.utf16.count <= 4096 })
     }
 
-    func testHashtagsPreserveHindiMarksAndShortNames() {
+    func testHashtagsPreserveHindiMarksAndShortNames() throws {
         XCTAssertEqual(LocalLibraryUpdateClient.hashtags(for: "दिल्ली में AI मिशन"), ["#दिल्ली", "#में", "#AI", "#मिशन"])
     }
 
@@ -470,11 +463,11 @@ final class LocalLibraryNetworkTests: XCTestCase {
 
 @MainActor
 final class LibraryImageAppendTests: XCTestCase {
-    func testRepeatedImageFetchPreservesExistingImagesAndDeduplicatesNewResults() async {
+    func testRepeatedImageFetchPreservesExistingImagesAndDeduplicatesNewResults() async throws {
         let repository = LocalLibraryRepository()
         let story = Story(title: "Image test", imageURLs: ["file:///tmp/imported.jpg", "https://existing.test/photo.jpg"])
         await repository.save(story)
-        let vm = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, updater: LocalLibraryUpdaterStub())
+        let vm = LibraryViewModel( repository: repository, updater: LocalLibraryUpdaterStub())
         await vm.refresh()
         vm.selectedStoryID = story.id
         await vm.update(.images)
@@ -502,7 +495,7 @@ extension LocalLibraryNetworkTests {
         }
         let client = LocalLibraryUpdateClient(httpClient: http(), news: { (probe, 20) }, imageNews: { (probe, 20) })
         let story = Story(title: "Indian physicist wins Oskar Klein medal, one of the top prizes in physics", sourceLinks: [.init(title: "News", url: "https://news.google.com/rss/articles/opaque", source: "Publisher")])
-        let result = try await client.update(.images, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let result = try await client.update(.images, story: story)
         XCTAssertEqual(result.images, ["https://publisher.test/usable.jpg"])
         XCTAssertEqual(result.imagePreviews?["https://publisher.test/usable.jpg"], Data([1, 2, 3]))
     }
@@ -518,7 +511,7 @@ extension LocalLibraryNetworkTests {
         }
         let client = LocalLibraryUpdateClient(httpClient: http(), news: { (probe, 20) })
         let story = Story(title: "Physics", imageURLs: ["https://publisher.test/old.jpg"])
-        let result = try await client.update(.images, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        let result = try await client.update(.images, story: story)
         XCTAssertEqual(result.images, ["https://publisher.test/new.jpg"])
     }
 }

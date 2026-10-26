@@ -14,10 +14,19 @@ final class LocalAgentViewModel {
         didSet {
             if !version.isEmpty { selectedVersions[agentID] = version }
             prepareDraft()
-            selectCompatibleProvider()
         }
     }
-    var provider: LocalAgentProvider = .codex
+    private var providerOverride: LocalAgentProvider = .codex
+    private var modelOverrideValue = ""
+    private let agentSelection: (any WorkspaceAgentSelecting)?
+    var usesAppDefault: Bool {
+        get { agentSelection?.usesAppDefault ?? false }
+        set { agentSelection?.usesAppDefault = newValue }
+    }
+    var provider: LocalAgentProvider {
+        get { agentSelection?.provider ?? providerOverride }
+        set { if let agentSelection { agentSelection.provider = newValue } else { providerOverride = newValue } }
+    }
     private var selectedVersions: [String: String] = [:]
     private var drafts: [String: AgentInputDraft] = [:]
     private var providerSettings: [LocalAgentProvider: LocalAgentSessionSettings] = [:]
@@ -32,7 +41,7 @@ final class LocalAgentViewModel {
     @ObservationIgnored private let service: any LocalAgentRunning
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(service: any LocalAgentRunning) { self.service = service }
+    init(service: any LocalAgentRunning, agentSelection: (any WorkspaceAgentSelecting)? = nil) { self.service = service; self.agentSelection = agentSelection }
     var agents: [LocalAgentDefinition] {
         var seen = Set<String>()
         return definitions.filter { seen.insert($0.agentID).inserted }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -53,7 +62,7 @@ final class LocalAgentViewModel {
         get { providerSettings[provider] ?? .init() }
         set { providerSettings[provider] = newValue }
     }
-    var model: String { get { sessionSettings.model } set { sessionSettings.model = newValue } }
+    var model: String { get { usesAppDefault ? (agentSelection?.model ?? "") : sessionSettings.model } set { agentSelection?.model = newValue; sessionSettings.model = newValue } }
     var executable: String { provider.executable }
     var inputJSON: String? { try? preparedInput() }
     var inputError: String? { do { _ = try preparedInput(); return nil } catch { return error.localizedDescription } }
@@ -78,7 +87,6 @@ final class LocalAgentViewModel {
             definitions = loaded; providers = available; errorMessage = nil
             if agentID.isEmpty { agentID = agents.first?.agentID ?? "" }
             else { restoreVersion() }
-            selectCompatibleProvider()
         } catch {
             guard !Task.isCancelled else { return }
             definitions = []; providers = [:]
@@ -92,9 +100,6 @@ final class LocalAgentViewModel {
     func selectProvider(_ selected: LocalAgentProvider) {
         guard !isRunning, isAvailable(selected) else { return }
         provider = selected
-    }
-    private func selectCompatibleProvider() {
-        if !isAvailable(provider), let next = LocalAgentProvider.allCases.first(where: { isAvailable($0) }) { provider = next }
     }
     private func restoreVersion() {
         if let selected = selectedVersions[agentID] {

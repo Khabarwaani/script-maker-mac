@@ -114,16 +114,14 @@ struct StoryListView: View {
     @ViewBuilder
     private var detail: some View {
         if let story = viewModel.selectedStory {
-            StoryDetailView(story: story, viewModel: viewModel, onDelete: { storyToDelete = story }) { storyID in
-                Task { await viewModel.mergeClip(storyID: storyID) }
-            }
+            StoryDetailView(story: story, viewModel: viewModel, onDelete: { storyToDelete = story })
             .id(story.id).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 12) {
                 Image(systemName: "doc.text").font(.largeTitle)
                 Text(viewModel.stories.isEmpty ? "No saved stories" : "Select a story").font(.headline)
                 if viewModel.stories.isEmpty {
-                    Text("Use the plus button to add a news title, or generate a story in Studio.")
+                    Text("Use the plus button to add a news title, or save a generated story from Pipeline.")
                         .font(.callout).multilineTextAlignment(.center)
                 }
             }.foregroundStyle(AppTheme.secondaryInk)
@@ -140,7 +138,8 @@ private struct AddLibraryStoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Add story").font(.title2.weight(.semibold))
-            Text("Enter a news title. Related news, images and hashtags are fetched directly from the web; no AI or Script Maker server is needed.")
+            if let error = viewModel.saveError { Text(error).font(.callout).foregroundStyle(AppTheme.danger) }
+            Text("Enter a news title. Related news, images and hashtags are fetched directly from the web.")
                 .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             VStack(alignment: .leading, spacing: 8) {
                 Text("Title / headline").font(.headline)

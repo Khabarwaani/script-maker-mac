@@ -8,6 +8,7 @@ struct ScriptDetailItem: Codable, Identifiable, Sendable, Hashable {
     var originalScript: String
     var detailedScript: String
     var instruction: String
+    var history: [ScriptChatTurn]?
     var createdAt: String
     var updatedAt: String
 
@@ -17,6 +18,7 @@ struct ScriptDetailItem: Codable, Identifiable, Sendable, Hashable {
         originalScript: String = "",
         detailedScript: String = "",
         instruction: String = "",
+        history: [ScriptChatTurn]? = nil,
         createdAt: String = DateFormatting.iso8601Now(),
         updatedAt: String = DateFormatting.iso8601Now()
     ) {
@@ -25,6 +27,7 @@ struct ScriptDetailItem: Codable, Identifiable, Sendable, Hashable {
         self.originalScript = originalScript
         self.detailedScript = detailedScript
         self.instruction = instruction
+        self.history = history
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

@@ -1,14 +1,22 @@
 name: CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      acceptance_artifact:
+        description: Build an installable acceptance artifact after tests pass
+        type: boolean
+        default: false
   push:
-    branches: [main, develop]
+    branches: [main, develop, "revamp/**"]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, "revamp/**"]
 
 jobs:
   build:
     runs-on: xcode-27
+    env:
+      APP_BUNDLE_IDENTIFIER: ${{ github.event_name == 'workflow_dispatch' && inputs.acceptance_artifact && 'ai.khabarwaani.scriptmaker.mac.acceptance' || 'ai.khabarwaani.scriptmaker.mac.tests' }}
     defaults:
       run:
         working-directory: ScriptMakerMac
@@ -27,9 +35,30 @@ jobs:
           persist-credentials: false
       - name: Check macOS 27 toolchain
         run: bash scripts/check-localagent-toolchain.sh
+      - name: Check architecture
+        run: bash scripts/check-architecture.sh
       - name: Build & Test (Debug)
         run: |
           xcodebuild -scheme ScriptMakerMac \
             -destination 'platform=macOS' \
             -configuration Debug \
-            test
+            PRODUCT_BUNDLE_IDENTIFIER="$APP_BUNDLE_IDENTIFIER" CODE_SIGNING_ALLOWED=NO test
+      - name: Prepare acceptance artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.acceptance_artifact
+        run: |
+          xcodebuild -scheme ScriptMakerMac -configuration Debug -destination 'platform=macOS' \
+            PRODUCT_BUNDLE_IDENTIFIER="$APP_BUNDLE_IDENTIFIER" CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings -json > "$RUNNER_TEMP/ScriptMakerMac-settings.json"
+          built_app="$(ruby -rjson -e 'settings = JSON.parse(File.read(ARGV[0])).find { |t| t["target"] == "ScriptMakerMac" }.fetch("buildSettings"); puts File.join(settings.fetch("TARGET_BUILD_DIR"), settings.fetch("FULL_PRODUCT_NAME"))' "$RUNNER_TEMP/ScriptMakerMac-settings.json")"
+          ditto "$built_app" "$RUNNER_TEMP/ScriptMakerMac.app"
+          codesign --force --deep --sign - "$RUNNER_TEMP/ScriptMakerMac.app"
+          codesign --verify --deep --strict "$RUNNER_TEMP/ScriptMakerMac.app"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/ScriptMakerMac.app" "$RUNNER_TEMP/ScriptMakerMac-acceptance.zip"
+          echo "$GITHUB_SHA" > "$RUNNER_TEMP/acceptance-commit.txt"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.acceptance_artifact
+        with:
+          name: ScriptMakerMac-acceptance-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/ScriptMakerMac-acceptance.zip
+            ${{ runner.temp }}/acceptance-commit.txt
