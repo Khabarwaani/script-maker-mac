@@ -29,6 +29,7 @@ final class ResearcherViewModel {
     var selectedHeadline: String = ""
     var isRefreshingHeadlines: Bool = false
     var headlinesErrorMessage: String? = nil
+    private var headlinesRequestID: UUID?
 
     // Trending Hashtags
     var trendingHashtags: [NewsHashtag] = []
@@ -151,14 +152,20 @@ final class ResearcherViewModel {
     func onCategoryChanged(_ newCategory: String) async {
         guard selectedCategory != newCategory else { return }
         selectedCategory = newCategory
+        headlines = []
+        selectedHeadline = ""
+        if selectedStorySource == Self.newsSourceLabel { topic = "" }
         await refreshHeadlines(forceFresh: false)
     }
 
     func refreshHeadlines(forceFresh: Bool = false) async {
-        guard !isRefreshingHeadlines else { return }
+        let requestID = UUID()
+        headlinesRequestID = requestID
         isRefreshingHeadlines = true
         headlinesErrorMessage = nil
-        defer { isRefreshingHeadlines = false }
+        defer {
+            if headlinesRequestID == requestID { isRefreshingHeadlines = false }
+        }
 
         let categoryParam = selectedCategory.isEmpty ? nil : selectedCategory
         do {
@@ -168,6 +175,8 @@ final class ResearcherViewModel {
                 limit: config.newsPageSize,
                 forceFresh: forceFresh
             )
+            guard headlinesRequestID == requestID, selectedCategory == (categoryParam ?? ""),
+                  selectedStorySource == Self.newsSourceLabel else { return }
             let titles = resp.titles.map(\.title)
             headlines = titles
             if selectedHeadline.isEmpty || !headlines.contains(selectedHeadline) {
@@ -175,9 +184,11 @@ final class ResearcherViewModel {
                     onHeadlineChanged(first)
                 } else {
                     selectedHeadline = ""
+                    topic = ""
                 }
             }
         } catch {
+            guard headlinesRequestID == requestID, selectedStorySource == Self.newsSourceLabel else { return }
             headlinesErrorMessage = error.localizedDescription
         }
     }

@@ -151,16 +151,18 @@ struct ResearcherView: View {
                         } else {
                             StudioOptionPicker(
                                 "Subgroup",
-                                selection: $viewModel.selectedCategory,
+                                selection: Binding(
+                                    get: { viewModel.selectedCategory },
+                                    set: { category in
+                                        Task { await viewModel.onCategoryChanged(category) }
+                                    }
+                                ),
                                 options: viewModel.categories.map(\.id),
                                 label: { id in
                                     viewModel.categories.first(where: { $0.id == id })?.label ?? id
                                 }
                             )
                             .disabled(viewModel.isRefreshingCategories)
-                            .onChange(of: viewModel.selectedCategory) { _, newCat in
-                                Task { await viewModel.onCategoryChanged(newCat) }
-                            }
                         }
 
                         StudioRefreshButton(
