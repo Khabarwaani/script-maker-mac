@@ -26,6 +26,7 @@ final class ContentViewModel {
     let localAgentViewModel: LocalAgentViewModel
     let pipelineViewModel: PipelineTabViewModel
     let scriptDetailViewModel: ScriptDetailViewModel
+    let agentCatalogViewModel: AgentCatalogViewModel
 
     var selectedTab: Tab = .researcher
 
@@ -36,7 +37,8 @@ final class ContentViewModel {
         libraryViewModel: LibraryViewModel,
         localAgentViewModel: LocalAgentViewModel,
         pipelineViewModel: PipelineTabViewModel,
-        scriptDetailViewModel: ScriptDetailViewModel
+        scriptDetailViewModel: ScriptDetailViewModel,
+        agentCatalogViewModel: AgentCatalogViewModel
     ) {
         self.config = config
         self.preferencesViewModel = preferencesViewModel
@@ -45,5 +47,6 @@ final class ContentViewModel {
         self.localAgentViewModel = localAgentViewModel
         self.pipelineViewModel = pipelineViewModel
         self.scriptDetailViewModel = scriptDetailViewModel
+        self.agentCatalogViewModel = agentCatalogViewModel
     }
 }
