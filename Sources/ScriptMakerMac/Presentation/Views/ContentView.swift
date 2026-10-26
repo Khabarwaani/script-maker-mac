@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
+    @State private var showingAgentCatalog = false
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
@@ -51,8 +52,12 @@ struct ContentView: View {
                 .padding(4)
                 .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.line, lineWidth: 1))
-                HStack {
+                HStack(spacing: 8) {
                     Spacer(minLength: 0)
+                    Button { showingAgentCatalog = true } label: { AndroidBotIcon(size: 16) }
+                        .controlSize(.large)
+                        .help(Text(verbatim: "Agents & Instructions…"))
+                        .accessibilityLabel("Agents & Instructions")
                     Button { showingPreferences = true } label: { Image(systemName: "gearshape") }
                         .controlSize(.large)
                         .help(Text(verbatim: "Settings… (⌘,)"))
@@ -86,6 +91,9 @@ struct ContentView: View {
         .frame(minWidth: 1000, minHeight: 650)
         .sheet(isPresented: $showingPreferences) {
             PreferencesView(viewModel: preferencesViewModel)
+        }
+        .sheet(isPresented: $showingAgentCatalog) {
+            AgentCatalogView(viewModel: viewModel.agentCatalogViewModel)
         }
     }
 }
