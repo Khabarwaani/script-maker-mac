@@ -247,6 +247,14 @@ final class ResearcherTests: XCTestCase {
         vm.openInPipeline()
 
         XCTAssertEqual(navigatedTopic, "Major Tech Milestone")
-        XCTAssertEqual(navigatedLocation, "Bengaluru, India")
+        XCTAssertEqual(navigatedLocation, config.newsSettings.location)
+
+        vm.researchResult = NewsResearchResult(
+            rawOutput: "", verified: true, confidence: 100,
+            date: "2023-08-23", location: "Moon southern high latitudes"
+        )
+        vm.openInPipeline()
+        XCTAssertEqual(navigatedTopic, "Major Tech Milestone")
+        XCTAssertEqual(navigatedLocation, config.newsSettings.location)
     }
 }
