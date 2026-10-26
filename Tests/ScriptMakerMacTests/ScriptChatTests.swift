@@ -108,7 +108,7 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertFalse(vm.isRefining)
     }
 
-    func testSaveReplacesOriginalAndKeepsOnlyLatestScript() async throws {
+    func testSaveCreatesIndependentScriptAndPreservesOriginal() async throws {
         let repository = ChatRepository()
         let original = Story(title: "A story", videoURL: "https://example.com/old.mp4", scriptText: "Original script", stageOutputs: ["script": "old output"])
         await repository.save(original)
@@ -123,29 +123,31 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertTrue(saved)
         let copy = try XCTUnwrap(library.selectedStory)
         XCTAssertNotEqual(copy.id, original.id)
-        XCTAssertEqual(copy.sourceStoryID, original.id)
+        XCTAssertNil(copy.sourceStoryID)
+        XCTAssertNil(copy.generationNumber)
         XCTAssertEqual(copy.scriptText, "Draft 1")
         XCTAssertNil(copy.instruction)
-        XCTAssertNil(copy.scriptVersions?.first?.instruction)
+        XCTAssertNil(copy.scriptVersions)
+        XCTAssertNil(copy.currentScriptVersionID)
+        XCTAssertNil(copy.scriptChatHistory)
         XCTAssertNil(chat.source)
         XCTAssertEqual(chat.originalScript, "")
         XCTAssertEqual(chat.consolidatedInstruction, "")
         XCTAssertEqual(chat.draft.latestScript, "")
         XCTAssertTrue(chat.turns.isEmpty)
-        XCTAssertEqual(copy.scriptVersions?.map(\.text), ["Draft 1"])
+        XCTAssertEqual(copy.summary, "")
         XCTAssertNil(copy.stageOutputs)
         XCTAssertNil(copy.videoURL)
         XCTAssertNil(copy.uploadReceipt)
-        XCTAssertNil(library.stories.first(where: { $0.id == original.id }))
-        XCTAssertEqual(library.stories.count, 1)
-        XCTAssertEqual(copy.currentScriptVersionID, copy.scriptVersions?.first?.id)
+        XCTAssertEqual(library.stories.first(where: { $0.id == original.id }), original)
+        XCTAssertEqual(library.stories.count, 2)
         let duplicate = await library.saveRefinedScript()
         XCTAssertFalse(duplicate)
         let persisted = await repository.all()
-        XCTAssertEqual(persisted.map(\.id), [copy.id])
+        XCTAssertEqual(Set(persisted.map(\.id)), Set([copy.id, original.id]))
         await library.refresh()
-        XCTAssertEqual(library.stories.map(\.id), [copy.id])
-        XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Draft 1"])
+        XCTAssertEqual(Set(library.stories.map(\.id)), Set([copy.id, original.id]))
+        XCTAssertNil(library.stories.first(where: { $0.id == copy.id })?.scriptChatHistory)
     }
 
     func testEmptyOriginalAndNoSuccessfulTurnCannotSave() async throws {
@@ -741,9 +743,10 @@ extension ScriptChatTests {
         let saved = await library.saveRefinedScript()
         XCTAssertTrue(saved)
         XCTAssertEqual(library.selectedStory?.scriptText, "Manually rewritten script")
-        XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Manually rewritten script"])
+        XCTAssertNil(library.selectedStory?.scriptVersions)
+        XCTAssertNil(library.selectedStory?.scriptChatHistory)
         let stored = await repository.all()
-        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.count, 2)
     }
 }
 
@@ -831,7 +834,7 @@ extension ScriptChatTests {
 }
 
 extension ScriptChatTests {
-    func testSavedStoryKeepsChatHistoryAndRestoresEarlierBranchesAfterReopening() async throws {
+    func testSaveAsNewScriptStartsWithoutEarlierChatBranches() async throws {
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         let repository = ChatRepository()
@@ -843,31 +846,27 @@ extension ScriptChatTests {
         await chat.refreshProviders()
         chat.userInstruction = "First instruction"
         await chat.refine()
-        let first = try XCTUnwrap(chat.selectedRevisionID)
         chat.userInstruction = "Second instruction"
-        await chat.refine()
-        let second = try XCTUnwrap(chat.selectedRevisionID)
-        await chat.selectRevision(first)
-        chat.userInstruction = "Fix Chat 1"
         await chat.refine()
         let savedSuccessfully = await library.saveRefinedScript()
         XCTAssertTrue(savedSuccessfully)
         let stored = await repository.all()
-        XCTAssertEqual(stored.count, 1)
-        let saved = try XCTUnwrap(stored.first)
-        XCTAssertEqual(saved.scriptText, "Draft 3")
-        XCTAssertEqual(saved.scriptVersions?.count, 1)
+        XCTAssertEqual(stored.count, 2)
+        let saved = try XCTUnwrap(stored.first(where: { $0.id != original.id }))
+        XCTAssertEqual(saved.scriptText, "Draft 2")
+        XCTAssertNil(saved.scriptVersions)
+        XCTAssertNil(saved.scriptChatHistory)
+        XCTAssertNil(saved.instruction)
+        XCTAssertNil(saved.sourceStoryID)
+        XCTAssertEqual(stored.first(where: { $0.id == original.id }), original)
         let decoded = try JSONDecoder().decode(Story.self, from: JSONEncoder().encode(saved))
         let reopened = ScriptChatViewModel(service: service)
         reopened.begin(decoded)
-        XCTAssertEqual(reopened.revisions.count, 3)
-        XCTAssertEqual(reopened.originalScript, "Original")
-        XCTAssertEqual(reopened.draft.latestScript, "Draft 3")
-        XCTAssertEqual(reopened.revisions.last?.parentID, first)
-        await reopened.selectRevision(second)
+        XCTAssertTrue(reopened.revisions.isEmpty)
+        XCTAssertTrue(reopened.turns.isEmpty)
+        XCTAssertEqual(reopened.originalScript, "Draft 2")
         XCTAssertEqual(reopened.draft.latestScript, "Draft 2")
-        XCTAssertEqual(reopened.consolidatedInstruction, "Active instructions 2")
-        XCTAssertEqual(reopened.turns.last?.userInstruction, "Second instruction")
+        XCTAssertEqual(reopened.consolidatedInstruction, "")
     }
 
     func testManualLibraryEditIsCurrentWithoutLosingSavedChatHistory() async throws {
