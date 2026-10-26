@@ -7,7 +7,7 @@ import Observation
 final class PipelineTabViewModel {
     var mode: PipelineMode = .preset
     var executionMode: PipelineExecutionMode = .continuous
-    var refinementInstruction = "Polish dialogue pacing and punchlines while preserving the facts, scene structure and script language."
+    var refinementInstruction = "Polish dialogue pacing and punchlines while preserving the facts, scene structure and script language. Preserve each scene's duration and word budget; do not increase its spoken word count."
     var editedOutput = ""
     private(set) var isPauseRequested = false
     private(set) var presets: [PipelinePresetTemplate] = []
@@ -234,12 +234,14 @@ final class PipelineTabViewModel {
 
     func selectHeadline(_ headline: String) {
         selectedHeadline = headline
+        guard !isRunning, selectedStudioSource == .categories else { return }
         studioTopic = headline
         applyTopicToFirstStep(headline)
     }
 
     func selectHashtag(_ tag: String) {
         selectedHashtag = tag
+        guard !isRunning, selectedStudioSource == .trendingHashtags else { return }
         if let match = trendingHashtags.first(where: { $0.tag == tag }) {
             let topicText = match.headline ?? match.tag
             studioTopic = topicText

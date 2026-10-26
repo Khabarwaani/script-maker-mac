@@ -119,8 +119,8 @@ final class ScriptDetailViewModel {
         }
         cancelDetail()
         selectedItemID = id
-        turns = histories[id] ?? []
         guard let item = items.first(where: { $0.id == id }) else { return }
+        turns = histories[id] ?? item.history ?? []
         editingTitle = item.title
         editingOriginalScript = item.originalScript
         editingDetailedScript = item.detailedScript
@@ -160,6 +160,7 @@ final class ScriptDetailViewModel {
             existing.originalScript = editingOriginalScript
             existing.detailedScript = editingDetailedScript
             existing.instruction = editingConsolidatedInstruction
+            existing.history = turns
             existing.updatedAt = DateFormatting.iso8601Now()
 
             try await repository.save(existing)

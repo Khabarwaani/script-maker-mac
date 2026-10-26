@@ -47,6 +47,16 @@ struct PipelineStoryMapper: PipelineStoryMapping {
         var summary = ""
         var hashtags: [String] = []
 
+        for step in steps.reversed() where step.status == .completed {
+            guard let text = step.result?.text.data(using: .utf8),
+                  let output = try? JSONSerialization.jsonObject(with: text) as? [String: Any],
+                  let items = output["items"] as? [[String: Any]],
+                  let storyTitle = items.first?["title"] as? String,
+                  !StringFormatting.isBlank(storyTitle) else { continue }
+            title = storyTitle
+            break
+        }
+
         if let items = json["items"] as? [[String: Any]], let first = items.first {
             title = first["title"] as? String ?? title
             summary = "Generated through Pipeline flow from \(steps.first?.agentName ?? "Pipeline")."
@@ -70,7 +80,12 @@ struct PipelineStoryMapper: PipelineStoryMapping {
             scriptText = lines.joined(separator: "\n")
         } else if let script = json["latestScript"] as? String ?? json["script"] as? String {
             scriptText = script
-            summary = "Refined script from ScriptChat."
+            if let titleLine = script.split(separator: "\n").first,
+               titleLine.hasPrefix("Title:") {
+                let scriptTitle = titleLine.dropFirst("Title:".count).trimmingCharacters(in: .whitespaces)
+                if !scriptTitle.isEmpty { title = scriptTitle }
+            }
+            summary = "Refined script from \(storyStep.agentName)."
         }
 
         // Gather any hashtags from earlier steps (e.g. NewsResearcher)
