@@ -345,9 +345,9 @@ private struct StoryImagesSection: View {
                             } else {
                                 Image(systemName: "photo").font(.largeTitle).foregroundStyle(AppTheme.secondaryInk)
                                     .frame(maxWidth: .infinity, minHeight: 80)
-                                if let error = viewModel.imageErrors[value] {
+                                if let error = viewModel.imageErrors[value] ?? (viewModel.imagePreviews[value] != nil ? "This image could not be decoded." : nil) {
                                     Text(error).font(.caption).foregroundStyle(AppTheme.secondaryInk).lineLimit(2)
-                                    Button("Retry image") { Task { await viewModel.loadImagePreviews(for: story) } }
+                                    Button("Retry image") { Task { await viewModel.retryImage(value, for: story) } }
                                 }
                             }
                             if value.hasPrefix("sample:") {

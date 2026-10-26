@@ -148,6 +148,14 @@ final class LibraryViewModel {
         } catch { actionNotice = "Could not import media: \(StringFormatting.errorMessage(error))" }
     }
 
+    func retryImage(_ value: String, for story: Story) async {
+        imagePreviews[value] = nil
+        imageErrors[value] = nil
+        var target = story
+        target.imageURLs = [value]
+        await loadImagePreviews(for: target)
+    }
+
     func loadImagePreviews(for story: Story) async {
         guard let importer = mediaImporter else { return }
         for value in story.imageURLs ?? [] {

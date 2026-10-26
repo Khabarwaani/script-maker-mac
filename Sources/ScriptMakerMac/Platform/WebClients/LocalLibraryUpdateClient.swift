@@ -38,6 +38,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
                             let (data, response) = try await fetch(url)
                             let html = String(decoding: data, as: UTF8.self)
                             let imageURLs = Self.imageURLs(in: html, baseURL: response.url ?? url)
+                            var imageFailures: [String] = []
                             for image in imageURLs where !known.contains(image.absoluteString) {
                                 do {
                                     var request = URLRequest(url: image, timeoutInterval: 12)
@@ -46,12 +47,12 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
                                     request.setValue("image/*", forHTTPHeaderField: "Accept")
                                     let (bytes, imageResponse) = try await httpClient.data(for: request)
                                     guard let http = imageResponse as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-                                          http.mimeType?.hasPrefix("image/") == true else { continue }
+                                          http.mimeType?.hasPrefix("image/") == true, !bytes.isEmpty else { imageFailures.append("Publisher rejected the image or returned non-image data."); continue }
                                     return (image.absoluteString, bytes, nil)
                                 } catch is CancellationError { throw CancellationError() }
-                                catch { continue }
+                                catch { imageFailures.append(StringFormatting.errorMessage(error)) }
                             }
-                            return (nil, nil, imageURLs.isEmpty ? "No publisher image at \(link.source)." : nil)
+                            return (nil, nil, imageURLs.isEmpty ? "No publisher image at \(link.source)." : imageFailures.first.map { "\(link.source): \($0)" })
                         } catch { return (nil, nil, error is CancellationError ? "Image fetch cancelled." : error.localizedDescription) }
                     }
                 }

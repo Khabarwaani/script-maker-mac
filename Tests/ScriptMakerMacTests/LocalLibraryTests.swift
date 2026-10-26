@@ -296,7 +296,7 @@ final class LocalLibraryNetworkTests: XCTestCase {
             XCTAssertEqual(url.path, "/photo.jpg")
             XCTAssertEqual(url.query, "a=1&b=2")
             XCTAssertEqual(request.httpMethod, "GET")
-            return (200, ["Content-Type": "image/jpeg"], Data())
+            return (200, ["Content-Type": "image/jpeg"], Data([1]))
         }
         let client = updater()
         var story = Story(title: "ISRO mission")
