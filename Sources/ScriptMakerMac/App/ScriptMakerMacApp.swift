@@ -122,6 +122,8 @@ enum CompositionRoot {
         let detailService = LocalScriptDetailService(runner: agentService)
         let detailRepository = LocalScriptDetailRepository()
         let scriptDetail = ScriptDetailViewModel(service: detailService, repository: detailRepository, clipboard: clipboard, config: config)
+        let agentCatalogService = KhabarwaaniAgentCatalogService()
+        let agentCatalog = AgentCatalogViewModel(service: agentCatalogService, clipboard: clipboard)
         return ContentViewModel(
             config: config,
             preferencesViewModel: preferences,
@@ -129,7 +131,8 @@ enum CompositionRoot {
             libraryViewModel: library,
             localAgentViewModel: localAgent,
             pipelineViewModel: pipeline,
-            scriptDetailViewModel: scriptDetail
+            scriptDetailViewModel: scriptDetail,
+            agentCatalogViewModel: agentCatalog
         )
     }
 }

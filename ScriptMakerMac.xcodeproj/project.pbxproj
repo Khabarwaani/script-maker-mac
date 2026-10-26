@@ -112,6 +112,20 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		PL105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTabView.swift; sourceTree = "<group>"; };
 		PL006 = {isa = PBXBuildFile; fileRef = PL106; };
 		PL106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowTests.swift; sourceTree = "<group>"; };
+		AC001 = {isa = PBXBuildFile; fileRef = AC101; };
+		AC101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInspectionModels.swift; sourceTree = "<group>"; };
+		AC002 = {isa = PBXBuildFile; fileRef = AC102; };
+		AC102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInspectionProviding.swift; sourceTree = "<group>"; };
+		AC003 = {isa = PBXBuildFile; fileRef = AC103; };
+		AC103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhabarwaaniAgentCatalogService.swift; sourceTree = "<group>"; };
+		AC004 = {isa = PBXBuildFile; fileRef = AC104; };
+		AC104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCatalogViewModel.swift; sourceTree = "<group>"; };
+		AC005 = {isa = PBXBuildFile; fileRef = AC105; };
+		AC105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AndroidBotIcon.swift; sourceTree = "<group>"; };
+		AC006 = {isa = PBXBuildFile; fileRef = AC106; };
+		AC106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCatalogView.swift; sourceTree = "<group>"; };
+		AC007 = {isa = PBXBuildFile; fileRef = AC107; };
+		AC107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInspectionTests.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
         E012 = {isa = PBXBuildFile; fileRef = E002; };
@@ -303,6 +317,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
+				AC101 /* AgentInspectionModels.swift */,
 				PL101 /* PipelineFlowModels.swift */,
 				TD101,
 				ND101,
@@ -319,6 +334,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AC102 /* AgentInspectionProviding.swift */,
 				PL102 /* PipelineFlowResolving.swift */,
 				L102 /* LocalAgentRunning.swift */,
 				R028 /* PipelineService.swift */,
@@ -367,6 +383,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G018 /* WebClients */ = {
 			isa = PBXGroup;
 			children = (
+				AC103 /* KhabarwaaniAgentCatalogService.swift */,
 				PL103 /* LocalPipelineFlowResolver.swift */,
 				TD102,
 				L103 /* TerminalLocalAgentService.swift */,
@@ -408,6 +425,8 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AC105 /* AndroidBotIcon.swift */,
+				AC106 /* AgentCatalogView.swift */,
 				PL105 /* PipelineTabView.swift */,
 				TD103,
 				ND102,
@@ -438,6 +457,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				AC104 /* AgentCatalogViewModel.swift */,
 				PL104 /* PipelineTabViewModel.swift */,
 				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
@@ -493,6 +513,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				AC107 /* AgentInspectionTests.swift */,
 				PL106 /* PipelineFlowTests.swift */,
 				L106 /* LocalAgentTests.swift */,
 				LL14 /* LocalLibraryTests.swift */, NS003, TD104, SC105, SD105, M101 /* MainReleaseRegressionTests.swift */, NR105,
@@ -573,6 +594,12 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC001 /* AgentInspectionModels.swift in Sources */,
+				AC002 /* AgentInspectionProviding.swift in Sources */,
+				AC003 /* KhabarwaaniAgentCatalogService.swift in Sources */,
+				AC004 /* AgentCatalogViewModel.swift in Sources */,
+				AC005 /* AndroidBotIcon.swift in Sources */,
+				AC006 /* AgentCatalogView.swift in Sources */,
 				PL001 /* PipelineFlowModels.swift in Sources */,
 				PL002 /* PipelineFlowResolving.swift in Sources */,
 				PL003 /* LocalPipelineFlowResolver.swift in Sources */,
@@ -657,6 +684,7 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC007 /* AgentInspectionTests.swift in Sources */,
 				PL006 /* PipelineFlowTests.swift in Sources */,
 				L006 /* LocalAgentTests.swift in Sources */,
 				LL04 /* LocalLibraryTests.swift in Sources */, NS013, TD004, SC005, SD005, M001 /* MainReleaseRegressionTests.swift in Sources */, NR005,
