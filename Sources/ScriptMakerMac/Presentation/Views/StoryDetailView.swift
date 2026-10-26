@@ -197,6 +197,7 @@ private struct StoryDetailToolbar: View {
             case .failure(let error): viewModel.actionNotice = "Could not choose media: \(error.localizedDescription)"
             }
         }
+        .fileDialogMessage(Text("Choose the image or video to add. Script Maker copies only the selected file into its Application Support folder; it does not need access to your entire Documents folder."))
         .alert("Reset story enrichment?", isPresented: $showingReset) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) { Task { await viewModel.resetEnrichment(id: story.id) } }

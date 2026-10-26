@@ -40,20 +40,13 @@ struct LocalStoryUploadClient: StoryUploading {
         return files.exists(at: url) ? try files.contents(of: url) : nil
     }
 
-    private func lines(_ data: Data?) -> [String] {
-        guard let data else { return [] }
-        return String(decoding: data, as: UTF8.self).components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty && !$0.hasPrefix("#") }
-    }
-
     private func telegram(_ story: Story, options: LibraryUploadOptions) async throws -> LibraryUploadResult {
-        let savedToken = options.telegramToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        let token = savedToken.isEmpty ? lines(try readOptional("Documents/telegrambot/bot_token.txt")).first ?? "" : savedToken
+        let token = options.telegramToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty, token.allSatisfy({ $0.isLetter || $0.isNumber || ":_-".contains($0) }) else {
             throw LibraryOperationError.invalidInput("Set up Telegram in Settings → Uploads: save your bot token and chat ID.")
         }
         var chatID = options.telegramChatID.trimmingCharacters(in: .whitespacesAndNewlines)
-        if chatID.isEmpty, let data = try readOptional(".cache/telegram_bot_chat_id.json") {
+        if chatID.isEmpty, let data = try readOptional("Library/Application Support/ScriptMakerMac/telegram-chat.json") {
             guard let cached = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw LibraryOperationError.invalidInput("Could not read cached Telegram chat ID. Save a chat ID in Settings → Uploads.")
             }
@@ -74,19 +67,15 @@ struct LocalStoryUploadClient: StoryUploading {
             }
             chatID = id.stringValue
             let data = try JSONSerialization.data(withJSONObject: ["chat_id": id])
-            try files.writeCreatingDirectory(data, to: home.appendingPathComponent(".cache/telegram_bot_chat_id.json"))
+            try files.writeCreatingDirectory(data, to: home.appendingPathComponent("Library/Application Support/ScriptMakerMac/telegram-chat.json"))
         }
         guard Int64(chatID) != nil else { throw LibraryOperationError.invalidInput("Telegram chat ID must be a number.") }
         var targets = [chatID]
         if options.includeTelegramGroups {
             var groups: Set<String> = []
-            for line in lines(try readOptional("Documents/telegrambot/group_ids.txt")) {
-                guard Int64(line) != nil else { throw LibraryOperationError.invalidInput("Invalid chat ID in ~/Documents/telegrambot/group_ids.txt.") }
-                groups.insert(line)
-            }
-            if let data = try readOptional(".cache/telegram_bot_groups.json") {
+            if let data = try readOptional("Library/Application Support/ScriptMakerMac/telegram-groups.json") {
                 guard let cached = try? JSONDecoder().decode([Int64].self, from: data) else {
-                    throw LibraryOperationError.invalidInput("Could not read ~/.cache/telegram_bot_groups.json.")
+                    throw LibraryOperationError.invalidInput("Could not read ~/Library/Application Support/ScriptMakerMac/telegram-groups.json.")
                 }
                 groups.formUnion(cached.map(String.init))
             }
@@ -99,7 +88,7 @@ struct LocalStoryUploadClient: StoryUploading {
                 }
             }
             let data = try JSONEncoder().encode(groups.compactMap(Int64.init).sorted())
-            try files.writeCreatingDirectory(data, to: home.appendingPathComponent(".cache/telegram_bot_groups.json"))
+            try files.writeCreatingDirectory(data, to: home.appendingPathComponent("Library/Application Support/ScriptMakerMac/telegram-groups.json"))
             targets += groups.filter { $0 != chatID }.sorted()
         }
         let caption = ([story.title] + ((story.hashtags ?? []).isEmpty ? [] : [(story.hashtags ?? []).joined(separator: " ")])).joined(separator: "\n")

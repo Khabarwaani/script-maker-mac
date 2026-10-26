@@ -338,3 +338,29 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
     func purgeMemory() {}
     func clearMemory() {}
 }
+
+final class LocalAgentWorkspaceTests: XCTestCase {
+    func testProviderLaunchUsesIsolatedProjectAndSandbox() {
+        XCTAssertEqual(LocalAgentProvider.antigravity.sessionArguments, ["--new-project", "--sandbox"])
+        XCTAssertEqual(LocalAgentProvider.codex.sessionArguments, ["--skip-git-repo-check"])
+        XCTAssertEqual(LocalAgentProvider.grok.sessionArguments, ["--single"])
+    }
+
+    func testLauncherEntersWorkspaceEvenWithUnrelatedInheritedDirectory() throws {
+        let files = FileStore()
+        let workspace = try files.makeTemporaryDirectory()
+        defer { try? files.removeDirectory(at: workspace) }
+        let launcher = try files.makeCLILauncher(executable: URL(fileURLWithPath: "/bin/pwd"), searchPaths: [], in: workspace)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [launcher.path]
+        process.currentDirectoryURL = URL(fileURLWithPath: "/")
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+        let output = try files.contents(of: workspace.appendingPathComponent("cli-output.jsonl"))
+        let actual = String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(URL(fileURLWithPath: actual).resolvingSymlinksInPath(), workspace.resolvingSymlinksInPath())
+    }
+}
