@@ -1,23 +1,14 @@
-# Tests
+# Testing
 
-Unit tests never make real calls: no network, no live server. Mock, stub, or fake.
+Remote CI first: use GitHub Actions `xcodebuild test` on the macOS 27 runner. Local test
+runs are only for diagnosing CI failures. Do not contact live providers, servers, news
+services or upload destinations in unit tests. Test ViewModels and Services, never Views.
 
-## Testing strategy: Remote CI first
+Cover agent discovery/version routing, schema validation, provider availability and
+compatibility, shared-default inheritance/overrides, cancellation and session isolation.
+Cover concurrent repository mutations, failed saves, corrupt reads, legacy storage,
+settings migration, refinement histories, media handling and mocked upload contracts.
+Fixtures belong in the test directory and must not seed or ship in the production app.
 
-Testing is performed in GitHub Actions CI (`xcodebuild` on macOS). Push the branch and open
-the draft PR — remote CI is the verification gate. Do not run local test suites during routine
-development; run tests locally only when diagnosing and reproducing a failure reported by CI.
-
-## What to test
-
-- ViewModels and Services, never Views.
-- `AppConfig.normalize`: valid URLs, IPv6 (bare/bracketed/with port),
-  and every fail-loud rejection.
-- `PipelineAPI`: mocked `URLSession` — session/stage/select/job payloads,
-  error mapping, SSE parsing.
-- No test hits the real server.
-
-## Trunk assumption
-
-Assumes develop and main are green. If not, file a bug: a red trunk breaks
-this strategy.
+Architecture checks run before build/tests. A green suite does not authorize merging or
+releasing the 2.0 revamp. Complete its acceptance checklist and obtain user approval.

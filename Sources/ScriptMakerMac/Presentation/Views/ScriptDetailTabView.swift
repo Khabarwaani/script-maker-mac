@@ -222,6 +222,7 @@ private struct ScriptDetailOptions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
+            Toggle("Use app default", isOn: $viewModel.usesAppDefault)
                 Picker("Provider", selection: $viewModel.selectedProvider) {
                     ForEach(LocalAgentProvider.allCases) { provider in
                         Text(provider.title).tag(provider)

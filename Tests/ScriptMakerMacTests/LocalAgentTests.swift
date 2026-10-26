@@ -340,7 +340,7 @@ private final class StubTerminalSession: TerminalSessionProtocol, ManagedLocalAg
 }
 
 final class LocalAgentWorkspaceTests: XCTestCase {
-    func testProviderLaunchUsesIsolatedProjectAndSandbox() {
+    func testProviderLaunchUsesIsolatedProjectAndSandbox() throws {
         XCTAssertEqual(LocalAgentProvider.antigravity.sessionArguments, ["--new-project", "--sandbox"])
         XCTAssertEqual(LocalAgentProvider.codex.sessionArguments, ["--skip-git-repo-check"])
         XCTAssertEqual(LocalAgentProvider.grok.sessionArguments, ["--single"])

@@ -20,7 +20,7 @@ private actor StubResearcherAgentRunner: LocalAgentRunning {
 
     func catalog() async throws -> [LocalAgentDefinition] { [] }
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] {
-        [.appleLocal: .init(isAvailable: true, reason: "Ready")]
+        [.codex: .init(isAvailable: true, reason: "Ready")]
     }
     func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
         executedRequests.append(request)
@@ -72,7 +72,7 @@ private final class StubClipboard: ClipboardWriting {
 
 @MainActor
 final class ResearcherTests: XCTestCase {
-    func testServiceValidatesEmptyTopic() async {
+    func testServiceValidatesEmptyTopic() async throws {
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
 
@@ -93,7 +93,7 @@ final class ResearcherTests: XCTestCase {
             language: "English",
             sourceURL: "https://isro.gov.in",
             humanInstruction: "Verify launch timeline",
-            provider: .appleLocal,
+            provider: .codex,
             model: "on-device"
         )
 
@@ -114,12 +114,12 @@ final class ResearcherTests: XCTestCase {
         XCTAssertTrue(executed.first?.inputJSON.contains("Verify launch timeline") == true)
     }
 
-    func testViewModelHeadlinesAndTopicSync() async {
+    func testViewModelHeadlinesAndTopicSync() async throws {
         let newsProvider = StubResearcherNewsProvider()
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
         let clipboard = StubClipboard()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         await vm.initialLoad()
@@ -129,6 +129,7 @@ final class ResearcherTests: XCTestCase {
         XCTAssertEqual(vm.headlines.count, 2)
         XCTAssertEqual(vm.selectedHeadline, "Breakthrough in Green Hydrogen")
         XCTAssertEqual(vm.topic, "Breakthrough in Green Hydrogen")
+        await vm.refreshProviders()
         XCTAssertTrue(vm.canRunResearch)
 
         vm.onHeadlineChanged("Space mission launched")
@@ -136,12 +137,12 @@ final class ResearcherTests: XCTestCase {
         XCTAssertEqual(vm.topic, "Space mission launched")
     }
 
-    func testViewModelCategorySubgroupsAndHeadlines() async {
+    func testViewModelCategorySubgroupsAndHeadlines() async throws {
         let newsProvider = StubResearcherNewsProvider()
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
         let clipboard = StubClipboard()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         await vm.loadCategories()
@@ -155,12 +156,12 @@ final class ResearcherTests: XCTestCase {
         XCTAssertEqual(vm.headlines.count, 2)
     }
 
-    func testViewModelTrendingHashtagsSync() async {
+    func testViewModelTrendingHashtagsSync() async throws {
         let newsProvider = StubResearcherNewsProvider()
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
         let clipboard = StubClipboard()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         vm.selectedStorySource = ResearcherViewModel.hashtagSourceLabel
@@ -171,15 +172,16 @@ final class ResearcherTests: XCTestCase {
         XCTAssertEqual(vm.topic, "Green Hydrogen Policy")
     }
 
-    func testViewModelRunResearchUpdatesResultAndState() async {
+    func testViewModelRunResearchUpdatesResultAndState() async throws {
         let newsProvider = StubResearcherNewsProvider()
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
         let clipboard = StubClipboard()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         vm.topic = "ISRO Mission"
+        await vm.refreshProviders()
         await vm.runResearch()
 
         XCTAssertFalse(vm.isResearching)
@@ -189,12 +191,12 @@ final class ResearcherTests: XCTestCase {
         XCTAssertEqual(vm.researchResult?.confidence, 95)
     }
 
-    func testViewModelCopyOutputWritesFormattedSummaryToClipboard() async {
+    func testViewModelCopyOutputWritesFormattedSummaryToClipboard() async throws {
         let newsProvider = StubResearcherNewsProvider()
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
         let clipboard = StubClipboard()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         vm.topic = "Green Energy Policy"
@@ -218,12 +220,12 @@ final class ResearcherTests: XCTestCase {
         XCTAssertEqual(vm.copyFeedbackMessage, "Research copied to clipboard")
     }
 
-    func testViewModelOpenInPipelineCallsNavigationCallback() async {
+    func testViewModelOpenInPipelineCallsNavigationCallback() async throws {
         let newsProvider = StubResearcherNewsProvider()
         let runner = StubResearcherAgentRunner()
         let service = LocalNewsResearcherService(runner: runner)
         let clipboard = StubClipboard()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ResearcherViewModel(newsProvider: newsProvider, researchService: service, clipboard: clipboard, config: config)
         vm.topic = "Major Tech Milestone"

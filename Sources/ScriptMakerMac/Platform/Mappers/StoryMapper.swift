@@ -1,10 +1,6 @@
 import Foundation
 
-/// Platform mapper: converts between `[String: Any]` dictionaries (from JSON/server)
-/// and the typed `Story` domain entity.
-///
-/// Dictionaries arrive from bundled JSON samples and the server API;
-/// the Domain layer works with `Story`.
+/// Adapts historical saved dictionaries to typed stories.
 enum StoryMapper {
     /// Dictionary → Story (tolerant: missing keys get defaults).
     static func from(_ dict: [String: Any]) -> Story {
@@ -27,32 +23,9 @@ enum StoryMapper {
             },
             scriptText: dict["script_md"] as? String ?? dict["script"] as? String,
             generationNumber: metadata["generation_number"] as? Int,
+            stageOutputs: metadata["stage_outputs"] as? [String: String] ?? dict["stageOutputs"] as? [String: String],
             imageURLs: metadata["image_urls"] as? [String]
         )
     }
 
-    /// Story → Dictionary (for persistence).
-    static func toDict(_ story: Story) -> [String: Any] {
-        var dict: [String: Any] = [
-            "id": story.id,
-            "title": story.title,
-            "summary": story.summary,
-            "headline": story.headline,
-            "created_at": story.createdAt,
-            "status": story.status,
-            "emotion": story.emotion,
-            "format": story.format,
-        ]
-        if let hashtags = story.hashtags { dict["hashtags"] = hashtags }
-        if let images = story.imageURLs { dict["image_urls"] = images }
-        if let links = story.sourceLinks {
-            dict["news_links"] = links.map { ["title": $0.title, "url": $0.url, "source": $0.source] }
-        }
-        if let script = story.scriptText { dict["script_md"] = script }
-        if let number = story.generationNumber { dict["generation_number"] = number }
-        if let videoURL = story.videoURL {
-            dict["video_url"] = videoURL
-        }
-        return dict
-    }
 }

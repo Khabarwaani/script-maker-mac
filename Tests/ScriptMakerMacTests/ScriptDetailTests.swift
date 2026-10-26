@@ -16,7 +16,7 @@ private actor DetailRefinerStub: ScriptDetailRefining {
     }
 
     func availability() -> [LocalAgentProvider: LocalAgentAvailability] {
-        [.appleLocal: .init(isAvailable: true, reason: "Ready")]
+        [.codex: .init(isAvailable: true, reason: "Ready")]
     }
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) {}
     func closeSession() {}
@@ -66,7 +66,7 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
 
     func catalog() async throws -> [LocalAgentDefinition] { [] }
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] {
-        [.appleLocal: .init(isAvailable: true, reason: "Ready")]
+        [.codex: .init(isAvailable: true, reason: "Ready")]
     }
     func run(_ request: LocalAgentRequest) async throws -> LocalAgentResult {
         executedRequests.append(request)
@@ -76,7 +76,7 @@ private actor StubLocalAgentRunner: LocalAgentRunning {
 
 @MainActor
 final class ScriptDetailTests: XCTestCase {
-    func testServiceValidatesBlankInput() async {
+    func testServiceValidatesBlankInput() async throws {
         let runner = StubLocalAgentRunner()
         let service = LocalScriptDetailService(runner: runner)
         do {
@@ -113,11 +113,11 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertTrue(executed.first?.inputJSON.contains("Cinematic lighting") == true)
     }
 
-    func testViewModelInitialStateAndItemLoading() async {
+    func testViewModelInitialStateAndItemLoading() async throws {
         let refiner = DetailRefinerStub()
         let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let item1 = ScriptDetailItem(id: "1", title: "Scene One", originalScript: "Original text 1", createdAt: "2026-10-24T00:00:00Z")
         let item2 = ScriptDetailItem(id: "2", title: "Scene Two", originalScript: "Original text 2", createdAt: "2026-10-24T01:00:00Z")
@@ -131,14 +131,15 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertEqual(vm.selectedItemID, "2") // Newest first
         XCTAssertEqual(vm.editingTitle, "Scene Two")
         XCTAssertEqual(vm.editingOriginalScript, "Original text 2")
+        await vm.refreshProviders()
         XCTAssertTrue(vm.canRunDetail)
     }
 
-    func testCreateNewItemAndEditing() async {
+    func testCreateNewItemAndEditing() async throws {
         let refiner = DetailRefinerStub()
         let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
         await vm.loadItems()
@@ -160,7 +161,7 @@ final class ScriptDetailTests: XCTestCase {
         let refiner = DetailRefinerStub()
         let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let item = ScriptDetailItem(id: "s1", title: "Tea Stall", originalScript: "Asha: चाय तैयार है?\nRavi: हाँ, बस 2 मिनट।")
         await repo.save(item)
@@ -169,6 +170,7 @@ final class ScriptDetailTests: XCTestCase {
         await vm.loadItems()
         vm.editingUserInstruction = "Warm steam from the kettle, slow continuous camera move."
 
+        await vm.refreshProviders()
         await vm.runDetail()
 
         XCTAssertFalse(vm.isDetailing)
@@ -184,11 +186,11 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertEqual(saved?.instruction, vm.editingConsolidatedInstruction)
     }
 
-    func testCopyScriptCopiesDetailedWhenPresentOtherwiseOriginal() async {
+    func testCopyScriptCopiesDetailedWhenPresentOtherwiseOriginal() async throws {
         let refiner = DetailRefinerStub()
         let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let vm = ScriptDetailViewModel(service: refiner, repository: repo, clipboard: clipboard, config: config)
         vm.editingOriginalScript = "Original Dialogue Only"
@@ -203,11 +205,11 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertEqual(clipboard.lastWrittenText, "Continuous Shot 10s: Setting...")
     }
 
-    func testSearchFiltering() async {
+    func testSearchFiltering() async throws {
         let refiner = DetailRefinerStub()
         let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let s1 = ScriptDetailItem(id: "1", title: "Morning News", originalScript: "Coffee shop scene")
         let s2 = ScriptDetailItem(id: "2", title: "Evening Talk", originalScript: "Rooftop dialogue")
@@ -226,11 +228,11 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertEqual(vm.filteredItems.first?.id, "2")
     }
 
-    func testDeleteItemRemovesAndSelectsNext() async {
+    func testDeleteItemRemovesAndSelectsNext() async throws {
         let refiner = DetailRefinerStub()
         let repo = DetailItemRepository()
         let clipboard = StubClipboardWriter()
-        let config = AppConfig()
+        let config = makeTestConfig()
 
         let s1 = ScriptDetailItem(id: "1", title: "First")
         let s2 = ScriptDetailItem(id: "2", title: "Second")
@@ -248,7 +250,7 @@ final class ScriptDetailTests: XCTestCase {
         XCTAssertEqual(remaining.first?.id, "2")
     }
 
-    func testScriptDetailRepositoryIsolationFromStoryRepository() async {
+    func testScriptDetailRepositoryIsolationFromStoryRepository() async throws {
         let suiteName = "test_script_detail_isolation_\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create isolated UserDefaults")
@@ -256,10 +258,10 @@ final class ScriptDetailTests: XCTestCase {
         }
         defer { userDefaults.removePersistentDomain(forName: suiteName) }
 
-        let detailDataSource = UserDefaultsScriptDetailDataSource(key: "test_script_detail_items", userDefaults: userDefaults)
+        let detailDataSource = SavedScriptDetailDataSource(store: KeyValueStore(defaults: userDefaults), key: "test_script_detail_items")
         let detailRepo = LocalScriptDetailRepository(dataSource: detailDataSource)
 
-        let storyDataSource = UserDefaultsStoryDataSource(store: KeyValueStore(defaults: userDefaults))
+        let storyDataSource = SavedStoryDataSource(store: KeyValueStore(defaults: userDefaults))
         let storyRepo = LocalStoryRepository(dataSource: storyDataSource)
 
         // Save into detail repository
@@ -269,7 +271,7 @@ final class ScriptDetailTests: XCTestCase {
             originalScript: "Visual scene text",
             detailedScript: "Detailed prompt text"
         )
-        await detailRepo.save(detailItem)
+        try await detailRepo.save(detailItem)
 
         // Save into story repository
         let story = Story(
@@ -277,16 +279,16 @@ final class ScriptDetailTests: XCTestCase {
             title: "Library Story",
             scriptText: "Story script text"
         )
-        await storyRepo.save(story)
+        try await storyRepo.save(story)
 
         // Verify detail repo only contains detail item and no sample or library stories
-        let detailItems = await detailRepo.all()
+        let detailItems = try await detailRepo.all()
         XCTAssertEqual(detailItems.count, 1)
         XCTAssertEqual(detailItems.first?.id, "detail-1")
         XCTAssertEqual(detailItems.first?.title, "Detail Isolation Test")
 
         // Verify story repo contains saved story
-        let stories = await storyRepo.all()
+        let stories = try await storyRepo.all()
         XCTAssertTrue(stories.contains { $0.id == "story-1" })
 
         // Verify neither leaks into the other
@@ -296,18 +298,21 @@ final class ScriptDetailTests: XCTestCase {
 }
 
 extension ScriptDetailTests {
-    func testChatLoopUsesLatestEditsAndConsolidatedInstructions() async {
+    func testChatLoopUsesLatestEditsAndConsolidatedInstructions() async throws {
         let service = DetailRefinerStub()
         let repository = DetailItemRepository()
-        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: AppConfig())
+        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: makeTestConfig())
         await vm.loadItems()
         vm.editingOriginalScript = "Original dialogue"
         vm.editingUserInstruction = "Start wide"
+        await vm.refreshProviders()
         await vm.runDetail()
         vm.editingDetailedScript = "Manually revised current script"
         vm.editingConsolidatedInstruction = "Keep the wide opening and warmer lighting"
+        await vm.refreshProviders()
         await vm.runDetail()
         vm.editingUserInstruction = "Move closer at the end"
+        await vm.refreshProviders()
         await vm.runDetail()
         let requests = await service.requests
         XCTAssertEqual(requests.count, 3)
@@ -323,16 +328,18 @@ extension ScriptDetailTests {
         XCTAssertEqual(saved.first?.detailedScript, vm.editingDetailedScript)
     }
 
-    func testFailedUpdatePreservesCurrentScriptInstructionsAndHistory() async {
+    func testFailedUpdatePreservesCurrentScriptInstructionsAndHistory() async throws {
         let service = DetailRefinerStub()
-        let vm = ScriptDetailViewModel(service: service, repository: DetailItemRepository(), clipboard: StubClipboardWriter(), config: AppConfig())
+        let vm = ScriptDetailViewModel(service: service, repository: DetailItemRepository(), clipboard: StubClipboardWriter(), config: makeTestConfig())
         await vm.loadItems()
         vm.editingOriginalScript = "Original dialogue"
+        await vm.refreshProviders()
         await vm.runDetail()
         vm.editingDetailedScript = "Manual rewrite"
         vm.editingConsolidatedInstruction = "Edited context"
         vm.editingUserInstruction = "Make it warmer"
         await service.configure(fail: true)
+        await vm.refreshProviders()
         await vm.runDetail()
         XCTAssertEqual(vm.editingDetailedScript, "Manual rewrite")
         XCTAssertEqual(vm.editingConsolidatedInstruction, "Edited context")
@@ -342,12 +349,13 @@ extension ScriptDetailTests {
         XCTAssertFalse(vm.isDetailing)
     }
 
-    func testRefreshPreservesOpenChatEditsAndResetClearsCurrentDetail() async {
+    func testRefreshPreservesOpenChatEditsAndResetClearsCurrentDetail() async throws {
         let service = DetailRefinerStub()
         let repository = DetailItemRepository()
-        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: AppConfig())
+        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: makeTestConfig())
         await vm.loadItems()
         vm.editingOriginalScript = "Original dialogue"
+        await vm.refreshProviders()
         await vm.runDetail()
         vm.editingDetailedScript = "Unsaved manual rewrite"
         vm.editingUserInstruction = "Pending instruction"
@@ -369,7 +377,7 @@ private actor PendingDetailRefiner: ScriptDetailRefining {
     private var pending: CheckedContinuation<ScriptDetailDraft, Never>?
     private var started: CheckedContinuation<Void, Never>?
 
-    func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [:] }
+    func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [.codex: .init(isAvailable: true, reason: "Ready")] }
     func detail(_ request: ScriptDetailRequest) async throws -> ScriptDetailDraft {
         await withCheckedContinuation { continuation in
             pending = continuation
@@ -388,12 +396,14 @@ private actor PendingDetailRefiner: ScriptDetailRefining {
 }
 
 extension ScriptDetailTests {
-    func testSwitchingSceneIgnoresLateUpdateFromPreviousChat() async {
+    func testSwitchingSceneIgnoresLateUpdateFromPreviousChat() async throws {
         let service = PendingDetailRefiner()
         let repository = DetailItemRepository()
-        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: AppConfig())
+        let vm = ScriptDetailViewModel(service: service, repository: repository, clipboard: StubClipboardWriter(), config: makeTestConfig())
         await vm.loadItems()
         vm.editingOriginalScript = "First scene"
+        await vm.refreshProviders()
+        guard vm.canRunDetail else { return XCTFail("Expected available detail provider") }
         let run = Task { await vm.runDetail() }
         await service.waitForRequest()
         vm.createNewItem()

@@ -14,7 +14,7 @@ struct NewsResearchRequest: Sendable {
         language: String = "English",
         sourceURL: String? = nil,
         humanInstruction: String? = nil,
-        provider: LocalAgentProvider = .appleLocal,
+        provider: LocalAgentProvider = .codex,
         model: String = ""
     ) {
         self.topic = topic

@@ -5,8 +5,7 @@ import Observation
 @Observable
 @MainActor
 final class PreferencesViewModel {
-    private let config: AppConfig
-    private let modelCatalogProvider: (any AIModelCatalogProviding)?
+    private let config: any ApplicationSettings
     private let uploadSettings: (any UploadSettingsStoring)?
     var uploadOptions = LibraryUploadOptions()
     var uploadSettingsError: String?
@@ -140,65 +139,26 @@ final class PreferencesViewModel {
             uploadSettingsNotice = "Upload settings saved. Upload actions now use these settings with one click."
         } catch { uploadSettingsError = StringFormatting.errorMessage(error) }
     }
-    private var modelCatalog: AIModelCatalog?
-    var isLoadingModels = false
-    var isEditingModel = false
-    var draftProvider = ""
-    var draftModel = ""
-    var draftReasoning = "default"
-    var modelError: String?
+    var draftSelection: AgentSelection
+    var agentAvailability: [LocalAgentProvider: LocalAgentAvailability] = [:]
+    var agentSelectionNotice: String?
+    private let agentService: (any LocalAgentRunning)?
 
-    var selectedModelIdentifier: String { config.selectedAI.identifier }
-    var recentModels: [String] { Array(([selectedModelIdentifier] + config.recentAIIdentifiers.filter { $0 != selectedModelIdentifier }).prefix(5)) }
-    var providerOptions: [String] { modelCatalog?.providers.map(\.id) ?? [] }
-    var modelOptions: [String] { modelCatalog?.providers.first { $0.id == draftProvider }?.models.map(\.id) ?? [] }
-    var reasoningOptions: [String] { modelCatalog?.providers.first { $0.id == draftProvider }?.models.first { $0.id == draftModel }?.reasoning ?? [] }
-    var draftIdentifier: String { AIConfig(source: draftProvider, model: draftModel, power: draftReasoning).identifier }
-    var canSaveModel: Bool { providerOptions.contains(draftProvider) && modelOptions.contains(draftModel) && reasoningOptions.contains(draftReasoning) }
-
-    func selectRecentModel(_ identifier: String) {
-        guard let selection = AIConfig(identifier: identifier) else { return }
-        config.selectAI(selection)
+    func saveAgentSelection() {
+        draftSelection.model = draftSelection.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        config.defaultAgentSelection = draftSelection
+        agentSelectionNotice = "Default saved. Workspaces using the app default apply it to their next request."
     }
 
-    func editModel() async {
-        draftProvider = config.selectedAI.source
-        draftModel = config.selectedAI.model
-        draftReasoning = config.selectedAI.power.lowercased()
-        isEditingModel = true
-        await refreshModelCatalog()
+    func loadAgentSelection() async {
+        draftSelection = config.defaultAgentSelection
+        agentAvailability = await agentService?.availability() ?? [:]
     }
 
-    func refreshModelCatalog() async {
-        guard !isLoadingModels else { return }
-        isLoadingModels = true
-        defer { isLoadingModels = false }
-        modelError = nil
-        modelCatalog = nil
-        do {
-            guard let modelCatalogProvider else { throw APIError.notImplemented("Model catalog is unavailable.") }
-            let loaded = try await modelCatalogProvider.load()
-            guard !loaded.providers.isEmpty, loaded.providers.allSatisfy({ !$0.id.isEmpty && !$0.models.isEmpty && $0.models.allSatisfy({ !$0.id.isEmpty && !$0.reasoning.isEmpty }) }) else { throw APIError.malformed("Empty AI model catalog") }
-            modelCatalog = loaded
-            if !providerOptions.contains(draftProvider) { draftProvider = providerOptions.first ?? "" }
-            updateModelOptions()
-        } catch { modelError = error.localizedDescription }
-    }
-
-    func updateModelOptions() {
-        if !modelOptions.contains(draftModel) { draftModel = modelOptions.first ?? "" }
-        if !reasoningOptions.contains(draftReasoning) { draftReasoning = reasoningOptions.first ?? "" }
-    }
-
-    func saveModelSelection() {
-        guard canSaveModel else { modelError = "Choose a provider, model and reasoning level from the catalog."; return }
-        config.selectAI(AIConfig(source: draftProvider, model: draftModel, power: draftReasoning))
-        isEditingModel = false
-    }
-
-    init(config: AppConfig, modelCatalogProvider: (any AIModelCatalogProviding)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil) {
+    init(config: any ApplicationSettings, agentService: (any LocalAgentRunning)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil) {
         self.config = config
-        self.modelCatalogProvider = modelCatalogProvider
+        self.agentService = agentService
+        self.draftSelection = config.defaultAgentSelection
         self.uploadSettings = uploadSettings
         self.draftNewsSettings = config.newsSettings
         self.draftTrendingSettings = config.trendingSettings
