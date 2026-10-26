@@ -31,8 +31,6 @@ final class AppConfig: ApplicationSettings {
         }
     }
 
-    var newsDiscoveryCacheIdentifier: String { "\(newsSettings.cacheIdentifier)|\(newsPageSize)" }
-
     var appearance: AppAppearance {
         didSet { store.set(appearance.rawValue, forKey: "appearance") }
     }

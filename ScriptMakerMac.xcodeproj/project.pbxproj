@@ -381,18 +381,10 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G009 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				G010 /* Samples */,
 				R011 /* Assets.xcassets */,
 				R012 /* Info.plist */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		G010 /* Samples */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Samples;
 			sourceTree = "<group>";
 		};
 		D001 /* PBXTargetDependency */ = {
