@@ -114,16 +114,14 @@ struct StoryListView: View {
     @ViewBuilder
     private var detail: some View {
         if let story = viewModel.selectedStory {
-            StoryDetailView(story: story, viewModel: viewModel, onDelete: { storyToDelete = story }) { storyID in
-                Task { await viewModel.mergeClip(storyID: storyID) }
-            }
+            StoryDetailView(story: story, viewModel: viewModel, onDelete: { storyToDelete = story })
             .id(story.id).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 12) {
                 Image(systemName: "doc.text").font(.largeTitle)
                 Text(viewModel.stories.isEmpty ? "No saved stories" : "Select a story").font(.headline)
                 if viewModel.stories.isEmpty {
-                    Text("Use the plus button to add a news title, or generate a story in Studio.")
+                    Text("Use the plus button to add a news title, or save a generated story from Pipeline.")
                         .font(.callout).multilineTextAlignment(.center)
                 }
             }.foregroundStyle(AppTheme.secondaryInk)

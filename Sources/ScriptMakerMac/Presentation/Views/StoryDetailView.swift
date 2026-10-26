@@ -6,7 +6,6 @@ struct StoryDetailView: View {
     let story: Story
     @Bindable var viewModel: LibraryViewModel
     let onDelete: () -> Void
-    let onMerge: (String) -> Void
     @State private var showingEdit = false
     @State private var showingScriptChat = false
 
@@ -82,12 +81,6 @@ struct StoryDetailView: View {
                                         }.buttonStyle(.plain).help("Remove video").accessibilityLabel("Remove video").padding(8)
                                     }
                             }
-                            LoadingButton(isLoading: viewModel.isMerging) {
-                                onMerge(story.id)
-                            } label: {
-                                Text("Merge closing clip")
-                            }
-                            .buttonStyle(StudioButtonStyle())
                         }
                     }
                 }
@@ -472,9 +465,9 @@ private struct StoryGenerationDetails: View {
                     Text(story.headline)
                 }
                 if let outputs = story.stageOutputs {
-                    ForEach(PipelineStage.allCases) { stage in
-                        if let json = outputs[stage.rawValue] {
-                            DisclosureGroup(stage.title) {
+                    ForEach(outputs.keys.sorted(), id: \.self) { stage in
+                        if let json = outputs[stage] {
+                            DisclosureGroup(HistoricalPipelineStage(rawValue: stage)?.title ?? StringFormatting.displayKey(stage)) {
                                 Text(json).font(.system(.callout, design: .monospaced))
                                     .frame(maxWidth: .infinity, alignment: .leading).padding(12)
                                     .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))

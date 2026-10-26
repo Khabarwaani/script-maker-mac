@@ -89,7 +89,14 @@ struct KeyValueStore: Sendable {
         defaults.set(data, forKey: key)
     }
 
+    func object(forKey key: String) -> Any? { defaults.object(forKey: key) }
+    func string(forKey key: String) -> String? { defaults.string(forKey: key) }
+    func stringArray(forKey key: String) -> [String]? { defaults.stringArray(forKey: key) }
+    func integer(forKey key: String) -> Int { defaults.integer(forKey: key) }
+    func set(_ value: Any, forKey key: String) { defaults.set(value, forKey: key) }
+
     func remove(forKey key: String) {
+
         defaults.removeObject(forKey: key)
     }
 }
@@ -97,9 +104,11 @@ struct KeyValueStore: Sendable {
 /// Generic file store (FileManager wrapper).
 struct FileStore: Sendable {
     private let fileManager: FileManager
+    private let mediaNamespace: String
 
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, mediaNamespace: String = "ScriptMakerMac") {
         self.fileManager = fileManager
+        self.mediaNamespace = mediaNamespace
     }
 
     func contents(of url: URL) throws -> Data {
@@ -118,7 +127,7 @@ struct FileStore: Sendable {
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("ScriptMakerMac/Media", isDirectory: true)
+            .appendingPathComponent(mediaNamespace, isDirectory: true).appendingPathComponent("Media", isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         let destination = root.appendingPathComponent(UUID().uuidString).appendingPathExtension(source.pathExtension)
         try fileManager.copyItem(at: source, to: destination)

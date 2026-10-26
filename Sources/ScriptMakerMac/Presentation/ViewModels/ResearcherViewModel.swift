@@ -12,7 +12,7 @@ final class ResearcherViewModel {
     let newsProvider: any StudioNewsProviding
     let researchService: any NewsResearching
     let clipboard: any ClipboardWriting
-    let config: AppConfig
+    let config: any DiscoverySettingsProviding
 
     var onNavigateToPipeline: ((String, String?) -> Void)?
 
@@ -45,8 +45,21 @@ final class ResearcherViewModel {
     var language: String = "English"
 
     // Agent Execution
-    var selectedProvider: LocalAgentProvider = .appleLocal
-    var customModel: String = ""
+    private var providerOverride: LocalAgentProvider = .codex
+    private var modelOverrideValue = ""
+    private let agentSelection: (any WorkspaceAgentSelecting)?
+    var usesAppDefault: Bool {
+        get { agentSelection?.usesAppDefault ?? false }
+        set { agentSelection?.usesAppDefault = newValue }
+    }
+    var selectedProvider: LocalAgentProvider {
+        get { agentSelection?.provider ?? providerOverride }
+        set { if let agentSelection { agentSelection.provider = newValue } else { providerOverride = newValue } }
+    }
+    var customModel: String {
+        get { agentSelection?.model ?? modelOverrideValue }
+        set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
+    }
     var availableProviders: [LocalAgentProvider: LocalAgentAvailability] = [:]
 
     var isResearching: Bool = false
@@ -58,19 +71,26 @@ final class ResearcherViewModel {
         newsProvider: any StudioNewsProviding,
         researchService: any NewsResearching,
         clipboard: any ClipboardWriting,
-        config: AppConfig
+        config: any DiscoverySettingsProviding,
+        agentSelection: (any WorkspaceAgentSelecting)? = nil
     ) {
         self.newsProvider = newsProvider
         self.researchService = researchService
         self.clipboard = clipboard
         self.config = config
+        self.agentSelection = agentSelection
     }
 
     var isHashtagSource: Bool { selectedStorySource == Self.hashtagSourceLabel }
     var isManualSource: Bool { selectedStorySource == Self.manualSourceLabel }
 
+    var providerNotice: String {
+        if selectedProvider == .appleLocal { return "News research needs web access. Choose an installed terminal provider." }
+        return availableProviders[selectedProvider]?.reason ?? "Checking provider availability…"
+    }
     var canRunResearch: Bool {
-        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isResearching
+
+        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isResearching && selectedProvider != .appleLocal && availableProviders[selectedProvider]?.isAvailable == true
     }
 
     var effectiveModel: String {
@@ -261,11 +281,6 @@ final class ResearcherViewModel {
 
     func refreshProviders() async {
         availableProviders = await researchService.availability()
-        if let current = availableProviders[selectedProvider], !current.isAvailable {
-            if let fallback = availableProviders.first(where: { $0.value.isAvailable })?.key {
-                selectedProvider = fallback
-            }
-        }
     }
 
     private func formatResearchForCopy(_ result: NewsResearchResult) -> String {

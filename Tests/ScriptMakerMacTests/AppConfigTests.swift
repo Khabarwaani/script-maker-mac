@@ -3,9 +3,9 @@ import XCTest
 
 final class AppConfigTests: XCTestCase {
     @MainActor
-    func testNewsSettingsPersistAndInvalidEditsPreserveSavedSettings() {
+    func testNewsSettingsPersistAndInvalidEditsPreserveSavedSettings() throws {
         let defaults = makeIsolatedDefaults()
-        let config = AppConfig(defaults: defaults)
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
         XCTAssertEqual(config.newsSettings, NewsDiscoverySettings())
         let vm = PreferencesViewModel(config: config)
         vm.newsSearchHours = 12
@@ -18,7 +18,7 @@ final class AppConfigTests: XCTestCase {
         vm.saveNewsSettings()
         XCTAssertNil(vm.newsSettingsError)
         XCTAssertNotNil(vm.newsSettingsNotice)
-        let reopened = AppConfig(defaults: defaults)
+        let reopened = AppConfig(store: KeyValueStore(defaults: defaults))
         XCTAssertEqual(reopened.newsSettings, config.newsSettings)
         XCTAssertEqual(reopened.newsSettings.searchDuration, 12 * 3600)
         XCTAssertEqual(reopened.newsSettings.cacheDuration, 2 * 3600)
@@ -64,102 +64,39 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.newsSettings, NewsDiscoverySettings())
     }
 
-    func testScriptRefinementExecutionModeDefaultsAndPersistence() {
+    func testScriptRefinementExecutionModeDefaultsAndPersistence() throws {
         let defaults = makeIsolatedDefaults()
-        let config = AppConfig(defaults: defaults)
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
         XCTAssertEqual(config.scriptRefinementMode, .fastClean)
 
         config.scriptRefinementMode = .strictEphemeral
-        let reopened = AppConfig(defaults: defaults)
+        let reopened = AppConfig(store: KeyValueStore(defaults: defaults))
         XCTAssertEqual(reopened.scriptRefinementMode, .strictEphemeral)
 
         config.resetToDefaults()
         XCTAssertEqual(config.scriptRefinementMode, .fastClean)
     }
 
-    func testNormalizeBareHostAssumesHTTP() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "localhost:8000"), "http://localhost:8000")
-    }
 
-    func testNormalizeKeepsScheme() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "https://example.com:9000"), "https://example.com:9000")
-    }
 
-    func testNormalizeBracketsBareIPv6() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "http://::1:8000"), "http://[::1]:8000")
-    }
 
-    func testNormalizeKeepsBracketedIPv6() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "http://[::1]:8000"), "http://[::1]:8000")
-    }
 
-    func testNormalizeStripsTrailingSlash() throws {
-        XCTAssertEqual(try AppConfig.normalize(raw: "http://localhost:8000/"), "http://localhost:8000")
-    }
 
-    func testNormalizeRejectsEmpty() {
-        XCTAssertThrowsError(try AppConfig.normalize(raw: "   "))
-    }
 
-    func testNormalizeRejectsBadPort() {
-        XCTAssertThrowsError(try AppConfig.normalize(raw: "http://localhost:99999"))
-    }
 
-    func testDefaultIsLocalhost8000() {
-        XCTAssertEqual(AppConfig.defaultServerURL, "http://localhost:8000")
-    }
 
-    func testLocalserverName() {
-        XCTAssertEqual(AppConfig.localserverName, "localserver")
-    }
 
     private func makeIsolatedDefaults() -> UserDefaults {
         let suiteName = "test.suite.\(UUID().uuidString)"
         return UserDefaults(suiteName: suiteName)!
     }
 
-    func testHeadlinesCaching24HourExpiry() {
+
+
+
+    func testNewsPageSizeDefaultAndPersistence() throws {
         let defaults = makeIsolatedDefaults()
-        let config = AppConfig(defaults: defaults)
-        let testSource = "test_source_\(UUID().uuidString)"
-        let sample = ["Headline A", "Headline B"]
-
-        config.cacheHeadlines(sample, forSource: testSource)
-        let cached = config.getCachedHeadlines(forSource: testSource, maxAge: 86400)
-        XCTAssertEqual(cached, sample)
-
-        // Expired cache check
-        let expired = config.getCachedHeadlines(forSource: testSource, maxAge: -1)
-        XCTAssertNil(expired)
-    }
-
-    func testLastSelectedHeadlinePersistence() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfig(defaults: defaults)
-        let testSource = "test_source_\(UUID().uuidString)"
-        config.saveLastSelectedHeadline("Important Breaking News", forSource: testSource)
-        XCTAssertEqual(config.getLastSelectedHeadline(forSource: testSource), "Important Breaking News")
-    }
-
-    @MainActor
-    func testPreferencesModelEditorIgnoresRetiredSourceSettings() async {
-        let defaults = makeIsolatedDefaults()
-        defaults.set("server", forKey: "dataSource")
-        defaults.set("not a valid server address", forKey: "serverURL")
-        defaults.set(60.0, forKey: "localJSONDelay")
-        let config = AppConfig(defaults: defaults)
-        let vm = PreferencesViewModel(config: config,
-            modelCatalogProvider: BundledAIModelCatalog(bundled: BundledStudioCatalog()))
-        await vm.editModel()
-        XCTAssertNil(vm.modelError)
-        XCTAssertTrue(vm.providerOptions.contains("Codex"))
-        XCTAssertEqual(defaults.string(forKey: "serverURL"), "not a valid server address")
-        XCTAssertEqual(defaults.double(forKey: "localJSONDelay"), 60)
-    }
-
-    func testNewsPageSizeDefaultAndPersistence() {
-        let defaults = makeIsolatedDefaults()
-        let config = AppConfig(defaults: defaults)
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
         XCTAssertEqual(config.newsPageSize, 20)
         config.newsPageSize = 35
         XCTAssertEqual(config.newsPageSize, 35)
@@ -167,23 +104,12 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.newsPageSize, 20)
     }
 
-    func testAPIErrorLocalization() {
+    func testAPIErrorLocalization() throws {
         let err = APIError.unreachable(url: "http://localhost:8000", detail: "The request timed out.")
         XCTAssertEqual(err.errorDescription, "Could Not Connect to Server")
         XCTAssertEqual(err.failureReason, "The request timed out.")
     }
 
-    func testDataSourcePersistenceAcrossLaunches() {
-        let defaults = makeIsolatedDefaults()
-        let config1 = AppConfig(defaults: defaults)
-        config1.dataSource = .server
-        XCTAssertEqual(defaults.string(forKey: "dataSource"), "server")
-        XCTAssertNil(defaults.object(forKey: "useSampleData"))
-
-        // Simulate app relaunch with same persistent defaults
-        let config2 = AppConfig(defaults: defaults)
-        XCTAssertEqual(config2.dataSource, .server)
-    }
 
     func testRegionGeoResolutionAndValidation() throws {
         // Country codes

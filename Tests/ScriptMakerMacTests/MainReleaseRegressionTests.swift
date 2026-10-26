@@ -2,16 +2,10 @@ import XCTest
 @testable import ScriptMakerMac
 
 private func releaseTestConfig() -> AppConfig {
-    AppConfig(defaults: UserDefaults(suiteName: "release-regression-\(UUID().uuidString)")!)
+    AppConfig(store: KeyValueStore(defaults: UserDefaults(suiteName: "release-regression-\(UUID().uuidString)")!))
 }
 
 /// All UX flows must work against the dummy (sample) API — no network.
-final class MainReleaseSampleAPITests: XCTestCase {
-    private func service() -> PipelineService {
-        PipelineService(client: OfflineWebClient(), baseURL: URL(string: AppConfig.defaultServerURL)!)
-    }
-
-}
 
 @MainActor
 private final class TestClipboard: ClipboardWriting {
@@ -42,9 +36,9 @@ private actor MainReleaseWorkflowStoryRepository: StoryRepository {
 
 @MainActor
 final class MainReleaseLocalWorkflowTests: XCTestCase {
-    func testCopyImageWritesCachedBytesAndReportsClipboardFailure() async {
+    func testCopyImageWritesCachedBytesAndReportsClipboardFailure() async throws {
         let clipboard = TestClipboard()
-        let vm = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard)
+        let vm = LibraryViewModel( repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard)
         let data = Data([4, 5, 6])
         vm.imagePreviews["sample://image"] = data
         await vm.copyImage("sample://image")
@@ -56,13 +50,13 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
         XCTAssertFalse(vm.isCopyingImage)
     }
 
-    func testCopyImageLoadsUncachedImageAndReportsLoadFailure() async {
+    func testCopyImageLoadsUncachedImageAndReportsLoadFailure() async throws {
         let clipboard = TestClipboard()
         let url = URL(fileURLWithPath: "/tmp/image.png")
-        let vm = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url))
+        let vm = LibraryViewModel( repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url))
         await vm.copyImage(url.absoluteString)
         XCTAssertEqual(clipboard.imageData, Data([1, 2, 3]))
-        let failing = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url, fails: true))
+        let failing = LibraryViewModel( repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard, mediaImporter: TestMediaImporter(destination: url, fails: true))
         clipboard.imageData = nil
         await failing.copyImage(url.absoluteString)
         XCTAssertNil(clipboard.imageData)
@@ -72,7 +66,7 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
 
     func testAddStoryAcceptsOptionalScriptAndSelectsSavedUUID() async throws {
         let repository = MainReleaseWorkflowStoryRepository()
-        let library = LibraryViewModel(config: releaseTestConfig(), repository: repository)
+        let library = LibraryViewModel( repository: repository)
         library.prepareNewStory()
         XCTAssertFalse(library.canAddStory)
         let rejected = await library.addStory()
@@ -89,7 +83,7 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
         XCTAssertEqual(story.title, "Manual story")
         XCTAssertEqual(story.scriptText, "Full pasted screenplay\nSpoken dialogue")
         XCTAssertEqual(story.status, "saved")
-        let persisted = await repository.all()
+        let persisted = try await repository.all()
         XCTAssertEqual(persisted.count, 1)
         XCTAssertEqual(persisted.first?.id, story.id)
         library.prepareNewStory()
@@ -97,9 +91,9 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
         XCTAssertTrue(library.newStoryScript.isEmpty)
     }
 
-    func testCopyUsesSelectedContentAndReportsFailures() {
+    func testCopyUsesSelectedContentAndReportsFailures() throws {
         let clipboard = TestClipboard()
-        let library = LibraryViewModel(config: releaseTestConfig(), repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard)
+        let library = LibraryViewModel( repository: MainReleaseWorkflowStoryRepository(), clipboard: clipboard)
         library.copy("First screenplay", label: "Screenplay")
         XCTAssertEqual(clipboard.contents, "First screenplay")
         XCTAssertEqual(library.copyFeedback, "Screenplay copied")
@@ -115,35 +109,14 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
 
 }
 
-final class MainReleaseLocalSimulationTests: XCTestCase {
-    func testLibraryServerUpdateFailsWithoutSimulating() async {
-        do {
-            _ = try await LibraryUpdateClient().update(.hashtags, story: Story(), engine: "None", instruction: "", localJSON: false, delay: 60)
-            XCTFail("Server mode must not return fixtures")
-        } catch { XCTAssertTrue(error is ConfigError) }
-    }
-
-    func testLibraryUpdateCancellationAndDelay() async throws {
-        let client = LibraryUpdateClient()
-        let clock = ContinuousClock()
-        let start = clock.now
-        let result = try await client.update(.hashtags, story: Story(), engine: "None", instruction: "", localJSON: true, delay: 0.02)
-        XCTAssertGreaterThanOrEqual(start.duration(to: clock.now), .milliseconds(20))
-        XCTAssertFalse(result.hashtags?.isEmpty ?? true)
-        let task = Task { try await client.update(.news, story: Story(), engine: "None", instruction: "", localJSON: true, delay: 60) }
-        task.cancel()
-        do { _ = try await task.value; XCTFail("Cancelled update must fail") }
-        catch { XCTAssertTrue(error is CancellationError) }
-    }
-}
 
 @MainActor
 final class LibraryDetailTests: XCTestCase {
-    func testMultiSelectionDeletionKeepsUnselectedStoriesAndRejectsServerBatch() async {
+    func testMultiSelectionDeletionKeepsUnselectedStoriesAndRejectsServerBatch() async throws {
         let repo = MainReleaseWorkflowStoryRepository()
         let stories = (1...4).map { Story(title: "Story \($0)", scriptText: "Script \($0)") }
-        for story in stories { await repo.save(story) }
-        let vm = LibraryViewModel(config: releaseTestConfig(), repository: repo)
+        for story in stories { try await repo.save(story) }
+        let vm = LibraryViewModel( repository: repo)
         vm.stories = stories
         vm.selectAllStories()
         XCTAssertEqual(vm.selectedStoryIDs.count, 4)
@@ -153,7 +126,7 @@ final class LibraryDetailTests: XCTestCase {
         await vm.deleteStories(ids: vm.selectedStoryIDs)
         XCTAssertEqual(Set(vm.stories.map(\.id)), Set([stories[1].id, stories[3].id]))
         XCTAssertNotNil(vm.selectedStory)
-        let persisted = await repo.all()
+        let persisted = try await repo.all()
         XCTAssertEqual(persisted.count, 2)
         vm.selectStories([])
         XCTAssertNil(vm.selectedStoryID)
@@ -163,7 +136,7 @@ final class LibraryDetailTests: XCTestCase {
         vm.selectStories([stories[1].id, remote.id])
         await vm.deleteStories(ids: vm.selectedStoryIDs)
         XCTAssertEqual(vm.stories.count, 3)
-        let untouched = await repo.all()
+        let untouched = try await repo.all()
         XCTAssertEqual(untouched.count, 2)
         XCTAssertTrue(vm.notice?.contains("No stories were deleted") ?? false)
     }
@@ -172,8 +145,8 @@ final class LibraryDetailTests: XCTestCase {
         let repo = MainReleaseWorkflowStoryRepository()
         let link = StorySourceLink(title: "Wire", url: "https://example.com/news", source: "Wire")
         let story = Story(title: "Removals", videoURL: "https://example.com/video.mp4", hashtags: ["#One", "#Two"], sourceLinks: [link], scriptText: "Keep script", imageURLs: ["sample://one", "sample://two"])
-        await repo.save(story)
-        let vm = LibraryViewModel(config: releaseTestConfig(), repository: repo)
+        try await repo.save(story)
+        let vm = LibraryViewModel( repository: repo)
         vm.stories = [story]; vm.selectedStoryID = story.id
         await vm.remove(.hashtag("#One"), from: story.id)
         XCTAssertEqual(vm.selectedStory?.hashtags, ["#Two"])
@@ -196,18 +169,18 @@ final class LibraryDetailTests: XCTestCase {
         XCTAssertEqual(vm.selectedStory?.scriptText, "Keep script")
     }
 
-    func testMediaImportPersistsAttachmentAndFailureKeepsStory() async {
+    func testMediaImportPersistsAttachmentAndFailureKeepsStory() async throws {
         let repo = MainReleaseWorkflowStoryRepository()
         let story = Story(title: "Media", scriptText: "Keep script")
-        await repo.save(story)
+        try await repo.save(story)
         let imported = URL(fileURLWithPath: "/tmp/imported-image.png")
-        let vm = LibraryViewModel(config: releaseTestConfig(), repository: repo, mediaImporter: TestMediaImporter(destination: imported))
+        let vm = LibraryViewModel( repository: repo, mediaImporter: TestMediaImporter(destination: imported))
         vm.stories = [story]; vm.selectedStoryID = story.id
         await vm.importMedia(URL(fileURLWithPath: "/tmp/source.png"), kind: .image, storyID: story.id)
         XCTAssertEqual(vm.selectedStory?.imageURLs, [imported.absoluteString])
         XCTAssertNotNil(vm.imagePreviews[imported.absoluteString])
         XCTAssertEqual(vm.selectedStory?.id, story.id)
-        let failing = LibraryViewModel(config: releaseTestConfig(), repository: repo, mediaImporter: TestMediaImporter(destination: imported, fails: true))
+        let failing = LibraryViewModel( repository: repo, mediaImporter: TestMediaImporter(destination: imported, fails: true))
         failing.stories = vm.stories; failing.selectedStoryID = story.id
         await failing.importMedia(URL(fileURLWithPath: "/tmp/source.mp4"), kind: .video, storyID: story.id)
         XCTAssertNil(failing.selectedStory?.videoURL)
@@ -221,8 +194,8 @@ final class LibraryDetailTests: XCTestCase {
         var story = Story(title: "Before", createdAt: "2020-01-01T00:00:00Z", scriptText: "Old script")
         story.hashtags = ["#News"]; story.imageURLs = ["https://example.com/image.jpg"]
         story.sourceLinks = [StorySourceLink(title: "News", url: "https://example.com/news", source: "Wire")]
-        await repo.save(story)
-        let vm = LibraryViewModel(config: releaseTestConfig(), repository: repo)
+        try await repo.save(story)
+        let vm = LibraryViewModel( repository: repo)
         vm.stories = [story]; vm.selectedStoryID = story.id
         vm.prepareEdits(story); vm.editedScript = "Current script"
         let saved = await vm.saveEdits(id: story.id)
@@ -260,13 +233,10 @@ final class LibraryDetailTests: XCTestCase {
 
     func testUpdatesPersistOnlyRequestedFields() async throws {
         let config = releaseTestConfig()
-        let originalSource = config.dataSource, originalDelay = config.localJSONDelay
-        defer { config.dataSource = originalSource; config.localJSONDelay = originalDelay }
-        config.dataSource = .offline; config.localJSONDelay = 0
         let repo = MainReleaseWorkflowStoryRepository()
         let story = Story(title: "Update target", scriptText: "Keep script")
-        await repo.save(story)
-        let vm = LibraryViewModel(config: config, repository: repo, updater: ReleaseLibraryUpdateStub())
+        try await repo.save(story)
+        let vm = LibraryViewModel( repository: repo, updater: ReleaseLibraryUpdateStub())
         await vm.refresh()
         await vm.update(.hashtags)
         XCTAssertFalse(vm.selectedStory?.hashtags?.isEmpty ?? true)
@@ -293,141 +263,9 @@ private struct TestMediaImporter: LibraryMediaImporting {
     }
 }
 
-final class LibraryNetworkContractTests: XCTestCase {
-    func testBundledModelCatalogLoadsWithoutServerOrSimulationInputs() async throws {
-        let client = BundledAIModelCatalog(bundled: BundledStudioCatalog())
-        let catalog = try await client.load()
-        XCTAssertFalse(catalog.providers.isEmpty)
-        XCTAssertTrue(catalog.providers.allSatisfy { provider in
-            provider.models.contains { $0.id == "Default" && $0.reasoning == ["default"] }
-        })
-    }
 
-    private func client(status: Int = 200, body: String) -> LibraryUpdateClient {
-        LibraryStubProtocol.status = status
-        LibraryStubProtocol.body = Data(body.utf8)
-        LibraryStubProtocol.captured = nil
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [LibraryStubProtocol.self]
-        return LibraryUpdateClient(httpClient: HTTPClient(session: URLSession(configuration: configuration)))
-    }
 
-    func testUpdateUsesConfiguredURLAndContractBodyWithoutSimulationDelay() async throws {
-        let api = client(body: "{\"hashtags\":[\"#News\"]}")
-        let story = Story(title: "News", scriptText: "Current script")
-        let output = try await api.update(.hashtags, story: story, engine: "None", instruction: "", localJSON: false,
-                                          delay: 60, serverURL: URL(string: "http://library.test:8000/api"))
-        XCTAssertEqual(output.hashtags, ["#News"])
-        let request = try XCTUnwrap(LibraryStubProtocol.captured)
-        XCTAssertEqual(request.url?.absoluteString, "http://library.test:8000/api/stories/\(story.id)/updates/hashtags")
-        XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-        let body = try XCTUnwrap(request.httpBody)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        XCTAssertEqual(json["engine"] as? String, "None")
-        XCTAssertEqual(json["instruction"] as? String, "")
-        XCTAssertEqual((json["story"] as? [String: Any])?["scriptText"] as? String, "Current script")
-    }
 
-    func testUnavailableServerErrors() async throws {
-        let story = Story(scriptText: "Original script")
-        let unavailable = client(status: 501, body: "{\"error\":{\"code\":\"not_implemented\",\"message\":\"Pending\"}}")
-        do {
-            _ = try await unavailable.update(.news, story: story, engine: "None", instruction: "", localJSON: false,
-                                             delay: 60, serverURL: URL(string: "http://library.test"))
-            XCTFail("Unavailable server must not return fixture data")
-        } catch {
-            XCTAssertTrue(error is APIError)
-            guard case APIError.notImplemented(let reason) = error else { return XCTFail("Expected unsupported update: \(error)") }
-            XCTAssertTrue(reason.contains("No changes were saved"))
-        }
-    }
-}
-
-private final class LibraryStubProtocol: URLProtocol {
-    static var status = 200
-    static var body = Data()
-    static var captured: URLRequest?
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-    override func startLoading() {
-        var captured = request
-        if captured.httpBody == nil, let stream = captured.httpBodyStream {
-            stream.open()
-            defer { stream.close() }
-            var bytes = [UInt8](repeating: 0, count: 4096)
-            var data = Data()
-            while stream.hasBytesAvailable {
-                let count = stream.read(&bytes, maxLength: bytes.count)
-                if count <= 0 { break }
-                data.append(contentsOf: bytes.prefix(count))
-            }
-            captured.httpBody = data
-        }
-        Self.captured = captured
-        let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Self.body)
-        client?.urlProtocolDidFinishLoading(self)
-    }
-    override func stopLoading() { }
-}
-
-@MainActor
-final class SharedAISelectionTests: XCTestCase {
-    func testIdentifierEscapesSlashAndRoundTrips() throws {
-        let selection = AIConfig(source: "Provider A", model: "vendor/model", power: "High")
-        XCTAssertEqual(selection.identifier, "Provider%20A/vendor%2Fmodel/high")
-        let decoded = try XCTUnwrap(AIConfig(identifier: selection.identifier))
-        XCTAssertEqual(decoded.source, selection.source)
-        XCTAssertEqual(decoded.model, selection.model)
-        XCTAssertEqual(decoded.power, "High")
-        XCTAssertNil(AIConfig(identifier: "provider/model"))
-        XCTAssertNil(AIConfig(identifier: "provider//high"))
-    }
-
-    func testSelectionIsSharedPersistsAndKeepsFiveUniqueRecents() {
-        let defaults = UserDefaults(suiteName: "release-persistence-\(UUID().uuidString)")!
-        let config = AppConfig(defaults: defaults)
-        let original = config.selectedAI, recents = config.recentAIIdentifiers
-        defer { config.selectedAI = original; config.recentAIIdentifiers = recents }
-        config.recentAIIdentifiers = []
-        let generator = GenerateViewModel(config: config, catalogProvider: BundledStudioCatalog(), repository: LocalStoryRepository(), newsProvider: StubStudioNewsProvider())
-        for index in 1...6 { config.selectAI(AIConfig(source: "Provider", model: "model-\(index)", power: "High")) }
-        config.selectAI(AIConfig(source: "Provider", model: "model-3", power: "High"))
-        XCTAssertEqual(config.recentAIIdentifiers.count, 5)
-        XCTAssertEqual(Set(config.recentAIIdentifiers).count, 5)
-        XCTAssertEqual(config.recentAIIdentifiers.first, "Provider/model-3/high")
-        XCTAssertEqual(generator.selectedAIIdentifier, config.selectedAI.identifier)
-        generator.resetConfiguration()
-        XCTAssertEqual(generator.selectedAIIdentifier, "Provider/model-3/high")
-        XCTAssertEqual(AppConfig(defaults: defaults).selectedAI.identifier, config.selectedAI.identifier)
-    }
-
-    func testEditorLoadsThreeControlsAndAppliesOnlyOnSave() async throws {
-        let config = releaseTestConfig()
-        let original = config.selectedAI, recents = config.recentAIIdentifiers
-        let source = config.dataSource, delay = config.localJSONDelay
-        defer { config.selectedAI = original; config.recentAIIdentifiers = recents; config.dataSource = source; config.localJSONDelay = delay }
-        config.dataSource = .offline; config.localJSONDelay = 0
-        let vm = PreferencesViewModel(config: config, modelCatalogProvider: BundledAIModelCatalog(bundled: BundledStudioCatalog()))
-        await vm.editModel()
-        XCTAssertNil(vm.modelError)
-        vm.draftProvider = "Codex"; vm.updateModelOptions()
-        vm.draftModel = try XCTUnwrap(vm.modelOptions.last); vm.updateModelOptions()
-        vm.draftReasoning = try XCTUnwrap(vm.reasoningOptions.last)
-        XCTAssertEqual(config.selectedAI.identifier, original.identifier)
-        let identifier = vm.draftIdentifier
-        vm.saveModelSelection()
-        XCTAssertEqual(config.selectedAI.identifier, identifier)
-        XCTAssertEqual(config.recentAIIdentifiers.first, identifier)
-        XCTAssertFalse(vm.isEditingModel)
-    }
-}
-
-private struct ModelTestChecker: ServerConnectionChecking {
-    func isReachable(at url: URL) async -> Bool { false }
-}
 
 @MainActor
 final class LibrarySharingTests: XCTestCase {
@@ -446,10 +284,10 @@ final class LibrarySharingTests: XCTestCase {
         XCTAssertEqual(URLComponents(url: manual, resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "")
     }
 
-    func testShareRoutesFullStoryAndCancellationPreservesLibrary() async {
+    func testShareRoutesFullStoryAndCancellationPreservesLibrary() async throws {
         let sharing = SharingSpy()
         let config = releaseTestConfig()
-        let vm = LibraryViewModel(config: config, sharing: sharing)
+        let vm = LibraryViewModel( sharing: sharing)
         let story = Story(title: "Story", hashtags: ["#Tag"], sourceLinks: [.init(title: "Source", url: "https://example.com/news", source: "Wire")], scriptText: "Narrator: Full script")
         vm.stories = [story]; vm.selectedStoryID = story.id
         await vm.share(story, to: .googleDrive)
@@ -485,8 +323,7 @@ private final class SharingSpy: StorySharing {
 }
 
 private struct ReleaseLibraryUpdateStub: LibraryUpdating {
-    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
-                localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
+    func update(_ kind: LibraryUpdate, story: Story) async throws -> LibraryUpdateResult {
         LibraryUpdateResult(hashtags: ["#News"], images: ["https://example.com/image.jpg"],
                             news: [.init(title: "News", url: "https://example.com/news", source: "Publisher")])
     }

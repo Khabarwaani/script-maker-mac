@@ -9,7 +9,7 @@ final class ScriptDetailViewModel {
     let service: any ScriptDetailRefining
     let repository: any ScriptDetailRepository
     let clipboard: any ClipboardWriting
-    let config: AppConfig
+    let config: any AgentSettingsProviding
 
     private var detailTask: Task<Void, Never>?
     private var operationID = UUID()
@@ -26,8 +26,21 @@ final class ScriptDetailViewModel {
     var editingDetailedScript: String = ""
     var editingConsolidatedInstruction: String = ""
 
-    var selectedProvider: LocalAgentProvider = .appleLocal
-    var customModel: String = ""
+    private var providerOverride: LocalAgentProvider = .codex
+    private var modelOverrideValue = ""
+    private let agentSelection: (any WorkspaceAgentSelecting)?
+    var usesAppDefault: Bool {
+        get { agentSelection?.usesAppDefault ?? false }
+        set { agentSelection?.usesAppDefault = newValue }
+    }
+    var selectedProvider: LocalAgentProvider {
+        get { agentSelection?.provider ?? providerOverride }
+        set { if let agentSelection { agentSelection.provider = newValue } else { providerOverride = newValue } }
+    }
+    var customModel: String {
+        get { agentSelection?.model ?? modelOverrideValue }
+        set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
+    }
     var executionMode: ScriptRefinementExecutionMode = .fastClean
     var availableProviders: [LocalAgentProvider: LocalAgentAvailability] = [:]
 
@@ -40,12 +53,15 @@ final class ScriptDetailViewModel {
         service: any ScriptDetailRefining,
         repository: any ScriptDetailRepository,
         clipboard: any ClipboardWriting,
-        config: AppConfig
+        config: any AgentSettingsProviding,
+        agentSelection: (any WorkspaceAgentSelecting)? = nil
     ) {
         self.service = service
         self.repository = repository
         self.clipboard = clipboard
+        self.executionMode = config.scriptRefinementMode
         self.config = config
+        self.agentSelection = agentSelection
     }
 
     var filteredItems: [ScriptDetailItem] {
@@ -64,7 +80,7 @@ final class ScriptDetailViewModel {
     }
 
     var canRunDetail: Bool {
-        !editingOriginalScript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isDetailing && !isSaving && availableProviders[selectedProvider]?.isAvailable != false
+        !editingOriginalScript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isDetailing && !isSaving && availableProviders[selectedProvider]?.isAvailable == true
     }
 
     var canCopy: Bool {
@@ -84,18 +100,23 @@ final class ScriptDetailViewModel {
     }
 
     func loadItems() async {
-        let all = await repository.all()
-        items = all.sorted { $0.createdAt > $1.createdAt }
-        if let current = selectedItemID, items.contains(where: { $0.id == current }) {
-            return
-        } else if let first = items.first {
-            selectItem(id: first.id)
-        } else {
-            createNewItem()
-        }
+        do {
+            let all = try await repository.all()
+            items = all.sorted { $0.createdAt > $1.createdAt }
+            if let current = selectedItemID, items.contains(where: { $0.id == current }) {
+                return
+            } else if let first = items.first {
+                selectItem(id: first.id)
+            } else {
+                createNewItem()
+            }
+        } catch { errorMessage = StringFormatting.errorMessage(error) }
     }
 
     func selectItem(id: String) {
+        if let previous = selectedItemID, previous != id {
+            Task { [service] in await service.closeSession(id: "script-detail-\(previous)") }
+        }
         cancelDetail()
         selectedItemID = id
         turns = histories[id] ?? []
@@ -126,24 +147,26 @@ final class ScriptDetailViewModel {
     // MARK: - Actions
 
     func saveCurrentItem() async {
-        guard let id = selectedItemID else { return }
-        isSaving = true
-        defer { isSaving = false }
+        do {
+            guard let id = selectedItemID else { return }
+            isSaving = true
+            defer { isSaving = false }
 
-        let cleanTitle = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedTitle = cleanTitle.isEmpty ? "Untitled Scene" : cleanTitle
+            let cleanTitle = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            let resolvedTitle = cleanTitle.isEmpty ? "Untitled Scene" : cleanTitle
 
-        var existing = items.first(where: { $0.id == id }) ?? ScriptDetailItem(id: id)
-        existing.title = resolvedTitle
-        existing.originalScript = editingOriginalScript
-        existing.detailedScript = editingDetailedScript
-        existing.instruction = editingConsolidatedInstruction
-        existing.updatedAt = DateFormatting.iso8601Now()
+            var existing = items.first(where: { $0.id == id }) ?? ScriptDetailItem(id: id)
+            existing.title = resolvedTitle
+            existing.originalScript = editingOriginalScript
+            existing.detailedScript = editingDetailedScript
+            existing.instruction = editingConsolidatedInstruction
+            existing.updatedAt = DateFormatting.iso8601Now()
 
-        await repository.save(existing)
-        if let idx = items.firstIndex(where: { $0.id == id }) {
-            items[idx] = existing
-        }
+            try await repository.save(existing)
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx] = existing
+            }
+        } catch { errorMessage = StringFormatting.errorMessage(error) }
     }
 
     func runDetail() async {
@@ -225,23 +248,20 @@ final class ScriptDetailViewModel {
     }
 
     func deleteItem(id: String) async {
-        await repository.remove(id: id)
-        items.removeAll { $0.id == id }; histories[id] = nil
-        if selectedItemID == id {
-            if let first = items.first {
-                selectItem(id: first.id)
-            } else {
-                createNewItem()
+        do {
+            try await repository.remove(id: id)
+            items.removeAll { $0.id == id }; histories[id] = nil
+            if selectedItemID == id {
+                if let first = items.first {
+                    selectItem(id: first.id)
+                } else {
+                    createNewItem()
+                }
             }
-        }
+        } catch { errorMessage = StringFormatting.errorMessage(error) }
     }
 
     func refreshProviders() async {
         availableProviders = await service.availability()
-        if let current = availableProviders[selectedProvider], !current.isAvailable {
-            if let fallback = availableProviders.first(where: { $0.value.isAvailable })?.key {
-                selectedProvider = fallback
-            }
-        }
     }
 }

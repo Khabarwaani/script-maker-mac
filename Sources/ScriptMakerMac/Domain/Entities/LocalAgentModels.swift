@@ -11,7 +11,7 @@ struct LocalAgentDefinition: Identifiable, Equatable, Sendable {
     func supports(_ provider: LocalAgentProvider) -> Bool { provider != .appleLocal || !requiresWebResearch }
 }
 
-enum LocalAgentProvider: String, CaseIterable, Identifiable, Sendable {
+enum LocalAgentProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case codex, claude, antigravity, grok, appleLocal
     var id: String { rawValue }
     var title: String { self == .appleLocal ? "Apple Intelligence (on-device)" : rawValue.capitalized }

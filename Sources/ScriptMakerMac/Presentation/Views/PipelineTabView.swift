@@ -60,6 +60,7 @@ struct PipelineTabView: View {
             .frame(width: 220)
             .disabled(viewModel.isRunning)
 
+            Toggle("Use app default", isOn: $viewModel.usesAppDefault)
             Picker("Execution", selection: $viewModel.executionMode) {
                 ForEach(PipelineExecutionMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
             }

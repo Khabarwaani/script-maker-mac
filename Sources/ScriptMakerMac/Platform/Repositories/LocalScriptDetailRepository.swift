@@ -1,74 +1,49 @@
 import Foundation
 
-/// Data source interface for persisting Script Detail items.
 protocol ScriptDetailDataSourceProtocol: Sendable {
-    func load() -> [ScriptDetailItem]
-    func save(_ items: [ScriptDetailItem])
+    func load() throws -> [ScriptDetailItem]
+    func save(_ items: [ScriptDetailItem]) throws
 }
 
-/// Key-value storage implementation for Script Detail items, isolated from Library stories.
-final class UserDefaultsScriptDetailDataSource: ScriptDetailDataSourceProtocol, @unchecked Sendable {
+struct UserDefaultsScriptDetailDataSource: ScriptDetailDataSourceProtocol {
+    private let store: KeyValueStore
     private let key: String
-    private let userDefaults: UserDefaults
-
-    init(key: String = "script_detail_items", userDefaults: UserDefaults = .standard) {
-        self.key = key
-        self.userDefaults = userDefaults
+    init(store: KeyValueStore, key: String = "script_detail_items") { self.store = store; self.key = key }
+    func load() throws -> [ScriptDetailItem] {
+        guard let data = store.data(forKey: key) else { return [] }
+        do { return try JSONDecoder().decode([ScriptDetailItem].self, from: data) }
+        catch { throw PersistenceError.unreadable("Script Detail items") }
     }
-
-    func load() -> [ScriptDetailItem] {
-        guard let data = userDefaults.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([ScriptDetailItem].self, from: data)) ?? []
-    }
-
-    func save(_ items: [ScriptDetailItem]) {
-        guard let data = try? JSONEncoder().encode(items) else { return }
-        userDefaults.set(data, forKey: key)
+    func save(_ items: [ScriptDetailItem]) throws {
+        store.set(try JSONEncoder().encode(items), forKey: key)
     }
 }
 
-/// Platform repository for Script Detail scenes with memory cache and independent persistence.
-final class LocalScriptDetailRepository: ScriptDetailRepository, @unchecked Sendable {
+actor LocalScriptDetailRepository: ScriptDetailRepository {
     private let dataSource: any ScriptDetailDataSourceProtocol
     private var cache: [ScriptDetailItem]?
-    private let lock = NSLock()
-
-    init(dataSource: any ScriptDetailDataSourceProtocol = UserDefaultsScriptDetailDataSource()) {
-        self.dataSource = dataSource
-    }
-
-    func all() async -> [ScriptDetailItem] {
-        loadCached()
-    }
-
-    func save(_ item: ScriptDetailItem) async {
-        var items = loadCached()
+    init(dataSource: any ScriptDetailDataSourceProtocol) { self.dataSource = dataSource }
+    func all() throws -> [ScriptDetailItem] { try loadCached() }
+    func save(_ item: ScriptDetailItem) throws {
+        var items = try loadCached()
         items.removeAll { $0.id == item.id }
         items.insert(item, at: 0)
-        persist(items)
+        try persist(items)
     }
-
-    func remove(id: String) async {
-        var items = loadCached()
+    func remove(id: String) throws {
+        var items = try loadCached()
         items.removeAll { $0.id == id }
-        persist(items)
+        try persist(items)
     }
-
-    func invalidateCache() {
-        lock.withLock { cache = nil }
+    func invalidateCache() { cache = nil }
+    private func loadCached() throws -> [ScriptDetailItem] {
+        if let cache { return cache }
+        let items = try dataSource.load()
+        cache = items
+        return items
     }
-
-    private func loadCached() -> [ScriptDetailItem] {
-        lock.withLock {
-            if let cached = cache { return cached }
-            let loaded = dataSource.load()
-            cache = loaded
-            return loaded
-        }
-    }
-
-    private func persist(_ items: [ScriptDetailItem]) {
-        lock.withLock { cache = items }
-        dataSource.save(items)
+    private func persist(_ items: [ScriptDetailItem]) throws {
+        try dataSource.save(items)
+        cache = items
     }
 }

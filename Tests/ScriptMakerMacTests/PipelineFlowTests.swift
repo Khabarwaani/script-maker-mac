@@ -64,7 +64,7 @@ private func makeSampleDefinitions() throws -> [LocalAgentDefinition] {
 }
 
 final class PipelineFlowTests: XCTestCase {
-    func testPresetsAreAvailableAndWellConfigured() {
+    func testPresetsAreAvailableAndWellConfigured() throws {
         let resolver = LocalPipelineFlowResolver()
         let presets = resolver.availablePresets()
         XCTAssertEqual(presets.count, 9)
@@ -311,7 +311,7 @@ final class PipelineFlowTests: XCTestCase {
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
 
         XCTAssertEqual(vm.mode, .preset)
@@ -343,7 +343,7 @@ final class PipelineFlowTests: XCTestCase {
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
 
         vm.selectMode(.configurable)
@@ -399,7 +399,7 @@ final class PipelineFlowTests: XCTestCase {
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
         vm.selectMode(.configurable)
         vm.startConfigurable(initialAgentID: "ThreeSceneStoryCreator")
@@ -414,7 +414,7 @@ final class PipelineFlowTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let saved = await repo.all()
+        let saved = try await repo.all()
         XCTAssertTrue(saved.contains { $0.title == "Pipeline Success" })
         XCTAssertNotNil(vm.savedStoryNotice)
     }
@@ -427,7 +427,7 @@ final class PipelineFlowTests: XCTestCase {
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
         let news = PipelineStubNewsProvider()
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: news)
         await vm.refreshCatalogAndProviders()
 
         XCTAssertEqual(vm.studioCategories, ["trending", "technology"])
@@ -450,7 +450,7 @@ final class PipelineFlowTests: XCTestCase {
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
         let news = PipelineStubNewsProvider()
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: news)
         await vm.refreshCatalogAndProviders()
 
         vm.selectedStudioSource = .trendingHashtags
@@ -476,7 +476,7 @@ final class PipelineFlowTests: XCTestCase {
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
         let news = PipelineStubNewsProvider()
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: news)
         await vm.refreshCatalogAndProviders()
 
         vm.selectMode(.configurable)
@@ -496,7 +496,7 @@ final class PipelineFlowTests: XCTestCase {
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
         let news = PipelineStubNewsProvider()
 
-        let vm = PipelineTabViewModel(service: stubRunner, flowResolver: resolver, storyRepository: repo, newsProvider: news)
+        let vm = PipelineTabViewModel(service: stubRunner, executor: PipelineExecutionService(runner: stubRunner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: news)
         await vm.refreshCatalogAndProviders()
 
         vm.applyStudioTopic("Breaking Cyber Security News")
@@ -506,36 +506,6 @@ final class PipelineFlowTests: XCTestCase {
         XCTAssertEqual(vm.location, "India")
     }
 
-    @MainActor
-    func testGenerateViewModelStartInPipelineInvokesCallback() async throws {
-        let news = PipelineStubNewsProvider()
-        let config = AppConfig(defaults: UserDefaults(suiteName: "pipeline.test.\(UUID().uuidString)")!)
-        let genVM = GenerateViewModel(
-            config: config,
-            catalogProvider: BundledStudioCatalog(),
-            repository: LocalStoryRepository(),
-            newsProvider: news
-        )
-
-        var receivedTopic: String?
-        var receivedLocation: String?
-        genVM.onNavigateToPipeline = { topic, location in
-            receivedTopic = topic
-            receivedLocation = location
-        }
-
-        // When blank, should not invoke
-        genVM.topic = "   "
-        genVM.startInPipeline()
-        XCTAssertNil(receivedTopic)
-        XCTAssertNil(receivedLocation)
-
-        // When filled, invokes callback with topic and location from app config
-        genVM.topic = "Autonomous EV Fleets in India"
-        genVM.startInPipeline()
-        XCTAssertEqual(receivedTopic, "Autonomous EV Fleets in India")
-        XCTAssertEqual(receivedLocation, "India")
-    }
 }
 
 private actor ExecutionModeRunner: LocalAgentRunning {
@@ -584,7 +554,7 @@ private actor ExecutionModeRunner: LocalAgentRunning {
 extension PipelineFlowTests {
     @MainActor
     private func executionVM(_ runner: ExecutionModeRunner, mode: PipelineMode) async -> PipelineTabViewModel {
-        let vm = PipelineTabViewModel(service: runner, flowResolver: LocalPipelineFlowResolver(),
+        let vm = PipelineTabViewModel(service: runner, executor: PipelineExecutionService(runner: runner), storyMapper: PipelineStoryMapper(), flowResolver: LocalPipelineFlowResolver(),
             storyRepository: LocalStoryRepository(dataSource: InMemoryStoryDataSource()), newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
         vm.selectMode(mode)
@@ -701,7 +671,7 @@ extension PipelineFlowTests {
         XCTAssertFalse(vm.isStorySavable)
     }
 
-    func testStageOutputPresentsScenesDialogueAndUnknownFieldsWithoutJSON() {
+    func testStageOutputPresentsScenesDialogueAndUnknownFieldsWithoutJSON() throws {
         let raw = #"{"items":[{"title":"Launch","scenes":[{"title":"A scene","dialogues":[{"speaker":"Host","dialogue":"Hello"}],"words_count":1,"verification":{"passed":true}}]}],"custom_field":"Extra information"}"#
         let blocks = PipelineOutputBlock.sections(from: raw)
         XCTAssertTrue(blocks.contains { $0.title == "Launch" })
@@ -742,7 +712,7 @@ extension PipelineFlowTests {
         let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
         let resolver = LocalPipelineFlowResolver()
         let repo = LocalStoryRepository(dataSource: InMemoryStoryDataSource())
-        let vm = PipelineTabViewModel(service: runner, flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
+        let vm = PipelineTabViewModel(service: runner, executor: PipelineExecutionService(runner: runner), storyMapper: PipelineStoryMapper(), flowResolver: resolver, storyRepository: repo, newsProvider: PipelineStubNewsProvider())
         await vm.refreshCatalogAndProviders()
 
         let twoScenePreset = try XCTUnwrap(resolver.availablePresets().first { $0.id == "fast-two-scene-story" })
@@ -763,7 +733,7 @@ extension PipelineFlowTests {
         vm.saveStoryToLibrary()
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(vm.savedStoryNotice)
-        let savedStories = await repo.all()
+        let savedStories = try await repo.all()
         XCTAssertEqual(savedStories.count, 1)
     }
 }

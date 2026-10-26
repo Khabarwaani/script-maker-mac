@@ -44,7 +44,7 @@ private actor ChatRepository: StoryRepository {
 
 @MainActor
 final class ScriptChatTests: XCTestCase {
-    func testRefineAgainWithoutNewInputUsesLatestScriptAndConsolidatedInstructions() async {
+    func testRefineAgainWithoutNewInputUsesLatestScriptAndConsolidatedInstructions() async throws {
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         chat.begin(Story(scriptText: "Original"))
@@ -111,9 +111,9 @@ final class ScriptChatTests: XCTestCase {
     func testSaveReplacesOriginalAndKeepsOnlyLatestScript() async throws {
         let repository = ChatRepository()
         let original = Story(title: "A story", videoURL: "https://example.com/old.mp4", scriptText: "Original script", stageOutputs: ["script": "old output"])
-        await repository.save(original)
+        try await repository.save(original)
         let chat = ScriptChatViewModel(service: ChatRefinerStub())
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         await chat.refreshProviders()
@@ -141,7 +141,7 @@ final class ScriptChatTests: XCTestCase {
         XCTAssertEqual(copy.currentScriptVersionID, copy.scriptVersions?.first?.id)
         let duplicate = await library.saveRefinedScript()
         XCTAssertFalse(duplicate)
-        let persisted = await repository.all()
+        let persisted = try await repository.all()
         XCTAssertEqual(persisted.map(\.id), [copy.id])
         await library.refresh()
         XCTAssertEqual(library.stories.map(\.id), [copy.id])
@@ -564,7 +564,7 @@ extension ScriptChatTests {
         XCTAssertEqual(chat.draft.latestScript, "Draft 1")
     }
 
-    func testPrewarmAndCloseUseTheStoryOwner() async {
+    func testPrewarmAndCloseUseTheStoryOwner() async throws {
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         let story = Story(scriptText: "Original script")
@@ -637,7 +637,7 @@ extension ScriptChatTests {
 
     func testScriptRefinementModeInitializedFromConfig() async throws {
         let defaults = UserDefaults(suiteName: "test-script-refinement-mode-\(UUID())")!
-        let config = AppConfig(defaults: defaults)
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
         config.scriptRefinementMode = .daemon
 
         let service = ChatRefinerStub()
@@ -667,8 +667,8 @@ extension ScriptChatTests {
         let repository = ChatRepository()
         let selected = StoryScriptVersion(number: 2, text: "Selected script", createdAt: "2026-10-25", instruction: nil)
         let original = Story(scriptText: "Previous script", scriptVersions: [selected])
-        await repository.save(original)
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        try await repository.save(original)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         await chat.refreshProviders()
@@ -712,7 +712,7 @@ extension ScriptChatTests {
         XCTAssertTrue(chat.canSave)
     }
 
-    func testFailedRewriteKeepsEditedScriptAndBlankScriptCannotRunOrSave() async {
+    func testFailedRewriteKeepsEditedScriptAndBlankScriptCannotRunOrSave() async throws {
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         chat.begin(Story(scriptText: "Original"))
@@ -733,8 +733,8 @@ extension ScriptChatTests {
         let repository = ChatRepository()
         let chat = ScriptChatViewModel(service: ChatRefinerStub())
         let original = Story(scriptText: "Original")
-        await repository.save(original)
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        try await repository.save(original)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         chat.editableScript = "Manually rewritten script"
@@ -742,7 +742,7 @@ extension ScriptChatTests {
         XCTAssertTrue(saved)
         XCTAssertEqual(library.selectedStory?.scriptText, "Manually rewritten script")
         XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Manually rewritten script"])
-        let stored = await repository.all()
+        let stored = try await repository.all()
         XCTAssertEqual(stored.count, 1)
     }
 }
@@ -836,8 +836,8 @@ extension ScriptChatTests {
         let chat = ScriptChatViewModel(service: service)
         let repository = ChatRepository()
         let original = Story(scriptText: "Original", instruction: "Baseline")
-        await repository.save(original)
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        try await repository.save(original)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         await chat.refreshProviders()
@@ -852,7 +852,7 @@ extension ScriptChatTests {
         await chat.refine()
         let savedSuccessfully = await library.saveRefinedScript()
         XCTAssertTrue(savedSuccessfully)
-        let stored = await repository.all()
+        let stored = try await repository.all()
         XCTAssertEqual(stored.count, 1)
         let saved = try XCTUnwrap(stored.first)
         XCTAssertEqual(saved.scriptText, "Draft 3")

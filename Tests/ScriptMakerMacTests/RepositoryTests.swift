@@ -13,91 +13,91 @@ private func isolatedStoryStore() -> KeyValueStore {
 
 /// Unit tests for StoryRepository (business layer).
 final class StoryRepositoryTests: XCTestCase {
-    func testSaveAndLoad() async {
+    func testSaveAndLoad() async throws {
         let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
-        await repo.save(Story(id: "ut-1", title: "Unit Test"))
-        let stories = await repo.all()
+        try await repo.save(Story(id: "ut-1", title: "Unit Test"))
+        let stories = try await repo.all()
         XCTAssertTrue(stories.contains { $0.id == "ut-1" })
-        await repo.remove(id: "ut-1")
+        try await repo.remove(id: "ut-1")
     }
 
-    func testRemove() async {
+    func testRemove() async throws {
         let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
-        await repo.save(Story(id: "ut-remove", title: "Remove Me"))
-        await repo.remove(id: "ut-remove")
-        let stories = await repo.all()
+        try await repo.save(Story(id: "ut-remove", title: "Remove Me"))
+        try await repo.remove(id: "ut-remove")
+        let stories = try await repo.all()
         XCTAssertFalse(stories.contains { $0.id == "ut-remove" })
     }
 
-    func testSaveReplacesExisting() async {
+    func testSaveReplacesExisting() async throws {
         let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
-        await repo.save(Story(id: "ut-replace", title: "Original"))
-        await repo.save(Story(id: "ut-replace", title: "Updated"))
-        let matches = await repo.all().filter { $0.id == "ut-replace" }
+        try await repo.save(Story(id: "ut-replace", title: "Original"))
+        try await repo.save(Story(id: "ut-replace", title: "Updated"))
+        let matches = try await repo.all().filter { $0.id == "ut-replace" }
         XCTAssertEqual(matches.count, 1)
         XCTAssertEqual(matches.first?.title, "Updated")
-        await repo.remove(id: "ut-replace")
+        try await repo.remove(id: "ut-replace")
     }
 
-    func testNewestFirst() async {
+    func testNewestFirst() async throws {
         let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
-        await repo.save(Story(id: "ut-old", title: "Old"))
-        await repo.save(Story(id: "ut-new", title: "New"))
-        let stories = await repo.all()
+        try await repo.save(Story(id: "ut-old", title: "Old"))
+        try await repo.save(Story(id: "ut-new", title: "New"))
+        let stories = try await repo.all()
         let oldIdx = stories.firstIndex { $0.id == "ut-old" }
         let newIdx = stories.firstIndex { $0.id == "ut-new" }
         if let o = oldIdx, let n = newIdx {
             XCTAssertTrue(n < o, "Newer stories should appear first")
         }
-        await repo.remove(id: "ut-old")
-        await repo.remove(id: "ut-new")
+        try await repo.remove(id: "ut-old")
+        try await repo.remove(id: "ut-new")
     }
 
-    func testCacheInvalidation() async {
+    func testCacheInvalidation() async throws {
         // Platform is stateful: cache must reflect mutations.
         let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
-        await repo.save(Story(id: "cache-1", title: "Cached"))
-        var stories = await repo.all()
+        try await repo.save(Story(id: "cache-1", title: "Cached"))
+        var stories = try await repo.all()
         XCTAssertTrue(stories.contains { $0.id == "cache-1" })
-        await repo.remove(id: "cache-1")
-        stories = await repo.all()
+        try await repo.remove(id: "cache-1")
+        stories = try await repo.all()
         XCTAssertFalse(stories.contains { $0.id == "cache-1" },
                        "Cache must be invalidated on remove")
     }
 
-    func testInvalidateCacheReloadsFromDataSource() async {
+    func testInvalidateCacheReloadsFromDataSource() async throws {
         let repo = LocalStoryRepository(dataSource: TestStoryDataSource())
-        await repo.save(Story(id: "inv-1", title: "Before"))
-        _ = await repo.all() // populate cache
+        try await repo.save(Story(id: "inv-1", title: "Before"))
+        _ = try await repo.all() // populate cache
         await repo.invalidateCache()
-        let stories = await repo.all() // reloads from data source
+        let stories = try await repo.all() // reloads from data source
         XCTAssertTrue(stories.contains { $0.id == "inv-1" })
-        await repo.remove(id: "inv-1")
+        try await repo.remove(id: "inv-1")
     }
 }
 
 /// Unit tests for UserDefaultsStoryDataSource (infra layer).
 final class StoryDataSourceTests: XCTestCase {
-    func testSaveAndLoad() {
+    func testSaveAndLoad() throws {
         let store = isolatedStoryStore()
         let ds = UserDefaultsStoryDataSource(store: store)
-        let original = ds.load()
-        ds.save([Story(id: "ds-ut", title: "DS Test")])
-        XCTAssertTrue(ds.load().contains { $0.id == "ds-ut" })
-        ds.save(original) // restore
+        let original = try ds.load()
+        try ds.save([Story(id: "ds-ut", title: "DS Test")])
+        XCTAssertTrue(try ds.load().contains { $0.id == "ds-ut" })
+        try ds.save(original) // restore
     }
 
-    func testLoadReturnsArray() {
+    func testLoadReturnsArray() throws {
         let store = isolatedStoryStore()
         let ds = UserDefaultsStoryDataSource(store: store)
-        let result = ds.load()
+        let result = try ds.load()
         XCTAssertTrue(result is [Story])
     }
 
-    func testLegacyDictionaryMigration() {
+    func testLegacyDictionaryMigration() throws {
         let store = isolatedStoryStore()
         let ds = UserDefaultsStoryDataSource(store: store)
-        let original = ds.load()
+        let original = try ds.load()
         // Simulate legacy storage: raw JSON dictionaries.
         let legacy: [[String: Any]] = [
             ["id": "legacy-1", "title": "Legacy Story", "created_at": "2026-01-01T00:00:00Z"]
@@ -105,22 +105,22 @@ final class StoryDataSourceTests: XCTestCase {
         if let data = try? JSONSerialization.data(withJSONObject: legacy) {
             store.set(data, forKey: "savedStories")
         }
-        let loaded = ds.load()
+        let loaded = try ds.load()
         XCTAssertTrue(loaded.contains { $0.id == "legacy-1" })
         XCTAssertEqual(loaded.first { $0.id == "legacy-1" }?.title, "Legacy Story")
-        ds.save(original) // restore
+        try ds.save(original) // restore
     }
 }
 
 /// Unit tests for StoryMapper (platform layer).
 final class StoryMapperTests: XCTestCase {
-    func testFromDictWithDefaults() {
+    func testFromDictWithDefaults() throws {
         let story = StoryMapper.from([:])
         XCTAssertEqual(story.title, "Untitled")
         XCTAssertFalse(story.id.isEmpty)
     }
 
-    func testFromDictMapsAllFields() {
+    func testFromDictMapsAllFields() throws {
         let dict: [String: Any] = [
             "id": "m-1", "title": "T", "summary": "S", "headline": "H",
             "created_at": "2026-01-01", "status": "done",
@@ -132,7 +132,7 @@ final class StoryMapperTests: XCTestCase {
         XCTAssertEqual(story.videoURL, "http://x/y.mp4")
     }
 
-    func testRoundTrip() {
+    func testRoundTrip() throws {
         let original = Story(id: "rt-1", title: "Round Trip", videoURL: "http://x/v.mp4")
         let restored = StoryMapper.from(StoryMapper.toDict(original))
         XCTAssertEqual(restored.id, original.id)
@@ -141,38 +141,6 @@ final class StoryMapperTests: XCTestCase {
     }
 }
 
-/// Unit tests for ImageService (business layer).
-final class ImageServiceTests: XCTestCase {
-    func testOfflineReturnsNil() async {
-        let service = ImageService(webClient: OfflineWebClient())
-        let result = await service.fetchImage(from: "https://example.com/img.jpg")
-        XCTAssertNil(result)
-    }
 
-    func testInvalidURLReturnsNil() async {
-        let service = ImageService(webClient: OfflineWebClient())
-        let empty = await service.fetchImage(from: "")
-        XCTAssertNil(empty)
-        let invalid = await service.fetchImage(from: "not a url")
-        XCTAssertNil(invalid)
-    }
-}
 
 /// Unit tests for WebClient selection (service layer).
-final class WebClientSelectionTests: XCTestCase {
-    func testOfflineClientPing() async {
-        let client = OfflineWebClient()
-        let reachable = await client.ping()
-        XCTAssertTrue(reachable)
-    }
-
-    func testOfflineFetchDataThrows() async {
-        let client = OfflineWebClient()
-        do {
-            _ = try await client.fetchData(from: URL(string: "https://example.com")!)
-            XCTFail("Should throw offline")
-        } catch {
-            // Expected
-        }
-    }
-}

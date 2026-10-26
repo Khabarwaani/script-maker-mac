@@ -7,8 +7,7 @@ struct LocalLibraryUpdateClient: LibraryUpdating {
     let news: @MainActor @Sendable () throws -> (client: any NewsSearching, limit: Int)
     var imageNews: (@MainActor @Sendable () throws -> (client: any NewsSearching, limit: Int))? = nil
 
-    func update(_ kind: LibraryUpdate, story: Story, engine: String, instruction: String,
-                localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> LibraryUpdateResult {
+    func update(_ kind: LibraryUpdate, story: Story) async throws -> LibraryUpdateResult {
         let title = story.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { throw LibraryOperationError.invalidInput("Enter a title before fetching related news.") }
         try Task.checkCancellation()
