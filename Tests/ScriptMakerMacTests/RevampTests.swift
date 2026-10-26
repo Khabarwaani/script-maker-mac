@@ -85,6 +85,7 @@ final class WorkspaceSelectionTests: XCTestCase {
         XCTAssertEqual(library.newStoryTitle, "Keep this title")
         XCTAssertEqual(library.newStoryScript, "Keep this script")
         XCTAssertNotNil(library.actionNotice)
+        XCTAssertNotNil(library.saveError)
     }
     func testCorruptLibraryLoadShowsErrorWithoutInventingStories() async {
         let source = FailingStoryDataSource()
@@ -299,5 +300,21 @@ extension PersistenceRevampTests {
         XCTAssertEqual(story.id, "legacy")
         XCTAssertEqual(story.scriptText, "Old script")
         XCTAssertEqual(story.stageOutputs?["custom_stage"], "Historical output")
+    }
+}
+
+extension WorkspaceSelectionTests {
+    func testEditingOneStepProviderPreservesOtherConfiguredSteps() async throws {
+        let runner = RevampRunner()
+        let vm = PipelineTabViewModel(service: runner, executor: PipelineExecutionService(runner: runner), storyMapper: PipelineStoryMapper(),
+            flowResolver: LocalPipelineFlowResolver(), storyRepository: LocalStoryRepository(dataSource: FailingStoryDataSource()), newsProvider: StubStudioNewsProvider())
+        let definitions = try await runner.catalog()
+        let definition = try XCTUnwrap(definitions.first)
+        let draft = AgentInputDraft(schema: definition.schema, required: true)
+        vm.steps = [AgentPipelineStep(stepIndex: 0, agentID: "Example", agentName: "First", version: "1", draft: draft),
+                    AgentPipelineStep(stepIndex: 1, agentID: "Example", agentName: "Second", version: "1", draft: draft)]
+        vm.selectProvider(.grok)
+        XCTAssertEqual(vm.steps[0].provider, .grok)
+        XCTAssertEqual(vm.steps[1].provider, .codex)
     }
 }

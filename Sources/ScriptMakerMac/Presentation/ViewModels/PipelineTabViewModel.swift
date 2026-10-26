@@ -147,7 +147,8 @@ final class PipelineTabViewModel {
     }
 
     func availabilityReason(_ provider: LocalAgentProvider) -> String {
-        providers[provider]?.reason ?? "Checking availability…"
+        if activeDefinition?.supports(provider) == false { return "This agent needs web research. Choose a terminal provider." }
+        return providers[provider]?.reason ?? "Checking availability…"
     }
 
     // MARK: - Lifecycle & Setup
@@ -469,7 +470,7 @@ final class PipelineTabViewModel {
     func selectProvider(_ selected: LocalAgentProvider) {
         guard !isRunning else { return }
         provider = selected
-        for index in steps.indices { steps[index].provider = selected }
+        if steps.indices.contains(activeStepIndex) { steps[activeStepIndex].provider = selected }
     }
 
     // MARK: - Execution
@@ -671,6 +672,8 @@ final class PipelineTabViewModel {
     func saveStoryToLibrary() {
         guard !isSavingStory else { return }
         isSavingStory = true
+        savedStoryNotice = nil
+        errorMessage = nil
         let snapshot = steps
         Task { [weak self, storyRepository, storyMapper] in
             defer { self?.isSavingStory = false }

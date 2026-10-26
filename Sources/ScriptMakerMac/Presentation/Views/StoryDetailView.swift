@@ -445,6 +445,7 @@ private struct EditLibraryStoryView: View {
                 .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                 .background(ScrollBarConfiguration()).accessibilityLabel("Edit script")
             Text("The original story remains in Library.").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+            if let error = viewModel.saveError { Text(error).font(.callout).foregroundStyle(AppTheme.danger) }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).buttonStyle(StudioButtonStyle()).disabled(viewModel.isSavingEdits)

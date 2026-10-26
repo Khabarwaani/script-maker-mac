@@ -94,6 +94,7 @@ final class LibraryViewModel {
 
     var busyUpdates: Set<LibraryUpdate> = []
     var actionNotice: String?
+    var saveError: String?
     private var removedItem: (storyID: String, item: LibraryRemovedItem)?
     var canUndoRemoval: Bool { removedItem?.storyID == selectedStoryID && removedItem != nil }
 
@@ -176,10 +177,12 @@ final class LibraryViewModel {
     }
 
     func prepareEdits(_ story: Story) {
+        saveError = nil
         editedTitle = story.title; editedScript = story.scriptText ?? ""; editedSummary = story.summary
     }
 
     func saveEdits(id: String) async -> Bool {
+        saveError = nil
         do {
             guard canSaveEdits, var story = stories.first(where: { $0.id == id }) else { return false }
             isSavingEdits = true
@@ -198,11 +201,13 @@ final class LibraryViewModel {
             return true
         } catch {
             actionNotice = StringFormatting.errorMessage(error)
+            saveError = StringFormatting.errorMessage(error)
             return false
         }
     }
 
     func saveRefinedScript() async -> Bool {
+        saveError = nil
         do {
             guard let chat = scriptChat, chat.canSave, let original = chat.source,
                   !isSavingEdits, busyUpdates.isEmpty else { return false }
@@ -226,6 +231,7 @@ final class LibraryViewModel {
             return true
         } catch {
             actionNotice = StringFormatting.errorMessage(error)
+            saveError = StringFormatting.errorMessage(error)
             scriptChat?.showSaveError(StringFormatting.errorMessage(error))
             return false
         }
@@ -390,11 +396,13 @@ final class LibraryViewModel {
     }
 
     func prepareNewStory() {
+        saveError = nil
         newStoryTitle = ""
         newStoryScript = ""
     }
 
     func addStory() async -> Bool {
+        saveError = nil
         do {
             guard canAddStory else { return false }
             isAddingStory = true
@@ -414,6 +422,7 @@ final class LibraryViewModel {
             return true
         } catch {
             actionNotice = StringFormatting.errorMessage(error)
+            saveError = StringFormatting.errorMessage(error)
             return false
         }
     }
