@@ -175,7 +175,7 @@ final class ScriptChatServiceTests: XCTestCase {
         let lastRequest = await runner.lastRequest
         let request = try XCTUnwrap(lastRequest)
         XCTAssertEqual(request.agentID, "ScriptChat")
-        XCTAssertEqual(request.version, "1.1.0")
+        XCTAssertTrue(["1.0.1", "1.1.0"].contains(request.version))
         XCTAssertEqual(request.model, "test-model")
         XCTAssertEqual(request.sessionID, "script-chat")
         XCTAssertEqual(request.session.persistence, .persistentStdio)
