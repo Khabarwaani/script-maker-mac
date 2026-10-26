@@ -11,16 +11,12 @@ struct ContentView: View {
     @State private var preferencesViewModel: PreferencesViewModel
 
     @State private var showingPreferences = false
+    @State private var showingAgentCatalog = false
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        let resVM = viewModel.researcherViewModel
-        resVM.onNavigateToPipeline = { [weak viewModel] topic, location in
-            viewModel?.selectedTab = .pipeline
-            viewModel?.pipelineViewModel.applyStudioTopic(topic, location: location)
-        }
         _researcherViewModel = State(
-            wrappedValue: resVM
+            wrappedValue: viewModel.researcherViewModel
         )
         _libraryViewModel = State(
             wrappedValue: viewModel.libraryViewModel
@@ -51,8 +47,12 @@ struct ContentView: View {
                 .padding(4)
                 .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.line, lineWidth: 1))
-                HStack {
+                HStack(spacing: 8) {
                     Spacer(minLength: 0)
+                    Button { showingAgentCatalog = true } label: { AndroidBotIcon(size: 16) }
+                        .controlSize(.large)
+                        .help(Text(verbatim: "Agents & Instructions…"))
+                        .accessibilityLabel("Agents & Instructions")
                     Button { showingPreferences = true } label: { Image(systemName: "gearshape") }
                         .controlSize(.large)
                         .help(Text(verbatim: "Settings… (⌘,)"))
@@ -74,7 +74,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle(viewModel.config.buildTitle)
+        .navigationTitle(AppBuild.title)
         .font(.system(size: 14))
         .foregroundStyle(AppTheme.ink)
         .background(AppTheme.paper)
@@ -86,6 +86,9 @@ struct ContentView: View {
         .frame(minWidth: 1000, minHeight: 650)
         .sheet(isPresented: $showingPreferences) {
             PreferencesView(viewModel: preferencesViewModel)
+        }
+        .sheet(isPresented: $showingAgentCatalog) {
+            AgentCatalogView(viewModel: viewModel.agentCatalogViewModel)
         }
     }
 }

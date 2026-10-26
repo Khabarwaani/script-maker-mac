@@ -1,6 +1,6 @@
 import Foundation
 
-struct ScriptChatDraft: Equatable, Sendable {
+struct ScriptChatDraft: Hashable, Codable, Sendable {
     let latestScript: String
     let instruction: String
 }
@@ -20,6 +20,8 @@ protocol ScriptChatRefining: Sendable {
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability]
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) async
     func closeSession() async
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async
+    func closeSession(id: String) async
 }
 
 extension ScriptChatRefining {
@@ -28,9 +30,13 @@ extension ScriptChatRefining {
     }
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) async {}
     func closeSession() async {}
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async {
+        await prewarm(for: provider, model: model, mode: mode)
+    }
+    func closeSession(id: String) async { await closeSession() }
 }
 
-struct ScriptChatTurn: Identifiable, Equatable, Sendable {
+struct ScriptChatTurn: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let userInstruction: String
     let script: String
@@ -44,4 +50,29 @@ struct ScriptChatTurn: Identifiable, Equatable, Sendable {
         self.instruction = instruction
         self.instructionOverride = instructionOverride
     }
+}
+
+struct ScriptChatRevision: Identifiable, Hashable, Codable, Sendable {
+    let id: UUID
+    let draft: ScriptChatDraft
+    let turns: [ScriptChatTurn]
+    let parentID: UUID?
+    let createdAt: Date
+    let isManualEdit: Bool
+
+    init(draft: ScriptChatDraft, turns: [ScriptChatTurn], parentID: UUID? = nil, isManualEdit: Bool = false) {
+        id = UUID()
+        self.draft = draft
+        self.turns = turns
+        self.parentID = parentID
+        createdAt = Date()
+        self.isManualEdit = isManualEdit
+    }
+}
+
+struct ScriptChatHistory: Hashable, Codable, Sendable {
+    let originalScript: String
+    let originalInstruction: String
+    let revisions: [ScriptChatRevision]
+    let selectedRevisionID: UUID?
 }

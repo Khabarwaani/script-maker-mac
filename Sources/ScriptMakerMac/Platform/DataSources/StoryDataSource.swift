@@ -1,57 +1,41 @@
 import Foundation
 
-/// Platform layer: DataSource protocols.
-/// Defines HOW data is accessed (not the framework details).
-///
-///   Domain (Repository protocol)
-///       ↓
-///   Platform (Repository impl + DataSource protocol) ← YOU ARE HERE
-///       ↓
-///   Infra (KeyValueStore, HTTPClient, FileStore)
-
-/// Protocol for story persistence (typed).
 protocol StoryDataSourceProtocol: Sendable {
-    func load() -> [Story]
-    func save(_ stories: [Story])
+    func load() throws -> [Story]
+    func save(_ stories: [Story]) throws
 }
 
-/// Platform implementation using Infra's KeyValueStore.
-/// Persists via JSON encoding of the typed Story array.
-struct UserDefaultsStoryDataSource: StoryDataSourceProtocol {
+struct SavedStoryDataSource: StoryDataSourceProtocol {
     private let store: KeyValueStore
-    private let key = "savedStories"
-
-    init(store: KeyValueStore = KeyValueStore()) {
-        self.store = store
-    }
-
-    func load() -> [Story] {
-        let existing = loadSaved()
-        guard store.data(forKey: "sampleLibrarySeeded") == nil else { return existing }
-        let samples = (SampleData.json(for: "stories")?["stories"] as? [[String: Any]] ?? []).map(StoryMapper.from)
-        let ids = Set(existing.map(\.id))
-        let seeded = existing + samples.filter { !ids.contains($0.id) }
-        save(seeded)
-        store.set(Data([1]), forKey: "sampleLibrarySeeded")
-        return seeded
-    }
-
-    private func loadSaved() -> [Story] {
-        guard let data = store.data(forKey: key) else { return [] }
-        // Preferred: typed JSON.
-        if let stories = try? JSONDecoder().decode([Story].self, from: data) {
-            return stories
+    private let storage: (any CollectionDataStoring)?
+    init(store: KeyValueStore, storage: (any CollectionDataStoring)? = nil) { self.store = store; self.storage = storage }
+    func load() throws -> [Story] {
+        guard let data = try storage?.read() ?? store.data(forKey: "savedStories") else { return [] }
+        if let stories = try? JSONDecoder().decode([Story].self, from: data) { return stories }
+        if let dictionaries = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+           dictionaries.allSatisfy({ let metadata = $0["meta"] as? [String: Any] ?? $0; return metadata["id"] is String && metadata["title"] is String }) {
+            return dictionaries.map(StoryMapper.from)
         }
-        // Legacy fallback: pre-DTO `[String: Any]` dictionaries.
-        if let dicts = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            return dicts.map(StoryMapper.from)
-        }
-        return []
+        throw PersistenceError.unreadable("stories")
     }
+    func save(_ stories: [Story]) throws {
+        let data = try JSONEncoder().encode(stories)
+        try storage?.write(data)
+        store.set(data, forKey: "savedStories")
+    }
+}
 
-    func save(_ stories: [Story]) {
-        if let data = try? JSONEncoder().encode(stories) {
-            store.set(data, forKey: key)
-        }
+protocol CollectionDataStoring: Sendable {
+    func read() throws -> Data?
+    func write(_ data: Data) throws
+}
+
+struct FileCollectionStore: CollectionDataStoring {
+    let files: FileStore
+    let fileURL: @Sendable () throws -> URL
+    func read() throws -> Data? {
+        let url = try fileURL()
+        return files.exists(at: url) ? try files.contents(of: url) : nil
     }
+    func write(_ data: Data) throws { try files.write(data, to: fileURL()) }
 }

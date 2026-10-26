@@ -6,7 +6,6 @@ struct StoryDetailView: View {
     let story: Story
     @Bindable var viewModel: LibraryViewModel
     let onDelete: () -> Void
-    let onMerge: (String) -> Void
     @State private var showingEdit = false
     @State private var showingScriptChat = false
 
@@ -82,12 +81,6 @@ struct StoryDetailView: View {
                                         }.buttonStyle(.plain).help("Remove video").accessibilityLabel("Remove video").padding(8)
                                     }
                             }
-                            LoadingButton(isLoading: viewModel.isMerging) {
-                                onMerge(story.id)
-                            } label: {
-                                Text("Merge closing clip")
-                            }
-                            .buttonStyle(StudioButtonStyle())
                         }
                     }
                 }
@@ -123,7 +116,7 @@ private struct StoryDetailToolbar: View {
         HStack(spacing: 12) {
             Button { Task { await viewModel.update(.images) } } label: {
                 LibraryActionLabel(icon: "photo.badge.arrow.down", isLoading: viewModel.busyUpdates.contains(.images))
-            }.buttonStyle(.plain).help("Update images").accessibilityLabel("Update images")
+            }.buttonStyle(.plain).help("Fetch more images; keep existing images").accessibilityLabel("Fetch more images")
                 .disabled(viewModel.busyUpdates.contains(.images))
             Button { Task { await viewModel.enrich(storyID: story.id) } } label: {
                 LibraryActionLabel(icon: "arrow.triangle.2.circlepath", isLoading: !viewModel.busyUpdates.isEmpty)
@@ -197,6 +190,7 @@ private struct StoryDetailToolbar: View {
             case .failure(let error): viewModel.actionNotice = "Could not choose media: \(error.localizedDescription)"
             }
         }
+        .fileDialogMessage(Text("Choose the image or video to add. Script Maker copies only the selected file into its Application Support folder; it does not need access to your entire Documents folder."))
         .alert("Reset story enrichment?", isPresented: $showingReset) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) { Task { await viewModel.resetEnrichment(id: story.id) } }
@@ -326,6 +320,15 @@ private struct StoryImagesSection: View {
     @Bindable var viewModel: LibraryViewModel
     var body: some View {
         StoryDetailSection("Images") {
+            HStack {
+                Text("Publisher images").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                Spacer()
+                LoadingButton(isLoading: viewModel.busyUpdates.contains(.images)) {
+                    Task { await viewModel.update(.images) }
+                } label: {
+                    Label(story.imageURLs?.isEmpty == false ? "Fetch more" : "Fetch images", systemImage: "photo.badge.arrow.down")
+                }.disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
+            }
             if let images = story.imageURLs, !images.isEmpty {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180))], spacing: 12) {
                     ForEach(images, id: \.self) { value in
@@ -335,9 +338,13 @@ private struct StoryImagesSection: View {
                             } else {
                                 Image(systemName: "photo").font(.largeTitle).foregroundStyle(AppTheme.secondaryInk)
                                     .frame(maxWidth: .infinity, minHeight: 80)
+                                if let error = viewModel.imageErrors[value] ?? (viewModel.imagePreviews[value] != nil ? "This image could not be decoded." : nil) {
+                                    Text(error).font(.caption).foregroundStyle(AppTheme.secondaryInk).lineLimit(2)
+                                    Button("Retry image") { Task { await viewModel.retryImage(value, for: story) } }
+                                }
                             }
                             if value.hasPrefix("sample:") {
-                                Text("Local JSON · sample image").font(.caption)
+                                Text("Historical example image is unavailable. Fetch images to replace it.").font(.caption)
                             } else if let url = URL(string: value), ["https", "http"].contains(url.scheme?.lowercased() ?? "") {
                                 Link("Open image", destination: url)
                             }
@@ -356,7 +363,7 @@ private struct StoryImagesSection: View {
                     }
                 }
             } else {
-                Text("No images added. Use Update images to fetch story images.")
+                Text("No images yet. Fetch images to search publisher articles; Fetch more keeps existing images.")
                     .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             }
         }
@@ -438,6 +445,7 @@ private struct EditLibraryStoryView: View {
                 .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
                 .background(ScrollBarConfiguration()).accessibilityLabel("Edit script")
             Text("The original story remains in Library.").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+            if let error = viewModel.saveError { Text(error).font(.callout).foregroundStyle(AppTheme.danger) }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).buttonStyle(StudioButtonStyle()).disabled(viewModel.isSavingEdits)
@@ -458,9 +466,9 @@ private struct StoryGenerationDetails: View {
                     Text(story.headline)
                 }
                 if let outputs = story.stageOutputs {
-                    ForEach(PipelineStage.allCases) { stage in
-                        if let json = outputs[stage.rawValue] {
-                            DisclosureGroup(stage.title) {
+                    ForEach(outputs.keys.sorted(), id: \.self) { stage in
+                        if let json = outputs[stage] {
+                            DisclosureGroup(HistoricalPipelineStage(rawValue: stage)?.title ?? StringFormatting.displayKey(stage)) {
                                 Text(json).font(.system(.callout, design: .monospaced))
                                     .frame(maxWidth: .infinity, alignment: .leading).padding(12)
                                     .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))

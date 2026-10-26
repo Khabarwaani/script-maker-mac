@@ -148,180 +148,170 @@ private struct ScriptDetailRowView: View {
     }
 }
 
-// MARK: - Detail & Editing View
-
 private struct ScriptDetailEditorView: View {
     @Bindable var viewModel: ScriptDetailViewModel
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header / Toolbar
-            HStack(spacing: 12) {
-                TextField("Scene Title", text: $viewModel.editingTitle)
-                    .font(.title3.weight(.semibold))
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
-
-                Spacer()
-
-                // Provider Picker
-                Picker("Provider", selection: $viewModel.selectedProvider) {
-                    ForEach(LocalAgentProvider.allCases, id: \.self) { provider in
-                        Text(provider.title).tag(provider)
-                    }
-                }
-                .frame(width: 160)
-
-                // Copy Script Button
-                Button {
-                    viewModel.copyScript()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: viewModel.copyFeedbackMessage != nil ? "checkmark" : "doc.on.doc")
-                        Text(viewModel.copyFeedbackMessage ?? "Copy Script")
-                    }
-                }
-                .disabled(!viewModel.canCopy)
-                .help("Copy detailed script or original scene to clipboard")
-
-                // Save Button
-                LoadingButton(isLoading: viewModel.isSaving) {
-                    Task { await viewModel.saveCurrentItem() }
-                } label: {
-                    Label("Save", systemImage: "square.and.arrow.down")
-                }
-                .help("Save title, original script, and visual details")
-
-                // Delete Button
-                if let id = viewModel.selectedItemID {
-                    Button(role: .destructive) {
-                        Task { await viewModel.deleteItem(id: id) }
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .help("Delete this scene")
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(AppTheme.paper)
-
+            ScriptDetailToolbar(viewModel: viewModel)
             Divider().overlay(AppTheme.line)
-
-            // Error banner if any
-            if let error = viewModel.errorMessage {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                    Text(error)
-                        .font(.callout)
-                    Spacer()
-                    Button("Dismiss") {
-                        viewModel.errorMessage = nil
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ScriptDetailOptions(viewModel: viewModel)
+                    if let error = viewModel.errorMessage {
+                        Text(error).foregroundStyle(.red).textSelection(.enabled)
                     }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.red.opacity(0.1))
-                Divider().overlay(AppTheme.line)
+                    HStack(alignment: .top, spacing: 16) {
+                        ScriptDetailTextEditor(title: "Original script", text: $viewModel.editingOriginalScript)
+                            .frame(minWidth: 180, idealWidth: 240, maxWidth: 280)
+                        ScriptDetailTextEditor(title: "Current script", text: $viewModel.editingDetailedScript)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(viewModel.isDetailing || viewModel.isSaving)
+                    Text("Edit the current script, then send another instruction. Each update uses the latest script and consolidated instructions.")
+                        .font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Consolidated instructions").font(.subheadline.bold())
+                        TextEditor(text: $viewModel.editingConsolidatedInstruction)
+                            .font(.callout).scrollContentBackground(.hidden)
+                            .padding(8).frame(height: 90)
+                            .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+                            .accessibilityLabel("Consolidated instructions")
+                            .disabled(viewModel.isDetailing || viewModel.isSaving)
+                    }
+                    ScriptDetailHistory(viewModel: viewModel)
+                }.padding(20)
             }
+            Divider().overlay(AppTheme.line)
+            ScriptDetailComposer(viewModel: viewModel)
+        }.background(AppTheme.paper)
+    }
+}
 
-            // Split Editor Canvas
-            GeometryReader { proxy in
-                let halfWidth = (proxy.size.width - 1) / 2
-                HStack(spacing: 0) {
-                    // Left Column: Original Scene & Instruction Prompt
-                    VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Original Scene")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(AppTheme.ink)
-                                Spacer()
-                                Text("Dialogue preserved verbatim")
-                                    .font(.caption2)
-                                    .foregroundStyle(AppTheme.secondaryInk)
-                            }
-                            TextEditor(text: $viewModel.editingOriginalScript)
-                                .font(.system(size: 13, design: .monospaced))
-                                .padding(8)
-                                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
-                        }
-                        .frame(maxHeight: .infinity)
+private struct ScriptDetailToolbar: View {
+    @Bindable var viewModel: ScriptDetailViewModel
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Visual Direction Instruction")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppTheme.ink)
-                            TextField("e.g. Warm evening lighting; start wide on the street and push in slowly…", text: $viewModel.editingUserInstruction)
-                                .textFieldStyle(.plain)
-                                .padding(10)
-                                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
-                        }
+    var body: some View {
+        HStack(spacing: 12) {
+            TextField("Scene title", text: $viewModel.editingTitle)
+                .font(.title3.weight(.semibold)).textFieldStyle(.roundedBorder)
+                .disabled(viewModel.isDetailing || viewModel.isSaving)
+            Button {
+                viewModel.copyScript()
+            } label: {
+                Label(viewModel.copyFeedbackMessage ?? "Copy script", systemImage: "doc.on.doc")
+            }.disabled(!viewModel.canCopy)
+            LoadingButton(isLoading: viewModel.isSaving) {
+                Task { await viewModel.saveCurrentItem() }
+            } label: {
+                Label("Save updates", systemImage: "square.and.arrow.down")
+            }.disabled(viewModel.isDetailing || viewModel.isSaving)
+            if let id = viewModel.selectedItemID {
+                Button(role: .destructive) {
+                    Task { await viewModel.deleteItem(id: id) }
+                } label: { Image(systemName: "trash") }
+                .help("Delete scene").disabled(viewModel.isDetailing || viewModel.isSaving)
+            }
+        }.padding(16)
+    }
+}
 
-                        HStack {
-                            Spacer()
-                            LoadingButton(isLoading: viewModel.isDetailing) {
-                                Task { await viewModel.runDetail() }
-                            } label: {
-                                Label("Detail Scene with AI", systemImage: "sparkles")
-                                    .font(.body.weight(.medium))
-                            }
-                            .disabled(!viewModel.canRunDetail)
-                        }
+private struct ScriptDetailOptions: View {
+    @Bindable var viewModel: ScriptDetailViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+            Toggle("Use app default", isOn: $viewModel.usesAppDefault)
+                Picker("Provider", selection: $viewModel.selectedProvider) {
+                    ForEach(LocalAgentProvider.allCases) { provider in
+                        Text(provider.title).tag(provider)
+                            .disabled(viewModel.availableProviders[provider]?.isAvailable == false)
                     }
-                    .padding(20)
-                    .frame(width: halfWidth)
-
-                    Divider().overlay(AppTheme.line)
-
-                    // Right Column: Continuous-Shot Visual Detail Output & Editing
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Text("Continuous-Shot Visual Detail")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppTheme.ink)
-                            Spacer()
-                            if !viewModel.editingConsolidatedInstruction.isEmpty {
-                                Text("Multi-turn consolidated")
-                                    .font(.caption2)
-                                    .foregroundStyle(AppTheme.accent)
-                            }
-                        }
-
-                        TextEditor(text: $viewModel.editingDetailedScript)
-                            .font(.system(size: 13, design: .monospaced))
-                            .padding(8)
-                            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
-
-                        if !viewModel.editingConsolidatedInstruction.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Consolidated Visual Direction")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(AppTheme.secondaryInk)
-                                Text(viewModel.editingConsolidatedInstruction)
-                                    .font(.caption)
-                                    .foregroundStyle(AppTheme.ink)
-                                    .lineLimit(2)
-                            }
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
-                    .padding(20)
-                    .frame(width: halfWidth)
                 }
+                TextField("Model (provider default)", text: $viewModel.customModel)
+                    .textFieldStyle(.roundedBorder)
+                Picker("Mode", selection: $viewModel.executionMode) {
+                    ForEach(ScriptRefinementExecutionMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }.help(viewModel.executionMode.summary)
+            }.disabled(viewModel.isDetailing || viewModel.isSaving)
+            if let availability = viewModel.availableProviders[viewModel.selectedProvider], !availability.isAvailable {
+                Text(availability.reason).font(.caption).foregroundStyle(AppTheme.secondaryInk)
             }
         }
-        .background(AppTheme.paper)
+    }
+}
+
+private struct ScriptDetailTextEditor: View {
+    let title: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline)
+            TextEditor(text: $text)
+                .font(.body).scrollContentBackground(.hidden)
+                .padding(8).frame(height: 300)
+                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+                .accessibilityLabel(title)
+        }
+    }
+}
+
+private struct ScriptDetailHistory: View {
+    @Bindable var viewModel: ScriptDetailViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Chat history").font(.headline)
+            if viewModel.turns.isEmpty {
+                Text("Send an instruction to detail the scene, then continue chatting to update it.")
+                    .font(.callout).foregroundStyle(AppTheme.secondaryInk)
+            }
+            ForEach(Array(viewModel.turns.enumerated()), id: \.element.id) { index, turn in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("You · Update \(index + 1)").font(.caption.bold())
+                    Text(turn.userInstruction.isEmpty ? "Detail this scene" : turn.userInstruction)
+                    DisclosureGroup("Updated script") {
+                        Text(turn.script).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }.font(.callout).padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppTheme.sunken, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+}
+
+private struct ScriptDetailComposer: View {
+    @Bindable var viewModel: ScriptDetailViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Next instruction").font(.headline)
+            TextField("How should the current script change?", text: $viewModel.editingUserInstruction, axis: .vertical)
+                .lineLimit(2...4).textFieldStyle(.roundedBorder)
+                .disabled(viewModel.isDetailing || viewModel.isSaving)
+            HStack {
+                if viewModel.isDetailing {
+                    Button("Cancel") { viewModel.cancelDetail() }
+                } else {
+                    Button("Reset detail") { Task { await viewModel.resetDetail() } }
+                        .disabled(viewModel.isSaving || viewModel.editingDetailedScript.isEmpty)
+                }
+                Spacer()
+                Text("Updates save to this scene").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                LoadingButton(isLoading: viewModel.isDetailing) {
+                    Task { await viewModel.runDetail() }
+                } label: {
+                    Label(viewModel.editingDetailedScript.isEmpty ? "Detail scene" : "Update script", systemImage: "paperplane")
+                }
+                .buttonStyle(.borderedProminent).disabled(!viewModel.canRunDetail)
+            }
+        }.padding(16)
     }
 }

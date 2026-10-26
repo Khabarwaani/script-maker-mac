@@ -17,3 +17,7 @@ Version bump, notes, DMG, publish.
 - `main` carries the last released version (tagged). `develop` accumulates the
   next release's work — many PRs may merge with no version bump.
 - A version increase is not a release. The DMG on the GitHub Release is.
+
+For #147, finish the complete revamp and its tests before any version bump, preview or
+release. The CI workflow supports an explicitly dispatched acceptance artifact only
+after its build/tests pass; it preserves the current version and never publishes a tag.

@@ -23,6 +23,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
     var sourceStoryID: String?
     var currentScriptVersionID: String?
     var uploadReceipt: StoryUploadReceipt?
+    var scriptChatHistory: ScriptChatHistory?
 
     init(
         id: String = UUID().uuidString,
@@ -44,7 +45,8 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         scriptVersions: [StoryScriptVersion]? = nil,
         sourceStoryID: String? = nil,
         currentScriptVersionID: String? = nil,
-        uploadReceipt: StoryUploadReceipt? = nil
+        uploadReceipt: StoryUploadReceipt? = nil,
+        scriptChatHistory: ScriptChatHistory? = nil
     ) {
         self.id = id
         self.title = title
@@ -66,6 +68,7 @@ struct Story: Codable, Identifiable, Sendable, Hashable {
         self.sourceStoryID = sourceStoryID
         self.currentScriptVersionID = currentScriptVersionID
         self.uploadReceipt = uploadReceipt
+        self.scriptChatHistory = scriptChatHistory
     }
 }
 
@@ -90,6 +93,7 @@ struct LibraryUpdateResult: Codable, Sendable {
     var images: [String]?
     var news: [StorySourceLink]?
     var warnings: [String]? = nil
+    var imagePreviews: [String: Data]? = nil
 }
 
 enum StoryCopyFormat: String, CaseIterable, Identifiable {

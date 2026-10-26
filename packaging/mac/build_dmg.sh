@@ -11,7 +11,7 @@ if [ $# -ge 1 ]; then
     VERSION="$1"
 else
     VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' \
-        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null || echo 1.2.0)"
+        ../../Sources/ScriptMakerMac/Resources/Info.plist 2>/dev/null)"
 fi
 DMG="ScriptMakerMac-${VERSION}.dmg"
 
@@ -30,11 +30,10 @@ xcodebuild -project ../../ScriptMakerMac.xcodeproj \
   -destination 'generic/platform=macOS' \
   CODE_SIGNING_ALLOWED=NO -showBuildSettings -json > "$SETTINGS_FILE"
 
-BUILT_APP="$(python3 -c '
-import json, sys, os
-targets = json.load(open(sys.argv[1]))
-settings = next(t["buildSettings"] for t in targets if t.get("target") == "ScriptMakerMac")
-print(os.path.join(settings["TARGET_BUILD_DIR"], settings["FULL_PRODUCT_NAME"]))
+BUILT_APP="$(ruby -rjson -e '
+  targets = JSON.parse(File.read(ARGV.fetch(0)))
+  settings = targets.find { |target| target["target"] == "ScriptMakerMac" }.fetch("buildSettings")
+  puts File.join(settings.fetch("TARGET_BUILD_DIR"), settings.fetch("FULL_PRODUCT_NAME"))
 ' "$SETTINGS_FILE")"
 
 if [ ! -d "$BUILT_APP" ]; then
@@ -44,6 +43,6 @@ fi
 echo "==> Built: $BUILT_APP"
 
 echo "==> Creating DMG..."
-rm -f "$DMG"
 hdiutil create -volname "Script Maker" -srcfolder "$BUILT_APP" -ov -format UDZO "$DMG"
+hdiutil verify "$DMG"
 echo "Done: $(pwd)/$DMG"

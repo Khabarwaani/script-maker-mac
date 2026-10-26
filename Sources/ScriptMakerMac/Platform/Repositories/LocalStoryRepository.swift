@@ -1,62 +1,38 @@
 import Foundation
 
-/// Platform layer: repository implementation (stateful).
-/// Implements the domain's StoryRepository protocol using platform data sources.
-///
-/// Stateful: holds an in-memory cache so repeated `all()` calls don't hit
-/// the Infra store. Cache is invalidated on every mutation (save/remove).
-/// This is what distinguishes Platform (stateful) from Infra (stateless).
-///
-///   Domain (StoryRepository protocol)
-///       ↓
-///   Platform (LocalStoryRepository + DataSource protocol) ← YOU ARE HERE
-///       ↓
-///   Infra (KeyValueStore, HTTPClient, FileStore)
-final class LocalStoryRepository: StoryRepository, @unchecked Sendable {
+actor LocalStoryRepository: StoryRepository {
     private let dataSource: any StoryDataSourceProtocol
     private var cache: [Story]?
-    private let lock = NSLock()
-
-    init(dataSource: any StoryDataSourceProtocol = UserDefaultsStoryDataSource()) {
-        self.dataSource = dataSource
-    }
-
-    func save(_ story: Story) async {
-        var stories = loadCached()
+    init(dataSource: any StoryDataSourceProtocol) { self.dataSource = dataSource }
+    func all() throws -> [Story] { try loadCached() }
+    func save(_ story: Story) throws {
+        var stories = try loadCached()
         stories.removeAll { $0.id == story.id }
-        stories.insert(story, at: 0) // newest first
-        persist(stories)
+        stories.insert(story, at: 0)
+        try persist(stories)
     }
-
-    func all() async -> [Story] {
-        loadCached()
+    func replace(_ story: Story, removingID: String) throws {
+        var stories = try loadCached()
+        stories.removeAll { $0.id == removingID || $0.id == story.id }
+        stories.insert(story, at: 0)
+        try persist(stories)
     }
-
-    func remove(id: String) async {
-        var stories = loadCached()
-        stories.removeAll { $0.id == id }
-        persist(stories)
+    func remove(id: String) throws { try remove(ids: [id]) }
+    func remove(ids: Set<String>) throws {
+        var stories = try loadCached()
+        stories.removeAll { ids.contains($0.id) }
+        try persist(stories)
     }
-
-    /// Invalidate the cache (e.g. after external changes).
-    func invalidateCache() {
-        lock.withLock { cache = nil }
+    func invalidateCache() { cache = nil }
+    private func loadCached() throws -> [Story] {
+        if let cache { return cache }
+        let stories = try dataSource.load()
+        cache = stories
+        return stories
     }
-
-    // MARK: - Private
-
-    private func loadCached() -> [Story] {
-        lock.withLock {
-            if let cached = cache { return cached }
-            let stories = dataSource.load()
-            cache = stories
-            return stories
-        }
-    }
-
-    private func persist(_ stories: [Story]) {
-        lock.withLock { cache = stories }
-        dataSource.save(stories)
+    private func persist(_ stories: [Story]) throws {
+        try dataSource.save(stories)
+        cache = stories
     }
 }
 
@@ -115,7 +91,10 @@ struct LibraryMediaStore: LibraryMediaImporting {
     func importFile(_ url: URL) async throws -> URL { try files.importMedia(url) }
     func imageData(at url: URL) async throws -> Data {
         if url.isFileURL { return try files.contents(of: url) }
-        let (data, response) = try await httpClient.data(for: URLRequest(url: url))
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("image/*", forHTTPHeaderField: "Accept")
+        let (data, response) = try await httpClient.data(for: request)
         guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
             throw APIError.transport("Image request failed")
         }

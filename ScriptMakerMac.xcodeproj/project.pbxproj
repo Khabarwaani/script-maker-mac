@@ -5,6 +5,27 @@
 	};
 	objectVersion = 56;
 	objects = {
+ RVFIXREF = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
+ RVFIXBUILD = {isa = PBXBuildFile; fileRef = RVFIXREF; };
+ RVTESTRES = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (RVFIXBUILD,); runOnlyForDeploymentPostprocessing = 0; };
+ RVNEWSREF = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoveryTests.swift; sourceTree = "<group>"; };
+ RVNEWSBUILD = {isa = PBXBuildFile; fileRef = RVNEWSREF; };
+		FA44C891DBA164E8E2653F95 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevampTests.swift; sourceTree = "<group>"; };
+		5595EE01D8B100FB4E4C6F52 = {isa = PBXBuildFile; fileRef = FA44C891DBA164E8E2653F95; };
+		7303D5CB95ADEB6928E996F8 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionRoot.swift; sourceTree = "<group>"; };
+		CCE4A56DE9EBC227242730A0 = {isa = PBXBuildFile; fileRef = 7303D5CB95ADEB6928E996F8; };
+		107F2F33C2A5BD57B7C45573 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioControls.swift; sourceTree = "<group>"; };
+		1718C1BA4560246EC52E1A2B = {isa = PBXBuildFile; fileRef = 107F2F33C2A5BD57B7C45573; };
+		0C7D4DE6D4FAA3B5067FF876 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceAgentSelection.swift; sourceTree = "<group>"; };
+		2583FA9A47CDA7B7A116C5EF = {isa = PBXBuildFile; fileRef = 0C7D4DE6D4FAA3B5067FF876; };
+		EB72FC5A82496CD3ECB76FD9 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		3C1328124E6406DE9F4E71D7 = {isa = PBXBuildFile; fileRef = EB72FC5A82496CD3ECB76FD9; };
+		2C6D72F24476807BF1F10692 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineExecutionService.swift; sourceTree = "<group>"; };
+		5143011C612A472201FE3D03 = {isa = PBXBuildFile; fileRef = 2C6D72F24476807BF1F10692; };
+		07DCCA1D292BAFBD0BB8AD61 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsModels.swift; sourceTree = "<group>"; };
+		437B6D569B614E84ABECBE29 = {isa = PBXBuildFile; fileRef = 07DCCA1D292BAFBD0BB8AD61; };
+		8E27856C9CBAA136E075060B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationSettings.swift; sourceTree = "<group>"; };
+		230E2083C6B49EBA5057321B = {isa = PBXBuildFile; fileRef = 8E27856C9CBAA136E075060B; };
 TD101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingDiscoverySettings.swift; sourceTree = "<group>"; };
 TD001 = {isa = PBXBuildFile; fileRef = TD101; };
 TD102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingClientProvider.swift; sourceTree = "<group>"; };
@@ -57,10 +78,8 @@ SC101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sc
 SC001 = {isa = PBXBuildFile; fileRef = SC101; };
 NS001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsProviding.swift; sourceTree = "<group>"; };
 NS002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStudioNewsProvider.swift; sourceTree = "<group>"; };
-NS003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioNewsTests.swift; sourceTree = "<group>"; };
 NS011 = {isa = PBXBuildFile; fileRef = NS001; };
 NS012 = {isa = PBXBuildFile; fileRef = NS002; };
-NS013 = {isa = PBXBuildFile; fileRef = NS003; };
 LP004 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/NewsSearch"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.2; }; };
 LP005 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/abhi266raj/TrendingHashtag"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.2.0; }; };
 LD004 = {isa = XCSwiftPackageProductDependency; package = LP004; productName = NewsSearch; };
@@ -69,7 +88,6 @@ LB006 = {isa = PBXBuildFile; productRef = LD004; };
 LB007 = {isa = PBXBuildFile; productRef = LD005; };
 LB008 = {isa = PBXBuildFile; productRef = LD004; };
 LB009 = {isa = PBXBuildFile; productRef = LD005; };
-
 		DY001 = {isa = PBXBuildFile; fileRef = DY101; };
 		DY101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInputSchema.swift; sourceTree = "<group>"; };
 		DY002 = {isa = PBXBuildFile; fileRef = DY102; };
@@ -88,8 +106,6 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		L106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAgentTests.swift; sourceTree = "<group>"; };
 		L007 = {isa = PBXBuildFile; fileRef = L107; };
 		L107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrictLocalAgentSession.swift; sourceTree = "<group>"; };
-		Blibrary = {isa = PBXBuildFile; fileRef = Jlibrary; };
-		Jlibrary = {isa = PBXFileReference; lastKnownFileType = text.json; path = library_updates.json; sourceTree = "<group>"; };
 		M001 = {isa = PBXBuildFile; fileRef = M101; };
 		M101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainReleaseRegressionTests.swift; sourceTree = "<group>"; };
 		LL01 = {isa = PBXBuildFile; fileRef = LL11; };
@@ -112,146 +128,67 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		PL105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTabView.swift; sourceTree = "<group>"; };
 		PL006 = {isa = PBXBuildFile; fileRef = PL106; };
 		PL106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineFlowTests.swift; sourceTree = "<group>"; };
+		AC001 = {isa = PBXBuildFile; fileRef = AC101; };
+		AC101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInspectionModels.swift; sourceTree = "<group>"; };
+		AC002 = {isa = PBXBuildFile; fileRef = AC102; };
+		AC102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInspectionProviding.swift; sourceTree = "<group>"; };
+		AC003 = {isa = PBXBuildFile; fileRef = AC103; };
+		AC103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhabarwaaniAgentCatalogService.swift; sourceTree = "<group>"; };
+		AC004 = {isa = PBXBuildFile; fileRef = AC104; };
+		AC104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCatalogViewModel.swift; sourceTree = "<group>"; };
+		AC005 = {isa = PBXBuildFile; fileRef = AC105; };
+		AC105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AndroidBotIcon.swift; sourceTree = "<group>"; };
+		AC006 = {isa = PBXBuildFile; fileRef = AC106; };
+		AC106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCatalogView.swift; sourceTree = "<group>"; };
+		AC007 = {isa = PBXBuildFile; fileRef = AC107; };
+		AC107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInspectionTests.swift; sourceTree = "<group>"; };
 		/* Build files */
         E011 = {isa = PBXBuildFile; fileRef = E001; };
-        E012 = {isa = PBXBuildFile; fileRef = E002; };
-        E013 = {isa = PBXBuildFile; fileRef = E003; };
         T007 = {isa = PBXBuildFile; fileRef = T006; };
-		F044 /* StudioCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = R048 /* StudioCatalog.swift */; };
 		F045 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = R049 /* AppTheme.swift */; };
-		Bcatalog /* studio_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcatalog /* studio_catalog.json */; };
 		F001 /* ScriptMakerMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = R001 /* ScriptMakerMacApp.swift */; };
 		F035 /* CoreUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = R039 /* CoreUtilities.swift */; };
 		F036 /* Story.swift in Sources */ = {isa = PBXBuildFile; fileRef = R040 /* Story.swift */; };
-		F043 /* StudioConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = R047 /* StudioConfig.swift */; };
-		F002 /* PipelineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = R002 /* PipelineModels.swift */; };
-		F003 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = R003 /* AppConfig.swift */; };
 		F005 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R005 /* ContentViewModel.swift */; };
 		F006 /* PreferencesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R006 /* PreferencesViewModel.swift */; };
-		F007 /* GenerateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R007 /* GenerateViewModel.swift */; };
-		F032 /* ThumbnailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R035 /* ThumbnailViewModel.swift */; };
 		F029 /* StoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = R032 /* StoryRepository.swift */; };
 		F030 /* StoryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = R033 /* StoryDataSource.swift */; };
-		F031 /* ImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R034 /* ImageService.swift */; };
 		F033 /* LocalStoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = R036 /* LocalStoryRepository.swift */; };
 		F037 /* StoryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = R041 /* StoryMapper.swift */; };
 		F034 /* InfraStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = R037 /* InfraStore.swift */; };
 		F008 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R008 /* ContentView.swift */; };
 		F009 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R009 /* PreferencesView.swift */; };
-		F010 /* GenerateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R010 /* GenerateView.swift */; };
-		F012 /* VerifyStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R014 /* VerifyStageView.swift */; };
-		F013 /* CharactersStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R015 /* CharactersStageView.swift */; };
-		F014 /* DialogueStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R016 /* DialogueStageView.swift */; };
-		F015 /* ScenesStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R017 /* ScenesStageView.swift */; };
-		F016 /* ServerAddressBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R018 /* ServerAddressBarViewModel.swift */; };
-		F017 /* ServerAddressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = R019 /* ServerAddressBar.swift */; };
-		F018 /* StoryboardStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R020 /* StoryboardStageView.swift */; };
-		F019 /* IntegrationStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R021 /* IntegrationStageView.swift */; };
-		F020 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = R022 /* SampleData.swift */; };
 		F021 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = R023 /* LibraryViewModel.swift */; };
 		E011 /* AppConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E001 /* AppConfigTests.swift */; };
 		T007 /* RepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T006 /* RepositoryTests.swift */; };
-		E012 /* SampleDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E002 /* SampleDataTests.swift */; };
-		E013 /* SampleAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E003 /* SampleAPITests.swift */; };
-		F022 /* WebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R025 /* WebClient.swift */; };
-		F023 /* NetworkWebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R026 /* NetworkWebClient.swift */; };
-		F024 /* OfflineWebClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = R027 /* OfflineWebClient.swift */; };
-		F025 /* PipelineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = R028 /* PipelineService.swift */; };
 		F026 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = R029 /* APIError.swift */; };
-		F027 /* SceneThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = R030 /* SceneThumbnail.swift */; };
-		F039 /* ConfigSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R043 /* ConfigSidebarView.swift */; };
 		F040 /* StoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R044 /* StoryListView.swift */; };
-		F042 /* StudioDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R046 /* StudioDetailView.swift */; };
 		F041 /* StoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = R045 /* StoryDetailView.swift */; };
-		F028 /* StageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = R031 /* StageTracker.swift */; };
 		F011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = R011 /* Assets.xcassets */; };
-		Bverify /* verify.json in Resources */ = {isa = PBXBuildFile; fileRef = Jverify /* verify.json */; };
-		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
-		Bdialogue /* dialogue.json in Resources */ = {isa = PBXBuildFile; fileRef = Jdialogue /* dialogue.json */; };
-		Bscenes /* scenes.json in Resources */ = {isa = PBXBuildFile; fileRef = Jscenes /* scenes.json */; };
-		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
-		Brender /* validation.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* validation.json */; };
-		Bheadlines /* headlines.json in Resources */ = {isa = PBXBuildFile; fileRef = Jheadlines /* headlines.json */; };
-		Bcategories /* news_categories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcategories /* news_categories.json */; };
-		Bservers /* servers.json in Resources */ = {isa = PBXBuildFile; fileRef = Jservers /* servers.json */; };
-		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
-		Bstories /* stories.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstories /* stories.json */; };
-		Brender /* validation.json in Resources */ = {isa = PBXBuildFile; fileRef = Jrender /* validation.json */; };
-		Bstoryboard /* storyboard.json in Resources */ = {isa = PBXBuildFile; fileRef = Jstoryboard /* storyboard.json */; };
-		Bscenes /* scenes.json in Resources */ = {isa = PBXBuildFile; fileRef = Jscenes /* scenes.json */; };
-		Bdialogue /* dialogue.json in Resources */ = {isa = PBXBuildFile; fileRef = Jdialogue /* dialogue.json */; };
-		Bcharacters /* characters.json in Resources */ = {isa = PBXBuildFile; fileRef = Jcharacters /* characters.json */; };
 		/* File references */
         E001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigTests.swift; sourceTree = "<group>"; };
-        E002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataTests.swift; sourceTree = "<group>"; };
-        E003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleAPITests.swift; sourceTree = "<group>"; };
         T006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryTests.swift; sourceTree = "<group>"; };
-		R048 /* StudioCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioCatalog.swift; sourceTree = "<group>"; };
 		R049 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
-		Jcatalog /* studio_catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = studio_catalog.json; sourceTree = "<group>"; };
 		R001 /* ScriptMakerMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptMakerMacApp.swift; sourceTree = "<group>"; };
 		R039 /* CoreUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreUtilities.swift; sourceTree = "<group>"; };
 		R040 /* Story.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Story.swift; sourceTree = "<group>"; };
-		R047 /* StudioConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioConfig.swift; sourceTree = "<group>"; };
-		R002 /* PipelineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineModels.swift; sourceTree = "<group>"; };
-		R003 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		R005 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
 		R006 /* PreferencesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesViewModel.swift; sourceTree = "<group>"; };
-		R035 /* ThumbnailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailViewModel.swift; sourceTree = "<group>"; };
-		R007 /* GenerateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateViewModel.swift; sourceTree = "<group>"; };
 		R008 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		R009 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
-		R010 /* GenerateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateView.swift; sourceTree = "<group>"; };
-		R014 /* VerifyStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyStageView.swift; sourceTree = "<group>"; };
-		R015 /* CharactersStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharactersStageView.swift; sourceTree = "<group>"; };
-		R016 /* DialogueStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogueStageView.swift; sourceTree = "<group>"; };
-		R017 /* ScenesStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenesStageView.swift; sourceTree = "<group>"; };
-		R018 /* ServerAddressBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAddressBarViewModel.swift; sourceTree = "<group>"; };
-		R019 /* ServerAddressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAddressBar.swift; sourceTree = "<group>"; };
-		R020 /* StoryboardStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryboardStageView.swift; sourceTree = "<group>"; };
-		R021 /* IntegrationStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationStageView.swift; sourceTree = "<group>"; };
-		R022 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
-		R025 /* WebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebClient.swift; sourceTree = "<group>"; };
-		R026 /* NetworkWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWebClient.swift; sourceTree = "<group>"; };
-		R027 /* OfflineWebClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWebClient.swift; sourceTree = "<group>"; };
-		R043 /* ConfigSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigSidebarView.swift; sourceTree = "<group>"; };
 		R044 /* StoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryListView.swift; sourceTree = "<group>"; };
-		R046 /* StudioDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioDetailView.swift; sourceTree = "<group>"; };
 		E001 /* AppConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigTests.swift; sourceTree = "<group>"; };
 		T006 /* RepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryTests.swift; sourceTree = "<group>"; };
-		E002 /* SampleDataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataTests.swift; sourceTree = "<group>"; };
-		E003 /* SampleAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleAPITests.swift; sourceTree = "<group>"; };
 		E004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		R045 /* StoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDetailView.swift; sourceTree = "<group>"; };
-		R031 /* StageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageTracker.swift; sourceTree = "<group>"; };
-		R030 /* SceneThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneThumbnail.swift; sourceTree = "<group>"; };
 		R032 /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
 		R033 /* StoryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryDataSource.swift; sourceTree = "<group>"; };
 		R041 /* StoryMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryMapper.swift; sourceTree = "<group>"; };
 		R037 /* InfraStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfraStore.swift; sourceTree = "<group>"; };
 		R036 /* LocalStoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoryRepository.swift; sourceTree = "<group>"; };
-		R034 /* ImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageService.swift; sourceTree = "<group>"; };
-		R035 /* ThumbnailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailViewModel.swift; sourceTree = "<group>"; };
 		R029 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
-		R028 /* PipelineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineService.swift; sourceTree = "<group>"; };
 		R024 /* ScriptMakerMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ScriptMakerMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		R023 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
-		Jverify /* verify.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = verify.json; sourceTree = "<group>"; };
-		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
-		Jdialogue /* dialogue.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = dialogue.json; sourceTree = "<group>"; };
-		Jscenes /* scenes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = scenes.json; sourceTree = "<group>"; };
-		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
-		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
-		Jheadlines /* headlines.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = headlines.json; sourceTree = "<group>"; };
-		Jcategories /* news_categories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = news_categories.json; sourceTree = "<group>"; };
-		Jservers /* servers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = servers.json; sourceTree = "<group>"; };
-		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
-		Jstories /* stories.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = stories.json; sourceTree = "<group>"; };
-		Jrender /* validation.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = validation.json; sourceTree = "<group>"; };
-		Jstoryboard /* storyboard.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = storyboard.json; sourceTree = "<group>"; };
-		Jscenes /* scenes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = scenes.json; sourceTree = "<group>"; };
-		Jdialogue /* dialogue.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = dialogue.json; sourceTree = "<group>"; };
-		Jcharacters /* characters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = characters.json; sourceTree = "<group>"; };
 		R011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		R012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		R013 /* ScriptMakerMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScriptMakerMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -281,13 +218,15 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		};
 		G003 /* Products */ = {
 			isa = PBXGroup;
-			children = ( R013 /* ScriptMakerMac.app */, );
+			children = (
+                 R013 /* ScriptMakerMac.app */, );
 			name = Products;
 			sourceTree = "<group>";
 		};
 		G004 /* App */ = {
 			isa = PBXGroup;
-			children = ( R001 /* ScriptMakerMacApp.swift */, );
+			children = (
+                7303D5CB95ADEB6928E996F8, R001 /* ScriptMakerMacApp.swift */, );
 			path = App;
 			sourceTree = "<group>";
 		};
@@ -303,15 +242,15 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
+                07DCCA1D292BAFBD0BB8AD61,
+                8E27856C9CBAA136E075060B,
+				AC101 /* AgentInspectionModels.swift */,
 				PL101 /* PipelineFlowModels.swift */,
 				TD101,
 				ND101,
 				L101 /* LocalAgentModels.swift */,
 				DY101 /* AgentInputSchema.swift */,
-				R002 /* PipelineModels.swift */,
 				R040 /* Story.swift */, SD106,
-				R047 /* StudioConfig.swift */,
-				R048 /* StudioCatalog.swift */,
 			);
 			path = Entities;
 			sourceTree = "<group>";
@@ -319,13 +258,13 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+                2C6D72F24476807BF1F10692,
+				AC102 /* AgentInspectionProviding.swift */,
 				PL102 /* PipelineFlowResolving.swift */,
 				L102 /* LocalAgentRunning.swift */,
-				R028 /* PipelineService.swift */,
-				R034 /* ImageService.swift */,
 				R029 /* APIError.swift */,
 				R032 /* StoryRepository.swift */,
-				R025 /* WebClient.swift */, NS001, SC101, SD101, SD107, NR101,
+				 NS001, SC101, SD101, SD107, NR101,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -350,6 +289,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G016 /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
+                EB72FC5A82496CD3ECB76FD9,
 				R036 /* LocalStoryRepository.swift */, SD108,
 			);
 			path = Repositories;
@@ -359,7 +299,6 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				R033 /* StoryDataSource.swift */,
-				R022 /* SampleData.swift */,
 			);
 			path = DataSources;
 			sourceTree = "<group>";
@@ -367,14 +306,13 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G018 /* WebClients */ = {
 			isa = PBXGroup;
 			children = (
+				AC103 /* KhabarwaaniAgentCatalogService.swift */,
 				PL103 /* LocalPipelineFlowResolver.swift */,
 				TD102,
 				L103 /* TerminalLocalAgentService.swift */,
 				LL11 /* LocalLibraryUpdateClient.swift */, NS002, SC102, SD102, NR102,
 				L107 /* StrictLocalAgentSession.swift */,
 				LL12 /* LocalStoryUploadClient.swift */,
-				R026 /* NetworkWebClient.swift */,
-				R027 /* OfflineWebClient.swift */,
 			);
 			path = WebClients;
 			sourceTree = "<group>";
@@ -391,7 +329,6 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 			isa = PBXGroup;
 			children = (
 				R037 /* InfraStore.swift */,
-				R003 /* AppConfig.swift */,
 			);
 			path = Infra;
 			sourceTree = "<group>";
@@ -408,6 +345,9 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+                107F2F33C2A5BD57B7C45573,
+				AC105 /* AndroidBotIcon.swift */,
+				AC106 /* AgentCatalogView.swift */,
 				PL105 /* PipelineTabView.swift */,
 				TD103,
 				ND102,
@@ -416,21 +356,9 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 				DY102 /* DynamicAgentInputForm.swift */,
 				R008 /* ContentView.swift */,
 				R049 /* AppTheme.swift */, BT101 /* LoadingButton.swift */,
-				R030 /* SceneThumbnail.swift */,
-				R043 /* ConfigSidebarView.swift */,
 				R044 /* StoryListView.swift */,
-				R046 /* StudioDetailView.swift */,
 				R045 /* StoryDetailView.swift */, SC104, SD104, NR104,
-				R031 /* StageTracker.swift */,
 				R009 /* PreferencesView.swift */,
-				R010 /* GenerateView.swift */,
-				R014 /* VerifyStageView.swift */,
-				R015 /* CharactersStageView.swift */,
-				R016 /* DialogueStageView.swift */,
-				R017 /* ScenesStageView.swift */,
-				R019 /* ServerAddressBar.swift */,
-				R020 /* StoryboardStageView.swift */,
-				R021 /* IntegrationStageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -438,13 +366,13 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+                0C7D4DE6D4FAA3B5067FF876,
+				AC104 /* AgentCatalogViewModel.swift */,
 				PL104 /* PipelineTabViewModel.swift */,
 				L104 /* LocalAgentViewModel.swift */,
 				R005 /* ContentViewModel.swift */,
 				R006 /* PreferencesViewModel.swift */,
-				R007 /* GenerateViewModel.swift */, SC103, SD103, NR103,
-				R035 /* ThumbnailViewModel.swift */,
-				R018 /* ServerAddressBarViewModel.swift */,
+				 SC103, SD103, NR103,
 				R023 /* LibraryViewModel.swift */,
 			);
 			path = ViewModels;
@@ -453,29 +381,10 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G009 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				G010 /* Samples */,
 				R011 /* Assets.xcassets */,
 				R012 /* Info.plist */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		G010 /* Samples */ = {
-			isa = PBXGroup;
-			children = (
-				Jverify /* verify.json */,
-				Jcatalog /* studio_catalog.json */, Jlibrary /* library_updates.json */,
-				Jcharacters /* characters.json */,
-				Jdialogue /* dialogue.json */,
-				Jscenes /* scenes.json */,
-				Jstoryboard /* storyboard.json */,
-				Jrender /* validation.json */,
-				Jstories /* stories.json */,
-				Jservers /* servers.json */,
-				Jheadlines /* headlines.json */,
-				Jcategories /* news_categories.json */,
-			);
-			path = Samples;
 			sourceTree = "<group>";
 		};
 		D001 /* PBXTargetDependency */ = {
@@ -493,13 +402,15 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+ RVFIXREF,
+ RVNEWSREF,
+                FA44C891DBA164E8E2653F95,
+				AC107 /* AgentInspectionTests.swift */,
 				PL106 /* PipelineFlowTests.swift */,
 				L106 /* LocalAgentTests.swift */,
-				LL14 /* LocalLibraryTests.swift */, NS003, TD104, SC105, SD105, M101 /* MainReleaseRegressionTests.swift */, NR105,
+				LL14 /* LocalLibraryTests.swift */,  TD104, SC105, SD105, M101 /* MainReleaseRegressionTests.swift */, NR105,
 				E001 /* AppConfigTests.swift */,
 				T006 /* RepositoryTests.swift */,
-				E002 /* SampleDataTests.swift */,
-				E003 /* SampleAPITests.swift */,
 				E004 /* Info.plist */,
 			);
 			path = Tests/ScriptMakerMacTests;
@@ -538,6 +449,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			isa = PBXNativeTarget;
 			buildConfigurationList = C003 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */;
 			buildPhases = (
+ RVTESTRES,
 				P004 /* Sources */,
 				P005 /* Frameworks */,
 			);
@@ -573,6 +485,19 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                CCE4A56DE9EBC227242730A0,
+                1718C1BA4560246EC52E1A2B,
+                2583FA9A47CDA7B7A116C5EF,
+                3C1328124E6406DE9F4E71D7,
+                5143011C612A472201FE3D03,
+                437B6D569B614E84ABECBE29,
+                230E2083C6B49EBA5057321B,
+				AC001 /* AgentInspectionModels.swift in Sources */,
+				AC002 /* AgentInspectionProviding.swift in Sources */,
+				AC003 /* KhabarwaaniAgentCatalogService.swift in Sources */,
+				AC004 /* AgentCatalogViewModel.swift in Sources */,
+				AC005 /* AndroidBotIcon.swift in Sources */,
+				AC006 /* AgentCatalogView.swift in Sources */,
 				PL001 /* PipelineFlowModels.swift in Sources */,
 				PL002 /* PipelineFlowResolving.swift in Sources */,
 				PL003 /* LocalPipelineFlowResolver.swift in Sources */,
@@ -594,44 +519,19 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 				F001 /* ScriptMakerMacApp.swift in Sources */,
 				F035 /* CoreUtilities.swift in Sources */,
 				F036 /* Story.swift in Sources */,
-				F043 /* StudioConfig.swift in Sources */,
-				F044 /* StudioCatalog.swift in Sources */,
 				F045 /* AppTheme.swift in Sources */,
-				F002 /* PipelineModels.swift in Sources */,
-				F003 /* AppConfig.swift in Sources */,
-				F022 /* WebClient.swift in Sources */,
-				F023 /* NetworkWebClient.swift in Sources */,
-				F024 /* OfflineWebClient.swift in Sources */,
-				F025 /* PipelineService.swift in Sources */,
 				F026 /* APIError.swift in Sources */,
-				F027 /* SceneThumbnail.swift in Sources */,
-				F039 /* ConfigSidebarView.swift in Sources */,
 				F040 /* StoryListView.swift in Sources */,
-				F042 /* StudioDetailView.swift in Sources */,
 				F041 /* StoryDetailView.swift in Sources */,
-				F028 /* StageTracker.swift in Sources */,
 				F005 /* ContentViewModel.swift in Sources */,
 				F006 /* PreferencesViewModel.swift in Sources */,
-				F007 /* GenerateViewModel.swift in Sources */,
-				F032 /* ThumbnailViewModel.swift in Sources */,
 				F029 /* StoryRepository.swift in Sources */,
 				F030 /* StoryDataSource.swift in Sources */,
-				F031 /* ImageService.swift in Sources */,
 				F033 /* LocalStoryRepository.swift in Sources */,
 				F037 /* StoryMapper.swift in Sources */,
 				F034 /* InfraStore.swift in Sources */,
 				F008 /* ContentView.swift in Sources */,
 				F009 /* PreferencesView.swift in Sources */,
-				F010 /* GenerateView.swift in Sources */,
-				F012 /* VerifyStageView.swift in Sources */,
-				F013 /* CharactersStageView.swift in Sources */,
-				F014 /* DialogueStageView.swift in Sources */,
-				F015 /* ScenesStageView.swift in Sources */,
-				F016 /* ServerAddressBarViewModel.swift in Sources */,
-				F017 /* ServerAddressBar.swift in Sources */,
-				F018 /* StoryboardStageView.swift in Sources */,
-				F019 /* IntegrationStageView.swift in Sources */,
-				F020 /* SampleData.swift in Sources */,
 				F021 /* LibraryViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -657,13 +557,14 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+ RVNEWSBUILD,
+                5595EE01D8B100FB4E4C6F52,
+				AC007 /* AgentInspectionTests.swift in Sources */,
 				PL006 /* PipelineFlowTests.swift in Sources */,
 				L006 /* LocalAgentTests.swift in Sources */,
-				LL04 /* LocalLibraryTests.swift in Sources */, NS013, TD004, SC005, SD005, M001 /* MainReleaseRegressionTests.swift in Sources */, NR005,
+				LL04 /* LocalLibraryTests.swift in Sources */,  TD004, SC005, SD005, M001 /* MainReleaseRegressionTests.swift in Sources */, NR005,
 				E011 /* AppConfigTests.swift in Sources */,
 				T007 /* RepositoryTests.swift in Sources */,
-				E012 /* SampleDataTests.swift in Sources */,
-				E013 /* SampleAPITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -676,7 +577,7 @@ P006 /* Build revision */ = {
 		P003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ( F011 /* Assets.xcassets in Resources */, Bcatalog /* studio_catalog.json in Resources */, Blibrary /* library_updates.json in Resources */, Bverify /* verify.json in Resources */, Bcharacters /* characters.json in Resources */, Bdialogue /* dialogue.json in Resources */, Bscenes /* scenes.json in Resources */, Bstoryboard /* storyboard.json in Resources */, Brender /* validation.json in Resources */, Bstories /* stories.json in Resources */, Bservers /* servers.json in Resources */, Bheadlines /* headlines.json in Resources */, Bcategories /* news_categories.json in Resources */, );
+			files = ( F011 /* Assets.xcassets in Resources */,             );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B001 /* Debug */ = {

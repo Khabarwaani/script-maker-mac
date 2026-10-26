@@ -9,6 +9,8 @@ private actor ChatRefinerStub: ScriptChatRefining {
     var shouldReturnBlank = false
     var failOnRequest: Int?
     var prewarmedModes: [ScriptRefinementExecutionMode] = []
+    var prewarmedOwners: [String] = []
+    var closedOwners: [String] = []
     func configure(fail: Bool = false, blank: Bool = false) { shouldFail = fail; shouldReturnBlank = blank }
     func fail(onRequest number: Int) { failOnRequest = number }
     func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [.codex: .init(isAvailable: true, reason: "Ready")] }
@@ -17,6 +19,15 @@ private actor ChatRefinerStub: ScriptChatRefining {
         prewarmedModes.append(mode)
     }
     func closeSession() { closeSessionCount += 1 }
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) {
+        prewarmedOwners.append(sessionID)
+        prewarm(for: provider, model: model, mode: mode)
+    }
+    func closeSession(id: String) {
+        closedOwners.append(id)
+        closeSession()
+    }
+
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft {
         requests.append(request)
         if shouldFail || requests.count == failOnRequest { throw APIError.transport("Provider unavailable") }
@@ -33,7 +44,7 @@ private actor ChatRepository: StoryRepository {
 
 @MainActor
 final class ScriptChatTests: XCTestCase {
-    func testRefineAgainWithoutNewInputUsesLatestScriptAndConsolidatedInstructions() async {
+    func testRefineAgainWithoutNewInputUsesLatestScriptAndConsolidatedInstructions() async throws {
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         chat.begin(Story(scriptText: "Original"))
@@ -102,7 +113,7 @@ final class ScriptChatTests: XCTestCase {
         let original = Story(title: "A story", videoURL: "https://example.com/old.mp4", scriptText: "Original script", stageOutputs: ["script": "old output"])
         await repository.save(original)
         let chat = ScriptChatViewModel(service: ChatRefinerStub())
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         await chat.refreshProviders()
@@ -175,7 +186,7 @@ final class ScriptChatServiceTests: XCTestCase {
         let lastRequest = await runner.lastRequest
         let request = try XCTUnwrap(lastRequest)
         XCTAssertEqual(request.agentID, "ScriptChat")
-        XCTAssertEqual(request.version, "1.0.0")
+        XCTAssertTrue(["1.0.1", "1.1.0"].contains(request.version))
         XCTAssertEqual(request.model, "test-model")
         XCTAssertEqual(request.sessionID, "script-chat")
         XCTAssertEqual(request.session.persistence, .persistentStdio)
@@ -204,7 +215,23 @@ final class ScriptChatServiceTests: XCTestCase {
         XCTAssertEqual(closed, "test-session")
     }
 
+    func testExplicitOwnerIsPassedThroughPrewarmRunAndClose() async throws {
+        let runner = ChatRunnerStub()
+        let service: any ScriptChatRefining = LocalScriptChatService(runner: runner)
+        await service.prewarm(for: .codex, model: "m", mode: .fastClean, sessionID: "story-owner")
+        _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"),
+            userInstruction: "Shorten", provider: .codex, model: "m", sessionID: "story-owner"))
+        await service.closeSession(id: "story-owner")
+        let warmed = await runner.prewarmedSessionID
+        let request = await runner.lastRequest
+        let closed = await runner.closedSessionID
+        XCTAssertEqual(warmed, "story-owner")
+        XCTAssertEqual(request?.sessionID, warmed)
+        XCTAssertEqual(closed, warmed)
+    }
+
     func testScriptRefinementExecutionModesConfigureSessionCorrectly() async throws {
+
         let runner = ChatRunnerStub()
         let service = LocalScriptChatService(runner: runner, sessionID: "custom-session")
 
@@ -537,7 +564,21 @@ extension ScriptChatTests {
         XCTAssertEqual(chat.draft.latestScript, "Draft 1")
     }
 
+    func testPrewarmAndCloseUseTheStoryOwner() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let story = Story(scriptText: "Original script")
+        chat.begin(story)
+        await chat.prewarm()
+        await chat.closeSession()
+        let warmed = await service.prewarmedOwners
+        let closed = await service.closedOwners
+        XCTAssertEqual(warmed, ["script-chat-\(story.id)"])
+        XCTAssertEqual(closed, warmed)
+    }
+
     func testResetClearsTurnsAndDraftAndClosesSession() async throws {
+
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         let story = Story(scriptText: "Baseline story script")
@@ -596,7 +637,7 @@ extension ScriptChatTests {
 
     func testScriptRefinementModeInitializedFromConfig() async throws {
         let defaults = UserDefaults(suiteName: "test-script-refinement-mode-\(UUID())")!
-        let config = AppConfig(defaults: defaults)
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
         config.scriptRefinementMode = .daemon
 
         let service = ChatRefinerStub()
@@ -627,7 +668,7 @@ extension ScriptChatTests {
         let selected = StoryScriptVersion(number: 2, text: "Selected script", createdAt: "2026-10-25", instruction: nil)
         let original = Story(scriptText: "Previous script", scriptVersions: [selected])
         await repository.save(original)
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         await chat.refreshProviders()
@@ -671,7 +712,7 @@ extension ScriptChatTests {
         XCTAssertTrue(chat.canSave)
     }
 
-    func testFailedRewriteKeepsEditedScriptAndBlankScriptCannotRunOrSave() async {
+    func testFailedRewriteKeepsEditedScriptAndBlankScriptCannotRunOrSave() async throws {
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         chat.begin(Story(scriptText: "Original"))
@@ -693,7 +734,7 @@ extension ScriptChatTests {
         let chat = ScriptChatViewModel(service: ChatRefinerStub())
         let original = Story(scriptText: "Original")
         await repository.save(original)
-        let library = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, scriptChat: chat)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
         await library.refresh()
         chat.begin(original)
         chat.editableScript = "Manually rewritten script"
@@ -703,5 +744,154 @@ extension ScriptChatTests {
         XCTAssertEqual(library.selectedStory?.scriptVersions?.map(\.text), ["Manually rewritten script"])
         let stored = await repository.all()
         XCTAssertEqual(stored.count, 1)
+    }
+}
+
+extension ScriptChatTests {
+    func testEarlierRevisionRestoresItsContextAndCanBranchWithoutLosingLaterRevisions() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original", instruction: "Baseline"))
+        await chat.refreshProviders()
+        chat.userInstruction = "First change"
+        await chat.refine()
+        let first = try XCTUnwrap(chat.selectedRevisionID)
+        chat.userInstruction = "Second change"
+        await chat.refine()
+        let second = try XCTUnwrap(chat.selectedRevisionID)
+        XCTAssertEqual(chat.previousRevisionID, first)
+        await chat.selectRevision(first)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+        XCTAssertEqual(chat.consolidatedInstruction, "Active instructions 1")
+        XCTAssertEqual(chat.turns.count, 1)
+        XCTAssertFalse(chat.hasScriptEdits)
+        chat.userInstruction = "Fix the first draft differently"
+        await chat.refine()
+        let request = await service.requests.last
+        XCTAssertEqual(request?.draft.latestScript, "Draft 1")
+        XCTAssertEqual(request?.draft.instruction, "Active instructions 1")
+        XCTAssertEqual(chat.revisions.count, 3)
+        XCTAssertEqual(chat.revisions.last?.parentID, first)
+        XCTAssertEqual(chat.previousRevisionID, first)
+        XCTAssertEqual(chat.turns.count, 2)
+        await chat.selectRevision(second)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 2")
+        XCTAssertEqual(chat.turns.last?.userInstruction, "Second change")
+        await chat.selectRevision(nil)
+        XCTAssertEqual(chat.draft.latestScript, "Original")
+        XCTAssertEqual(chat.consolidatedInstruction, "Baseline")
+        XCTAssertTrue(chat.turns.isEmpty)
+        XCTAssertEqual(chat.revisions.count, 3)
+    }
+
+    func testFailedRefinementKeepsSelectedRevisionAndArchivesForRecovery() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "First change"
+        await chat.refine()
+        let selected = chat.selectedRevisionID
+        chat.editableScript = "Manual correction"
+        chat.userInstruction = "Fix pacing"
+        XCTAssertTrue(chat.hasUnsavedRevisionEdits)
+        await service.configure(fail: true)
+        await chat.refine()
+        XCTAssertEqual(chat.selectedRevisionID, selected)
+        XCTAssertEqual(chat.draft.latestScript, "Manual correction")
+        XCTAssertEqual(chat.revisions.count, 1)
+        XCTAssertEqual(chat.userInstruction, "Fix pacing")
+        XCTAssertNotNil(chat.errorMessage)
+        await chat.selectRevision(nil)
+        await chat.selectRevision(selected)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+        XCTAssertFalse(chat.hasUnsavedRevisionEdits)
+    }
+
+    func testHistoryReplayArchivesReplacedVersionsAndSaveClearsChatRevisions() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "First"
+        await chat.refine()
+        let old = try XCTUnwrap(chat.selectedRevisionID)
+        let turn = try XCTUnwrap(chat.turns.first)
+        chat.setHistoryInstruction("Corrected instruction", for: turn.id)
+        await chat.applyHistoryEdits()
+        XCTAssertEqual(chat.revisions.count, 2)
+        XCTAssertNotEqual(chat.selectedRevisionID, old)
+        await chat.selectRevision(old)
+        XCTAssertEqual(chat.draft.latestScript, "Draft 1")
+        XCTAssertEqual(chat.turns.first?.userInstruction, "First")
+        chat.markSaved()
+        XCTAssertTrue(chat.revisions.isEmpty)
+        XCTAssertNil(chat.selectedRevisionID)
+    }
+}
+
+extension ScriptChatTests {
+    func testSavedStoryKeepsChatHistoryAndRestoresEarlierBranchesAfterReopening() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let repository = ChatRepository()
+        let original = Story(scriptText: "Original", instruction: "Baseline")
+        await repository.save(original)
+        let library = LibraryViewModel( repository: repository, scriptChat: chat)
+        await library.refresh()
+        chat.begin(original)
+        await chat.refreshProviders()
+        chat.userInstruction = "First instruction"
+        await chat.refine()
+        let first = try XCTUnwrap(chat.selectedRevisionID)
+        chat.userInstruction = "Second instruction"
+        await chat.refine()
+        let second = try XCTUnwrap(chat.selectedRevisionID)
+        await chat.selectRevision(first)
+        chat.userInstruction = "Fix Chat 1"
+        await chat.refine()
+        let savedSuccessfully = await library.saveRefinedScript()
+        XCTAssertTrue(savedSuccessfully)
+        let stored = await repository.all()
+        XCTAssertEqual(stored.count, 1)
+        let saved = try XCTUnwrap(stored.first)
+        XCTAssertEqual(saved.scriptText, "Draft 3")
+        XCTAssertEqual(saved.scriptVersions?.count, 1)
+        let decoded = try JSONDecoder().decode(Story.self, from: JSONEncoder().encode(saved))
+        let reopened = ScriptChatViewModel(service: service)
+        reopened.begin(decoded)
+        XCTAssertEqual(reopened.revisions.count, 3)
+        XCTAssertEqual(reopened.originalScript, "Original")
+        XCTAssertEqual(reopened.draft.latestScript, "Draft 3")
+        XCTAssertEqual(reopened.revisions.last?.parentID, first)
+        await reopened.selectRevision(second)
+        XCTAssertEqual(reopened.draft.latestScript, "Draft 2")
+        XCTAssertEqual(reopened.consolidatedInstruction, "Active instructions 2")
+        XCTAssertEqual(reopened.turns.last?.userInstruction, "Second instruction")
+    }
+
+    func testManualLibraryEditIsCurrentWithoutLosingSavedChatHistory() async throws {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        chat.begin(Story(scriptText: "Original"))
+        await chat.refreshProviders()
+        chat.userInstruction = "Improve dialogue"
+        await chat.refine()
+        let history = chat.historyForSaving
+        let edited = Story(scriptText: "Edited in Library", scriptChatHistory: history)
+        let reopened = ScriptChatViewModel(service: service)
+        reopened.begin(edited)
+        XCTAssertEqual(reopened.draft.latestScript, "Edited in Library")
+        XCTAssertEqual(reopened.originalScript, "Original")
+        XCTAssertEqual(reopened.revisions.count, 2)
+        XCTAssertTrue(reopened.revisions.last?.isManualEdit == true)
+        await reopened.selectRevision(history.selectedRevisionID)
+        XCTAssertEqual(reopened.draft.latestScript, "Draft 1")
+    }
+
+    func testOlderStoriesDecodeWithoutChatHistory() throws {
+        let story = try JSONDecoder().decode(Story.self, from: Data(#"{"id":"old","title":"Old story","summary":"","headline":"","createdAt":"2026-10-25","status":"saved","emotion":"","format":"","scriptText":"Saved script"}"#.utf8))
+        XCTAssertNil(story.scriptChatHistory)
+        XCTAssertEqual(story.scriptText, "Saved script")
     }
 }

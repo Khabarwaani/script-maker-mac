@@ -60,6 +60,9 @@ struct PipelineTabView: View {
             .frame(width: 220)
             .disabled(viewModel.isRunning)
 
+            Toggle("Use app default", isOn: $viewModel.usesAppDefault)
+                .help("Applies to new steps. Existing steps keep their configured providers.")
+                .disabled(viewModel.isRunning)
             Picker("Execution", selection: $viewModel.executionMode) {
                 ForEach(PipelineExecutionMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
             }
@@ -85,6 +88,7 @@ struct PipelineTabView: View {
                     Label("Save Story to Library", systemImage: "folder.badge.plus")
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isSavingStory)
             }
 
             Button("Reset Pipeline") {
@@ -599,11 +603,14 @@ private struct StepWorkAreaView: View {
                     )) {
                         ForEach(LocalAgentProvider.allCases) { prov in
                             Text(prov.title).tag(prov)
+                                .disabled(!viewModel.isAvailable(prov) || viewModel.activeDefinition?.supports(prov) != true)
                         }
                     }
                     .pickerStyle(.menu)
                     .disabled(viewModel.isRunning)
                     Text(viewModel.availabilityReason(step.provider)).font(.caption2).foregroundStyle(.secondary)
+                    TextField("Workflow model (provider default)", text: $viewModel.modelOverride)
+                        .textFieldStyle(.roundedBorder).disabled(viewModel.isRunning)
                 }
 
                 if let def = viewModel.activeDefinition {

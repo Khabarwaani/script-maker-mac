@@ -15,6 +15,7 @@ actor LocalNewsResearcherService: NewsResearching {
     }
 
     func research(_ request: NewsResearchRequest) async throws -> NewsResearchResult {
+        guard request.provider != .appleLocal else { throw LocalAgentError.invalidInput("News research requires a terminal provider with web access.") }
         let trimmedTopic = request.topic.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTopic.isEmpty else {
             throw LocalAgentError.invalidInput("A news topic or headline is required for research.")
@@ -36,7 +37,7 @@ actor LocalNewsResearcherService: NewsResearching {
 
         let agentRequest = LocalAgentRequest(
             agentID: "NewsResearcher",
-            version: "1.1.0",
+            version: NewsResearcher.Spec.identity.version,
             inputJSON: inputJSON,
             provider: request.provider,
             executable: request.provider.executable,
@@ -63,17 +64,7 @@ actor LocalNewsResearcherService: NewsResearching {
             )
         }
 
-        // Fallback for unstructured outputs
-        return NewsResearchResult(
-            rawOutput: outputText,
-            verified: true,
-            confidence: 70,
-            date: DateFormatting.iso8601Now(),
-            location: nil,
-            people: [],
-            notes: [outputText],
-            hashtags: []
-        )
+        throw LocalAgentError.invalidOutput(raw: outputText, reason: "News Researcher returned an invalid research result. Review the raw output and retry.")
     }
 
     private func extractJSON(from text: String) -> String {

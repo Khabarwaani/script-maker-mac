@@ -11,14 +11,22 @@ struct LocalAgentDefinition: Identifiable, Equatable, Sendable {
     func supports(_ provider: LocalAgentProvider) -> Bool { provider != .appleLocal || !requiresWebResearch }
 }
 
-enum LocalAgentProvider: String, CaseIterable, Identifiable, Sendable {
+enum LocalAgentProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     case codex, claude, antigravity, grok, appleLocal
     var id: String { rawValue }
     var title: String { self == .appleLocal ? "Apple Intelligence (on-device)" : rawValue.capitalized }
     var executable: String { self == .antigravity ? "agy" : rawValue }
+    var sessionArguments: [String] {
+        switch self {
+        case .codex: return ["--skip-git-repo-check"]
+        case .antigravity: return ["--new-project", "--sandbox"]
+        case .grok: return ["--single"]
+        default: return []
+        }
+    }
 }
 
-struct LocalAgentSessionSettings: Sendable {
+struct LocalAgentSessionSettings: Sendable, Equatable {
     enum Persistence: String, CaseIterable, Identifiable, Sendable {
         case ephemeral, persistentStdio, daemon
         var id: String { rawValue }
