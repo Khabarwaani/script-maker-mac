@@ -128,6 +128,7 @@ final class LibraryViewModel {
     var isSavingEdits = false
     var isImportingMedia = false
     var imagePreviews: [String: Data] = [:]
+    var imageErrors: [String: String] = [:]
     var canSaveEdits: Bool { !StringFormatting.isBlank(editedTitle) && !isSavingEdits && busyUpdates.isEmpty }
 
     func importMedia(_ source: URL, kind: LibraryMediaKind, storyID: String) async {
@@ -152,8 +153,8 @@ final class LibraryViewModel {
         for value in story.imageURLs ?? [] {
             guard imagePreviews[value] == nil, let url = URL(string: value),
                   url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { continue }
-            do { imagePreviews[value] = try await importer.imageData(at: url) }
-            catch { actionNotice = "Could not load image: \(StringFormatting.errorMessage(error))" }
+            do { imagePreviews[value] = try await importer.imageData(at: url); imageErrors[value] = nil }
+            catch { imageErrors[value] = StringFormatting.errorMessage(error) }
         }
     }
 
@@ -208,7 +209,7 @@ final class LibraryViewModel {
         defer { busyUpdates.remove(kind) }
         do {
             let warnings = try await applyUpdate(kind, storyID: story.id)
-            if selectedStoryID == story.id { actionNotice = "\(kind.rawValue.capitalized) updated" + (warnings.isEmpty ? "" : ". " + warnings.joined(separator: " ")) }
+            if selectedStoryID == story.id { actionNotice = (kind == .images ? "Image search complete; existing images retained" : "\(kind.rawValue.capitalized) updated") + (warnings.isEmpty ? "" : ". " + warnings.joined(separator: " ")) }
         } catch { if selectedStoryID == story.id { actionNotice = StringFormatting.errorMessage(error) } }
     }
 
@@ -225,7 +226,9 @@ final class LibraryViewModel {
             current.hashtags = values
         case .images:
             guard let values = result.images else { throw APIError.malformed("Missing images update") }
-            current.imageURLs = (current.imageURLs ?? []).filter { URL(string: $0)?.isFileURL == true } + values
+            var seen = Set(current.imageURLs ?? [])
+            current.imageURLs = (current.imageURLs ?? []) + values.filter { seen.insert($0).inserted }
+            if let previews = result.imagePreviews { imagePreviews.merge(previews) { _, new in new } }
         case .news:
             guard let values = result.news else { throw APIError.malformed("Missing news update") }
             current.sourceLinks = values

@@ -295,7 +295,7 @@ final class LocalLibraryNetworkTests: XCTestCase {
             XCTAssertEqual(url.host, "publisher.test")
             XCTAssertEqual(url.path, "/photo.jpg")
             XCTAssertEqual(url.query, "a=1&b=2")
-            XCTAssertEqual(request.httpMethod, "HEAD")
+            XCTAssertEqual(request.httpMethod, "GET")
             return (200, ["Content-Type": "image/jpeg"], Data())
         }
         let client = updater()
@@ -465,5 +465,60 @@ final class LocalLibraryNetworkTests: XCTestCase {
         XCTAssertTrue(result.message.contains("sent to 1 chat(s)"))
         XCTAssertTrue(result.message.contains("Partial failure"))
         XCTAssertTrue(result.message.contains("-1001"))
+    }
+}
+
+@MainActor
+final class LibraryImageAppendTests: XCTestCase {
+    func testRepeatedImageFetchPreservesExistingImagesAndDeduplicatesNewResults() async {
+        let repository = LocalLibraryRepository()
+        let story = Story(title: "Image test", imageURLs: ["file:///tmp/imported.jpg", "https://existing.test/photo.jpg"])
+        await repository.save(story)
+        let vm = LibraryViewModel(config: AppConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), repository: repository, updater: LocalLibraryUpdaterStub())
+        await vm.refresh()
+        vm.selectedStoryID = story.id
+        await vm.update(.images)
+        await vm.update(.images)
+        XCTAssertEqual(vm.selectedStory?.imageURLs, ["file:///tmp/imported.jpg", "https://existing.test/photo.jpg", "https://publisher.test/photo.jpg"])
+    }
+}
+
+extension LocalLibraryNetworkTests {
+    func testGoogleWrapperUsesPublisherSearchAndTriesAlternativeImageMetadata() async throws {
+        let probe = LibrarySearchProbe()
+        LocalLibraryHTTPStub.handler = { request in
+            switch request.url!.path {
+            case "/article":
+                return (200, [:], Data(#"<meta property="og:image" content="/broken.jpg"><meta name="twitter:image" content="/usable.jpg">"#.utf8))
+            case "/broken.jpg": return (403, [:], Data())
+            case "/usable.jpg":
+                XCTAssertEqual(request.httpMethod, "GET")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://publisher.test/article")
+                return (200, ["Content-Type": "image/jpeg"], Data([1, 2, 3]))
+            default:
+                XCTFail("Google wrapper should not be scraped for publisher images")
+                return (404, [:], Data())
+            }
+        }
+        let client = LocalLibraryUpdateClient(httpClient: http(), news: { (probe, 20) }, imageNews: { (probe, 20) })
+        let story = Story(title: "Indian physicist wins Oskar Klein medal, one of the top prizes in physics", sourceLinks: [.init(title: "News", url: "https://news.google.com/rss/articles/opaque", source: "Publisher")])
+        let result = try await client.update(.images, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        XCTAssertEqual(result.images, ["https://publisher.test/usable.jpg"])
+        XCTAssertEqual(result.imagePreviews?["https://publisher.test/usable.jpg"], Data([1, 2, 3]))
+    }
+
+    func testFetchMoreSkipsAlreadySavedImageAndReturnsAnotherCandidate() async throws {
+        let probe = LibrarySearchProbe()
+        LocalLibraryHTTPStub.handler = { request in
+            if request.url!.path == "/article" {
+                return (200, [:], Data(#"<meta property="og:image" content="/old.jpg"><meta name="twitter:image" content="/new.jpg">"#.utf8))
+            }
+            XCTAssertEqual(request.url!.path, "/new.jpg")
+            return (200, ["Content-Type": "image/jpeg"], Data([4]))
+        }
+        let client = LocalLibraryUpdateClient(httpClient: http(), news: { (probe, 20) })
+        let story = Story(title: "Physics", imageURLs: ["https://publisher.test/old.jpg"])
+        let result = try await client.update(.images, story: story, engine: "None", instruction: "", localJSON: false, delay: 0, serverURL: nil)
+        XCTAssertEqual(result.images, ["https://publisher.test/new.jpg"])
     }
 }

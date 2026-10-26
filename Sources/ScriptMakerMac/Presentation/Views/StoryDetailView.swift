@@ -123,7 +123,7 @@ private struct StoryDetailToolbar: View {
         HStack(spacing: 12) {
             Button { Task { await viewModel.update(.images) } } label: {
                 LibraryActionLabel(icon: "photo.badge.arrow.down", isLoading: viewModel.busyUpdates.contains(.images))
-            }.buttonStyle(.plain).help("Update images").accessibilityLabel("Update images")
+            }.buttonStyle(.plain).help("Fetch more images; keep existing images").accessibilityLabel("Fetch more images")
                 .disabled(viewModel.busyUpdates.contains(.images))
             Button { Task { await viewModel.enrich(storyID: story.id) } } label: {
                 LibraryActionLabel(icon: "arrow.triangle.2.circlepath", isLoading: !viewModel.busyUpdates.isEmpty)
@@ -327,6 +327,15 @@ private struct StoryImagesSection: View {
     @Bindable var viewModel: LibraryViewModel
     var body: some View {
         StoryDetailSection("Images") {
+            HStack {
+                Text("Publisher images").font(.caption).foregroundStyle(AppTheme.secondaryInk)
+                Spacer()
+                LoadingButton(isLoading: viewModel.busyUpdates.contains(.images)) {
+                    Task { await viewModel.update(.images) }
+                } label: {
+                    Label(story.imageURLs?.isEmpty == false ? "Fetch more" : "Fetch images", systemImage: "photo.badge.arrow.down")
+                }.disabled(!viewModel.busyUpdates.isEmpty || viewModel.isSavingEdits)
+            }
             if let images = story.imageURLs, !images.isEmpty {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180))], spacing: 12) {
                     ForEach(images, id: \.self) { value in
@@ -336,6 +345,10 @@ private struct StoryImagesSection: View {
                             } else {
                                 Image(systemName: "photo").font(.largeTitle).foregroundStyle(AppTheme.secondaryInk)
                                     .frame(maxWidth: .infinity, minHeight: 80)
+                                if let error = viewModel.imageErrors[value] {
+                                    Text(error).font(.caption).foregroundStyle(AppTheme.secondaryInk).lineLimit(2)
+                                    Button("Retry image") { Task { await viewModel.loadImagePreviews(for: story) } }
+                                }
                             }
                             if value.hasPrefix("sample:") {
                                 Text("Local JSON · sample image").font(.caption)
@@ -357,7 +370,7 @@ private struct StoryImagesSection: View {
                     }
                 }
             } else {
-                Text("No images added. Use Update images to fetch story images.")
+                Text("No images yet. Fetch images to search publisher articles; Fetch more keeps existing images.")
                     .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             }
         }

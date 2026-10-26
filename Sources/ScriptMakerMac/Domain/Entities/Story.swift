@@ -93,6 +93,7 @@ struct LibraryUpdateResult: Codable, Sendable {
     var images: [String]?
     var news: [StorySourceLink]?
     var warnings: [String]? = nil
+    var imagePreviews: [String: Data]? = nil
 }
 
 enum StoryCopyFormat: String, CaseIterable, Identifiable {
