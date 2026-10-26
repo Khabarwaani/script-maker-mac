@@ -294,23 +294,13 @@ private struct TestMediaImporter: LibraryMediaImporting {
 }
 
 final class LibraryNetworkContractTests: XCTestCase {
-    func testServerModelCatalogUsesConfiguredURLWithoutDelayAndFailsLoud() async throws {
-        LibraryStubProtocol.status = 200
-        LibraryStubProtocol.body = Data(#"{"providers":[{"id":"provider","label":"Provider","models":[{"id":"model","label":"Model","reasoning":["high"]}]}]}"#.utf8)
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [LibraryStubProtocol.self]
-        let client = AIModelCatalogClient(httpClient: HTTPClient(session: URLSession(configuration: configuration)), bundled: BundledStudioCatalog())
-        let catalog = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test:8000/api"))
-        XCTAssertEqual(catalog.providers.first?.models.first?.id, "model")
-        XCTAssertEqual(LibraryStubProtocol.captured?.url?.absoluteString, "http://models.test:8000/api/ai/models")
-        LibraryStubProtocol.status = 501
-        do {
-            _ = try await client.load(localJSON: false, delay: 60, serverURL: URL(string: "http://models.test"))
-            XCTFail("Server mode must not substitute local models")
-        } catch {
-            guard case APIError.notImplemented(let reason) = error else { return XCTFail("Expected unsupported catalog: \(error)") }
-            XCTAssertTrue(reason.contains("not implemented"))
-        }
+    func testBundledModelCatalogLoadsWithoutServerOrSimulationInputs() async throws {
+        let client = BundledAIModelCatalog(bundled: BundledStudioCatalog())
+        let catalog = try await client.load()
+        XCTAssertFalse(catalog.providers.isEmpty)
+        XCTAssertTrue(catalog.providers.allSatisfy { provider in
+            provider.models.contains { $0.id == "Default" && $0.reasoning == ["default"] }
+        })
     }
 
     private func client(status: Int = 200, body: String) -> LibraryUpdateClient {
@@ -420,7 +410,7 @@ final class SharedAISelectionTests: XCTestCase {
         let source = config.dataSource, delay = config.localJSONDelay
         defer { config.selectedAI = original; config.recentAIIdentifiers = recents; config.dataSource = source; config.localJSONDelay = delay }
         config.dataSource = .offline; config.localJSONDelay = 0
-        let vm = PreferencesViewModel(config: config, connectionChecker: ModelTestChecker(), modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()))
+        let vm = PreferencesViewModel(config: config, modelCatalogProvider: BundledAIModelCatalog(bundled: BundledStudioCatalog()))
         await vm.editModel()
         XCTAssertNil(vm.modelError)
         vm.draftProvider = "Codex"; vm.updateModelOptions()

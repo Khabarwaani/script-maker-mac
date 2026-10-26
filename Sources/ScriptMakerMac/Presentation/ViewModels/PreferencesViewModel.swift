@@ -1,13 +1,11 @@
 import Foundation
 import Observation
 
-/// Preferences screen logic: edit + validate the server URL, test connectivity.
-/// Changes are staged in the view model and only saved to config on Save().
+/// App preferences and validated discovery/upload settings.
 @Observable
 @MainActor
 final class PreferencesViewModel {
     private let config: AppConfig
-    private let connectionChecker: any ServerConnectionChecking
     private let modelCatalogProvider: (any AIModelCatalogProviding)?
     private let uploadSettings: (any UploadSettingsStoring)?
     var uploadOptions = LibraryUploadOptions()
@@ -179,7 +177,7 @@ final class PreferencesViewModel {
         modelCatalog = nil
         do {
             guard let modelCatalogProvider else { throw APIError.notImplemented("Model catalog is unavailable.") }
-            let loaded = try await modelCatalogProvider.load(localJSON: config.dataSource != .server, delay: config.localJSONDelay, serverURL: config.dataSource == .server ? try config.baseURL() : nil)
+            let loaded = try await modelCatalogProvider.load()
             guard !loaded.providers.isEmpty, loaded.providers.allSatisfy({ !$0.id.isEmpty && !$0.models.isEmpty && $0.models.allSatisfy({ !$0.id.isEmpty && !$0.reasoning.isEmpty }) }) else { throw APIError.malformed("Empty AI model catalog") }
             modelCatalog = loaded
             if !providerOptions.contains(draftProvider) { draftProvider = providerOptions.first ?? "" }
@@ -198,27 +196,13 @@ final class PreferencesViewModel {
         isEditingModel = false
     }
 
-    var draftURL: String
-    var dataSource: DataSource
-    var errorMessage: String?
-    var noticeMessage: String?
-    var isTesting = false
-
-    init(config: AppConfig, connectionChecker: any ServerConnectionChecking, modelCatalogProvider: (any AIModelCatalogProviding)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil) {
+    init(config: AppConfig, modelCatalogProvider: (any AIModelCatalogProviding)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil) {
         self.config = config
-        self.connectionChecker = connectionChecker
         self.modelCatalogProvider = modelCatalogProvider
         self.uploadSettings = uploadSettings
         self.draftNewsSettings = config.newsSettings
         self.draftTrendingSettings = config.trendingSettings
         self.draftNewsPageSize = config.newsPageSize
-        self.draftURL = config.serverURL
-        self.dataSource = config.dataSource
-    }
-
-    var localJSONDelay: Double {
-        get { config.localJSONDelay }
-        set { config.localJSONDelay = min(max(newValue, 0), 60) }
     }
 
     var newsPageSize: Int {
@@ -226,7 +210,6 @@ final class PreferencesViewModel {
         set { draftNewsPageSize = min(max(newValue, 1), 100) }
     }
 
-    var currentURL: String { config.serverURL }
     var appearance: AppAppearance {
         get { config.appearance }
         set { config.appearance = newValue }
@@ -236,58 +219,4 @@ final class PreferencesViewModel {
         set { config.scriptRefinementMode = newValue }
     }
 
-    /// Save all staged changes to config.
-    func save() async {
-        guard !isTesting else { return }
-        errorMessage = nil
-        noticeMessage = nil
-
-        if dataSource != .server {
-            if let normalized = try? AppConfig.normalize(raw: draftURL), URL(string: normalized) != nil {
-                config.serverURL = normalized
-                draftURL = normalized
-            }
-            config.dataSource = dataSource
-            noticeMessage = "Using Local JSON with a \(localJSONDelay)-second simulation delay."
-            return
-        }
-        isTesting = true
-        defer { isTesting = false }
-        do {
-            let normalized = try AppConfig.normalize(raw: draftURL)
-            guard let url = URL(string: normalized) else { throw ConfigError.invalidURL(draftURL) }
-            let reachable = await connectionChecker.isReachable(at: url)
-            config.serverURL = normalized
-            draftURL = normalized
-            config.dataSource = .server
-            dataSource = .server
-            noticeMessage = reachable ? "Using server." : "Saved server configuration. Warning: server is currently unreachable at this URL."
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func resetToDefaults() {
-        draftURL = AppConfig.defaultServerURL
-        dataSource = .offline
-        errorMessage = nil
-        noticeMessage = "Defaults restored. Save to apply."
-    }
-
-    func testConnection() async {
-        guard !isTesting else { return }
-        isTesting = true
-        defer { isTesting = false }
-        errorMessage = nil
-        noticeMessage = nil
-        do {
-            let normalized = try AppConfig.normalize(raw: draftURL)
-            guard let url = URL(string: normalized) else { throw ConfigError.invalidURL(draftURL) }
-            noticeMessage = await connectionChecker.isReachable(at: url)
-                ? "Server reachable. Save with Server selected to use it."
-                : "Server unavailable. Local JSON is available without a server."
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }

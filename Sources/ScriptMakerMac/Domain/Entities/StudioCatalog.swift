@@ -5,7 +5,7 @@ protocol StudioCatalogProviding {
 }
 
 protocol AIModelCatalogProviding {
-    func load(localJSON: Bool, delay: TimeInterval, serverURL: URL?) async throws -> AIModelCatalog
+    func load() async throws -> AIModelCatalog
 }
 
 struct AIModelCatalog: Codable {

@@ -86,14 +86,14 @@ final class LocalLibraryWorkflowTests: XCTestCase {
 
     func testUploadUsesLatestSavedSettingsWithoutAnUploadForm() async throws {
         let settings = UploadSettingsStub()
-        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let preferences = PreferencesViewModel(config: config(), uploadSettings: settings)
         preferences.loadUploadSettings()
         preferences.uploadOptions = .init(telegramToken: " 123:token ", telegramChatID: " 42 ", includeTelegramGroups: true,
                                           googleAccessToken: " access ", googleEndpoint: "https://script.google.com/macros/s/test/exec")
         preferences.saveUploadSettings()
         XCTAssertNil(preferences.uploadSettingsError)
         XCTAssertNotNil(preferences.uploadSettingsNotice)
-        let reopened = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let reopened = PreferencesViewModel(config: config(), uploadSettings: settings)
         reopened.loadUploadSettings()
         XCTAssertEqual(reopened.uploadOptions, settings.options)
         XCTAssertEqual(reopened.uploadOptions.telegramChatID, "42")
@@ -114,7 +114,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
 
     func testUploadSettingsFailuresPreventUploadAndReportSaveFailure() async {
         let settings = UploadSettingsStub()
-        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let preferences = PreferencesViewModel(config: config(), uploadSettings: settings)
         preferences.loadUploadSettings()
         settings.fails = true
         preferences.saveUploadSettings()
@@ -137,7 +137,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
     func testInvalidUploadSettingsPreserveSavedValues() {
         let settings = UploadSettingsStub()
         settings.options.telegramChatID = "42"
-        let preferences = PreferencesViewModel(config: config(), connectionChecker: UploadSettingsChecker(), uploadSettings: settings)
+        let preferences = PreferencesViewModel(config: config(), uploadSettings: settings)
         preferences.loadUploadSettings()
         preferences.uploadOptions.telegramChatID = "invalid"
         preferences.saveUploadSettings()

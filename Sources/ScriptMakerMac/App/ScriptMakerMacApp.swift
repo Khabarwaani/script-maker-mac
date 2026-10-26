@@ -33,9 +33,8 @@ struct ScriptMakerMacApp: App {
 enum CompositionRoot {
     static func makeContentViewModel() -> ContentViewModel {
         let config = AppConfig()
-        let checker = ServerConnectionChecker(httpClient: HTTPClient())
         let uploadSettings = MacUploadSettingsStore(credentials: CredentialStore(service: "ScriptMakerMac", account: "upload-settings"))
-        let preferences = PreferencesViewModel(config: config, connectionChecker: checker, modelCatalogProvider: AIModelCatalogClient(httpClient: HTTPClient(), bundled: BundledStudioCatalog()), uploadSettings: uploadSettings)
+        let preferences = PreferencesViewModel(config: config, modelCatalogProvider: BundledAIModelCatalog(bundled: BundledStudioCatalog()), uploadSettings: uploadSettings)
         let repository = LocalStoryRepository()
         let makeNews: @MainActor @Sendable (Bool) throws -> any NewsSearching = { forceFresh in
             NewsSearchClient(configuration: try config.newsSettings.frameworkConfiguration(forceFresh: forceFresh))
