@@ -35,3 +35,14 @@ BUILT_APP="$(ruby -rjson -e '
   settings = targets.find { |target| target["target"] == "ScriptMakerMac" }.fetch("buildSettings")
   puts File.join(settings.fetch("TARGET_BUILD_DIR"), settings.fetch("FULL_PRODUCT_NAME"))
 ' "$SETTINGS_FILE")"
+
+if [ ! -d "$BUILT_APP" ]; then
+    echo "ERROR: built app missing at $BUILT_APP." >&2
+    exit 1
+fi
+echo "==> Built: $BUILT_APP"
+
+echo "==> Creating DMG..."
+hdiutil create -volname "Script Maker" -srcfolder "$BUILT_APP" -ov -format UDZO "$DMG"
+hdiutil verify "$DMG"
+echo "Done: $(pwd)/$DMG"
