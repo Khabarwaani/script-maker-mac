@@ -11,6 +11,11 @@ final class ScriptDetailViewModel {
     let clipboard: any ClipboardWriting
     let config: AppConfig
 
+    private var detailTask: Task<Void, Never>?
+    private var operationID = UUID()
+    private var histories: [String: [ScriptChatTurn]] = [:]
+    private(set) var turns: [ScriptChatTurn] = []
+
     var items: [ScriptDetailItem] = []
     var selectedItemID: String? = nil
     var searchQuery: String = ""
@@ -59,7 +64,7 @@ final class ScriptDetailViewModel {
     }
 
     var canRunDetail: Bool {
-        !editingOriginalScript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isDetailing
+        !editingOriginalScript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isDetailing && !isSaving && availableProviders[selectedProvider]?.isAvailable != false
     }
 
     var canCopy: Bool {
@@ -82,7 +87,7 @@ final class ScriptDetailViewModel {
         let all = await repository.all()
         items = all.sorted { $0.createdAt > $1.createdAt }
         if let current = selectedItemID, items.contains(where: { $0.id == current }) {
-            selectItem(id: current)
+            return
         } else if let first = items.first {
             selectItem(id: first.id)
         } else {
@@ -91,7 +96,9 @@ final class ScriptDetailViewModel {
     }
 
     func selectItem(id: String) {
+        cancelDetail()
         selectedItemID = id
+        turns = histories[id] ?? []
         guard let item = items.first(where: { $0.id == id }) else { return }
         editingTitle = item.title
         editingOriginalScript = item.originalScript
@@ -140,35 +147,64 @@ final class ScriptDetailViewModel {
     }
 
     func runDetail() async {
-        guard canRunDetail else { return }
+        guard canRunDetail, let itemID = selectedItemID else { return }
         isDetailing = true
         errorMessage = nil
-        defer { isDetailing = false }
-
-        let draft = ScriptDetailDraft(
-            latestScript: editingDetailedScript,
-            instruction: editingConsolidatedInstruction
-        )
-        let sessionID = selectedItemID.map { "script-detail-\($0)" }
+        let id = UUID()
+        operationID = id
+        let directive = editingUserInstruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        let instruction = directive.isEmpty ? editingConsolidatedInstruction : directive
         let request = ScriptDetailRequest(
             originalScript: editingOriginalScript,
-            draft: draft,
-            userInstruction: editingUserInstruction,
+            draft: ScriptDetailDraft(latestScript: editingDetailedScript, instruction: editingConsolidatedInstruction),
+            userInstruction: instruction,
             provider: selectedProvider,
             model: effectiveModel,
-            sessionID: sessionID,
+            sessionID: "script-detail-\(itemID)",
             mode: executionMode
         )
-
-        do {
-            let result = try await service.detail(request)
-            editingDetailedScript = result.latestScript
-            editingConsolidatedInstruction = result.instruction
-            editingUserInstruction = ""
-            await saveCurrentItem()
-        } catch {
-            errorMessage = error.localizedDescription
+        detailTask = Task { [weak self, service] in
+            do {
+                let result = try await service.detail(request)
+                try Task.checkCancellation()
+                guard let self, self.operationID == id, self.selectedItemID == itemID else { return }
+                guard !StringFormatting.isBlank(result.latestScript) else {
+                    throw LocalAgentError.invalidInput("Script Detail returned an empty script.")
+                }
+                self.editingDetailedScript = result.latestScript
+                self.editingConsolidatedInstruction = result.instruction
+                self.editingUserInstruction = ""
+                self.turns.append(ScriptChatTurn(userInstruction: instruction, script: result.latestScript, instruction: result.instruction))
+                self.histories[itemID] = self.turns
+                await self.saveCurrentItem()
+            } catch {
+                guard let self, self.operationID == id, !Task.isCancelled else { return }
+                self.errorMessage = StringFormatting.errorMessage(error)
+            }
+            guard let self, self.operationID == id else { return }
+            self.isDetailing = false
+            self.detailTask = nil
         }
+        await detailTask?.value
+    }
+
+    func cancelDetail() {
+        operationID = UUID()
+        detailTask?.cancel()
+        detailTask = nil
+        isDetailing = false
+    }
+
+    func resetDetail() async {
+        cancelDetail()
+        editingDetailedScript = ""
+        editingConsolidatedInstruction = ""
+        editingUserInstruction = ""
+        errorMessage = nil
+        turns = []
+        if let id = selectedItemID { histories[id] = nil }
+        await saveCurrentItem()
+        await service.closeSession()
     }
 
     func copyScript() {
@@ -189,7 +225,7 @@ final class ScriptDetailViewModel {
 
     func deleteItem(id: String) async {
         await repository.remove(id: id)
-        items.removeAll { $0.id == id }
+        items.removeAll { $0.id == id }; histories[id] = nil
         if selectedItemID == id {
             if let first = items.first {
                 selectItem(id: first.id)
