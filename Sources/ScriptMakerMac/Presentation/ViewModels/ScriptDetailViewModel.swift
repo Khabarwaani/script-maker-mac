@@ -196,6 +196,7 @@ final class ScriptDetailViewModel {
     }
 
     func resetDetail() async {
+        let owner = selectedItemID.map { "script-detail-\($0)" }
         cancelDetail()
         editingDetailedScript = ""
         editingConsolidatedInstruction = ""
@@ -204,7 +205,7 @@ final class ScriptDetailViewModel {
         turns = []
         if let id = selectedItemID { histories[id] = nil }
         await saveCurrentItem()
-        if let id = selectedItemID { await service.closeSession(id: "script-detail-\(id)") }
+        if let owner { await service.closeSession(id: owner) }
     }
 
     func copyScript() {

@@ -492,7 +492,30 @@ final class AgentSessionIsolationTests: XCTestCase {
         await service.closeSession(id: "detail")
     }
 
+    func testCancellingOneOwnerDoesNotClearAnotherRunningOwner() async throws {
+        let firstStarted = expectation(description: "First owner running")
+        let bothStarted = expectation(description: "Both owners running")
+        let gate = SessionExecutionGate(started: firstStarted, concurrent: bothStarted)
+        let resources = SessionResources(gate: gate)
+        let service = service(resources)
+        let chat = try request(owner: "chat"), detail = try request(owner: "detail")
+        let first = Task { try await service.run(chat) }
+        await fulfillment(of: [firstStarted], timeout: 2)
+        let second = Task { try await service.run(detail) }
+        await fulfillment(of: [bothStarted], timeout: 2)
+        first.cancel()
+        await gate.releaseAll()
+        do { _ = try await first.value; XCTFail("Expected cancellation") }
+        catch is CancellationError { }
+        _ = try await second.value
+        XCTAssertGreaterThan(resources.sessions[0].clears, 0)
+        XCTAssertEqual(resources.sessions[1].clears, 0)
+        await service.closeSession(id: "chat")
+        await service.closeSession(id: "detail")
+    }
+
     func testSameOwnerSerializesAndQueuedCancellationDoesNotClearActiveSession() async throws {
+
         let firstStarted = expectation(description: "First request running")
         let concurrent = expectation(description: "No concurrent use of one session")
         concurrent.isInverted = true
