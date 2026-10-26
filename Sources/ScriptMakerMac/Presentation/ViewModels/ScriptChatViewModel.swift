@@ -65,7 +65,7 @@ final class ScriptChatViewModel {
         cancel()
         let id = operationID
         isRefining = true
-        await service.closeSession()
+        await service.closeSession(id: sessionID)
         guard operationID == id else { return }
         selectedRevisionID = revisionID
         draft = revision?.draft ?? ScriptChatDraft(latestScript: originalScript, instruction: originalInstruction)
@@ -132,13 +132,14 @@ final class ScriptChatViewModel {
             return
         }
         let previousStoryID = source?.id
+        let previousSessionID = sessionID
         cancel()
         source = nil; turns = []; revisions = []; selectedRevisionID = nil; historyEdits = [:]; userInstruction = ""; errorMessage = nil; hasSavedDraft = false
         draft = ScriptChatDraft(latestScript: "", instruction: "")
         instructionDraft = ""
         if let config { mode = config.scriptRefinementMode }
         if let previousStoryID, previousStoryID != story.id {
-            Task { [service] in await service.closeSession() }
+            Task { [service] in await service.closeSession(id: previousSessionID) }
         }
         guard let script = story.scriptText, !StringFormatting.isBlank(script) else {
             errorMessage = "This story has no script to refine."
@@ -175,17 +176,17 @@ final class ScriptChatViewModel {
         let script = originalScript
         draft = ScriptChatDraft(latestScript: script, instruction: originalInstruction)
         instructionDraft = draft.instruction
-        await service.closeSession()
+        await service.closeSession(id: sessionID)
     }
 
     func closeSession() async {
         cancel()
-        await service.closeSession()
+        await service.closeSession(id: sessionID)
     }
 
     func prewarm() async {
         guard canUseProvider || (source != nil && !isRefining) else { return }
-        await service.prewarm(for: provider, model: model, mode: mode)
+        await service.prewarm(for: provider, model: model, mode: mode, sessionID: sessionID)
     }
 
     func refreshProviders() async {

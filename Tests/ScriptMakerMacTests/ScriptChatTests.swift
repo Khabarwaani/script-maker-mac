@@ -9,6 +9,8 @@ private actor ChatRefinerStub: ScriptChatRefining {
     var shouldReturnBlank = false
     var failOnRequest: Int?
     var prewarmedModes: [ScriptRefinementExecutionMode] = []
+    var prewarmedOwners: [String] = []
+    var closedOwners: [String] = []
     func configure(fail: Bool = false, blank: Bool = false) { shouldFail = fail; shouldReturnBlank = blank }
     func fail(onRequest number: Int) { failOnRequest = number }
     func availability() -> [LocalAgentProvider: LocalAgentAvailability] { [.codex: .init(isAvailable: true, reason: "Ready")] }
@@ -17,6 +19,15 @@ private actor ChatRefinerStub: ScriptChatRefining {
         prewarmedModes.append(mode)
     }
     func closeSession() { closeSessionCount += 1 }
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) {
+        prewarmedOwners.append(sessionID)
+        prewarm(for: provider, model: model, mode: mode)
+    }
+    func closeSession(id: String) {
+        closedOwners.append(id)
+        closeSession()
+    }
+
     func refine(_ request: ScriptChatRequest) async throws -> ScriptChatDraft {
         requests.append(request)
         if shouldFail || requests.count == failOnRequest { throw APIError.transport("Provider unavailable") }
@@ -204,7 +215,23 @@ final class ScriptChatServiceTests: XCTestCase {
         XCTAssertEqual(closed, "test-session")
     }
 
+    func testExplicitOwnerIsPassedThroughPrewarmRunAndClose() async throws {
+        let runner = ChatRunnerStub()
+        let service: any ScriptChatRefining = LocalScriptChatService(runner: runner)
+        await service.prewarm(for: .codex, model: "m", mode: .fastClean, sessionID: "story-owner")
+        _ = try await service.refine(.init(originalScript: "Original", draft: .init(latestScript: "Draft", instruction: "Inst"),
+            userInstruction: "Shorten", provider: .codex, model: "m", sessionID: "story-owner"))
+        await service.closeSession(id: "story-owner")
+        let warmed = await runner.prewarmedSessionID
+        let request = await runner.lastRequest
+        let closed = await runner.closedSessionID
+        XCTAssertEqual(warmed, "story-owner")
+        XCTAssertEqual(request?.sessionID, warmed)
+        XCTAssertEqual(closed, warmed)
+    }
+
     func testScriptRefinementExecutionModesConfigureSessionCorrectly() async throws {
+
         let runner = ChatRunnerStub()
         let service = LocalScriptChatService(runner: runner, sessionID: "custom-session")
 
@@ -537,7 +564,21 @@ extension ScriptChatTests {
         XCTAssertEqual(chat.draft.latestScript, "Draft 1")
     }
 
+    func testPrewarmAndCloseUseTheStoryOwner() async {
+        let service = ChatRefinerStub()
+        let chat = ScriptChatViewModel(service: service)
+        let story = Story(scriptText: "Original script")
+        chat.begin(story)
+        await chat.prewarm()
+        await chat.closeSession()
+        let warmed = await service.prewarmedOwners
+        let closed = await service.closedOwners
+        XCTAssertEqual(warmed, ["script-chat-\(story.id)"])
+        XCTAssertEqual(closed, warmed)
+    }
+
     func testResetClearsTurnsAndDraftAndClosesSession() async throws {
+
         let service = ChatRefinerStub()
         let chat = ScriptChatViewModel(service: service)
         let story = Story(scriptText: "Baseline story script")

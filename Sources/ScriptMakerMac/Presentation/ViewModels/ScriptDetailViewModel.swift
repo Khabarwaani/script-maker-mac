@@ -204,7 +204,7 @@ final class ScriptDetailViewModel {
         turns = []
         if let id = selectedItemID { histories[id] = nil }
         await saveCurrentItem()
-        await service.closeSession()
+        if let id = selectedItemID { await service.closeSession(id: "script-detail-\(id)") }
     }
 
     func copyScript() {

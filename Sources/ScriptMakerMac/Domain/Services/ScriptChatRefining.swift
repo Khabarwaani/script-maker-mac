@@ -20,6 +20,8 @@ protocol ScriptChatRefining: Sendable {
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability]
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) async
     func closeSession() async
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async
+    func closeSession(id: String) async
 }
 
 extension ScriptChatRefining {
@@ -28,6 +30,10 @@ extension ScriptChatRefining {
     }
     func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode) async {}
     func closeSession() async {}
+    func prewarm(for provider: LocalAgentProvider, model: String, mode: ScriptRefinementExecutionMode, sessionID: String) async {
+        await prewarm(for: provider, model: model, mode: mode)
+    }
+    func closeSession(id: String) async { await closeSession() }
 }
 
 struct ScriptChatTurn: Identifiable, Hashable, Codable, Sendable {
