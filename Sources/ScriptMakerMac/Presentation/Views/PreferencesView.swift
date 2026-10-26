@@ -36,50 +36,11 @@ struct PreferencesView: View {
                     Text(viewModel.scriptRefinementMode.summary)
                         .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("SOURCE").font(.caption.weight(.bold)).tracking(0.7).foregroundStyle(AppTheme.secondaryInk)
-                    StudioChoiceGroup(title: "Source", selection: $viewModel.dataSource, options: [.offline, .server], label: { $0.label })
-                    if viewModel.dataSource == .offline {
-                        HStack {
-                            Text("Network delay (s)")
-                            TextField("Seconds", value: $viewModel.localJSONDelay, format: .number)
-                                .frame(width: 60).textFieldStyle(.roundedBorder)
-                            Stepper("", value: $viewModel.localJSONDelay, in: 0...60, step: 0.5).labelsHidden()
-                        }
-                    }
-                    Text(viewModel.dataSource != .server
-                         ? "Bundled examples are ready to use. Explore every generation stage without a connection."
-                         : "Generation uses your configured pipeline server.")
-                        .font(.callout).foregroundStyle(AppTheme.secondaryInk)
-                    if viewModel.dataSource == .server {
-                        TextField("Server URL", text: $viewModel.draftURL).textFieldStyle(.roundedBorder)
-                    }
-                    HStack {
-                        if viewModel.dataSource == .server {
-                            LoadingButton(isLoading: viewModel.isTesting) {
-                                Task { await viewModel.testConnection() }
-                            } label: {
-                                Text("Test connection")
-                            }
-                        }
-                        LoadingButton(isLoading: viewModel.isTesting) {
-                            Task { await viewModel.save() }
-                        } label: {
-                            Text("Apply")
-                        }
-                    }
-                }
-                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.line, lineWidth: 1))
-
                 NewsDiscoverySettingsView(viewModel: viewModel)
                 TrendingDiscoverySettingsView(viewModel: viewModel)
 
                 LibraryUploadSettingsView(viewModel: viewModel)
 
-                if let error = viewModel.errorMessage { Text(error).foregroundStyle(AppTheme.danger) }
-                if let notice = viewModel.noticeMessage { Text(notice).foregroundStyle(AppTheme.secondaryInk) }
                 HStack {
                     Spacer()
                     Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(StudioPrimaryButtonStyle())

@@ -26,7 +26,7 @@ enum LocalAgentProvider: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct LocalAgentSessionSettings: Sendable {
+struct LocalAgentSessionSettings: Sendable, Equatable {
     enum Persistence: String, CaseIterable, Identifiable, Sendable {
         case ephemeral, persistentStdio, daemon
         var id: String { rawValue }

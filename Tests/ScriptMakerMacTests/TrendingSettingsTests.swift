@@ -101,7 +101,7 @@ final class TrendingSettingsTests: XCTestCase {
     func testTrendSettingsPersistAndInvalidEditsPreserveConfiguration() {
         let defaults = UserDefaults(suiteName: "trends.settings.\(UUID().uuidString)")!
         let config = AppConfig(defaults: defaults)
-        let vm = PreferencesViewModel(config: config, connectionChecker: TrendSettingsChecker())
+        let vm = PreferencesViewModel(config: config)
         vm.draftTrendingSettings.platform = .twitter
         vm.draftTrendingSettings.twitterEndpoint = "https://example.com/trends"
         vm.draftTrendingSettings.region = " us "

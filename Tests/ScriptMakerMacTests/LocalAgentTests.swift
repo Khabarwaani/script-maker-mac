@@ -364,3 +364,247 @@ final class LocalAgentWorkspaceTests: XCTestCase {
         XCTAssertEqual(URL(fileURLWithPath: actual).resolvingSymlinksInPath(), workspace.resolvingSymlinksInPath())
     }
 }
+
+final class AgentSessionIsolationTests: XCTestCase {
+    private func request(owner: String? = "chat") throws -> LocalAgentRequest {
+        var request = LocalAgentRequest(agentID: "SyntheticNewAgent", version: "1.0.0",
+            inputJSON: try payload(), provider: .codex, executable: "fake", sessionID: owner)
+        request.session.persistence = .persistentStdio
+        request.session.keepMemory = true
+        return request
+    }
+
+    private func service(_ resources: SessionResources) -> TerminalLocalAgentService {
+        TerminalLocalAgentService(entries: [syntheticEntry()],
+            makeSession: { _, workspace in resources.makeSession(workspace: workspace) },
+            makeWorkspace: { resources.makeWorkspace() },
+            removeWorkspace: { resources.removeWorkspace($0) })
+    }
+
+    func testOwnersHaveIndependentSessionsAndClosingOnePreservesTheOther() async throws {
+        let resources = SessionResources()
+        let service = service(resources)
+        let chat = try request(owner: "chat"), detail = try request(owner: "detail")
+        _ = try await service.run(chat)
+        _ = try await service.run(detail)
+        let sessions = resources.sessions
+        XCTAssertEqual(sessions.count, 2)
+        XCTAssertNotEqual(sessions[0].workspace, sessions[1].workspace)
+        await service.closeSession(id: "chat")
+        XCTAssertEqual(sessions[0].purges, 1)
+        XCTAssertEqual(sessions[1].clears, 0)
+        XCTAssertEqual(sessions[1].purges, 0)
+        _ = try await service.run(detail)
+        XCTAssertEqual(resources.sessions.count, 2)
+        XCTAssertEqual(resources.removed, [sessions[0].workspace])
+        await service.closeSession(id: "detail")
+        XCTAssertEqual(sessions[1].purges, 1)
+    }
+
+    func testPrewarmingUsesExplicitOwnerAndReusesMatchingSettings() async throws {
+        let resources = SessionResources()
+        let service = service(resources)
+        var input = try request(owner: nil)
+        await service.prewarm(sessionID: "chat", request: input)
+        XCTAssertEqual(resources.sessions.count, 1)
+        input.sessionID = "chat"
+        _ = try await service.run(input)
+        XCTAssertEqual(resources.sessions.count, 1)
+        await service.closeSession(id: "chat")
+        XCTAssertEqual(resources.removed.count, 1)
+    }
+
+    func testChangingExecutionSettingsReplacesAndDisposesSession() async throws {
+        let resources = SessionResources()
+        let service = service(resources)
+        var input = try request()
+        _ = try await service.run(input)
+        input.model = "another-model"
+        _ = try await service.run(input)
+        input.session.temperature = 0.5
+        _ = try await service.run(input)
+        input.session.persistence = .daemon
+        _ = try await service.run(input)
+        input.responseInstructions = "New response instructions"
+        _ = try await service.run(input)
+        XCTAssertEqual(resources.sessions.count, 5)
+        XCTAssertEqual(resources.removed.count, 4)
+        XCTAssertTrue(resources.sessions.dropLast().allSatisfy { $0.purges == 1 })
+        await service.closeSession(id: "chat")
+    }
+
+    func testEphemeralRequestsNeverReuseEvenWithTheSameOwner() async throws {
+        let resources = SessionResources()
+        let service = service(resources)
+        var input = try request()
+        input.session.persistence = .ephemeral
+        await service.prewarm(sessionID: "chat", request: input)
+        XCTAssertTrue(resources.sessions.isEmpty)
+        _ = try await service.run(input)
+        _ = try await service.run(input)
+        XCTAssertEqual(resources.sessions.count, 2)
+        XCTAssertEqual(resources.removed.count, 2)
+        XCTAssertTrue(resources.sessions.allSatisfy { $0.purges == 1 })
+    }
+
+    func testClosingFromACancelledTaskStillDisposesItsSession() async throws {
+        let resources = SessionResources()
+        let service = service(resources)
+        _ = try await service.run(request())
+        let close = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await service.closeSession(id: "chat")
+        }
+        await close.value
+        XCTAssertEqual(resources.sessions[0].purges, 1)
+        XCTAssertEqual(resources.removed.count, 1)
+    }
+
+    func testFactoryFailureRemovesWorkspaceAndReleasesOwner() async throws {
+
+        let resources = SessionResources()
+        let service = TerminalLocalAgentService(entries: [syntheticEntry()],
+            makeSession: { _, _ in throw LocalAgentError.unavailable("fake") },
+            makeWorkspace: { resources.makeWorkspace() },
+            removeWorkspace: { resources.removeWorkspace($0) })
+        for _ in 0..<2 {
+            do { _ = try await service.run(request()); XCTFail("Expected factory failure") }
+            catch LocalAgentError.unavailable { }
+        }
+        XCTAssertEqual(resources.removed.count, 2)
+    }
+
+    func testIndependentOwnersCanRunConcurrently() async throws {
+        let firstStarted = expectation(description: "First owner running")
+        let bothStarted = expectation(description: "Both owners running")
+        let gate = SessionExecutionGate(started: firstStarted, concurrent: bothStarted)
+        let resources = SessionResources(gate: gate)
+        let service = service(resources)
+        let chat = try request(owner: "chat"), detail = try request(owner: "detail")
+        let first = Task { try await service.run(chat) }
+        await fulfillment(of: [firstStarted], timeout: 2)
+        let second = Task { try await service.run(detail) }
+        await fulfillment(of: [bothStarted], timeout: 2)
+        await gate.releaseAll()
+        _ = try await first.value
+        _ = try await second.value
+        await service.closeSession(id: "chat")
+        await service.closeSession(id: "detail")
+    }
+
+    func testCancellingOneOwnerDoesNotClearAnotherRunningOwner() async throws {
+        let firstStarted = expectation(description: "First owner running")
+        let bothStarted = expectation(description: "Both owners running")
+        let gate = SessionExecutionGate(started: firstStarted, concurrent: bothStarted)
+        let resources = SessionResources(gate: gate)
+        let service = service(resources)
+        let chat = try request(owner: "chat"), detail = try request(owner: "detail")
+        let first = Task { try await service.run(chat) }
+        await fulfillment(of: [firstStarted], timeout: 2)
+        let second = Task { try await service.run(detail) }
+        await fulfillment(of: [bothStarted], timeout: 2)
+        first.cancel()
+        await gate.releaseAll()
+        do { _ = try await first.value; XCTFail("Expected cancellation") }
+        catch is CancellationError { }
+        _ = try await second.value
+        XCTAssertGreaterThan(resources.sessions[0].clears, 0)
+        XCTAssertEqual(resources.sessions[1].clears, 0)
+        await service.closeSession(id: "chat")
+        await service.closeSession(id: "detail")
+    }
+
+    func testSameOwnerSerializesAndQueuedCancellationDoesNotClearActiveSession() async throws {
+
+        let firstStarted = expectation(description: "First request running")
+        let concurrent = expectation(description: "No concurrent use of one session")
+        concurrent.isInverted = true
+        let gate = SessionExecutionGate(started: firstStarted, concurrent: concurrent)
+        let resources = SessionResources(gate: gate)
+        let service = service(resources)
+        let input = try request()
+        let first = Task { try await service.run(input) }
+        await fulfillment(of: [firstStarted], timeout: 2)
+        let cancelled = Task { try await service.run(input) }
+        let second = Task { try await service.run(input) }
+        await fulfillment(of: [concurrent], timeout: 0.1)
+        cancelled.cancel()
+        do { _ = try await cancelled.value; XCTFail("Expected cancellation") }
+        catch is CancellationError { }
+        XCTAssertEqual(resources.sessions.count, 1)
+        XCTAssertEqual(resources.sessions[0].clears, 0)
+        await gate.releaseAll()
+        _ = try await first.value
+        _ = try await second.value
+        let maximum = await gate.maximumConcurrent
+        XCTAssertEqual(maximum, 1)
+        await service.closeSession(id: "chat")
+    }
+}
+
+private final class SessionResources: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedSessions: [TrackingTerminalSession] = []
+    private var removedWorkspaces: [URL] = []
+    private let gate: SessionExecutionGate?
+    init(gate: SessionExecutionGate? = nil) { self.gate = gate }
+    var sessions: [TrackingTerminalSession] { lock.withLock { recordedSessions } }
+    var removed: [URL] { lock.withLock { removedWorkspaces } }
+    func makeWorkspace() -> URL { URL(fileURLWithPath: "/test/\(UUID().uuidString)") }
+    func makeSession(workspace: URL) -> TrackingTerminalSession {
+        let session = TrackingTerminalSession(workspace: workspace, gate: gate)
+        lock.withLock { recordedSessions.append(session) }
+        return session
+    }
+    func removeWorkspace(_ workspace: URL) {
+        lock.withLock { removedWorkspaces.append(workspace) }
+    }
+}
+
+private final class TrackingTerminalSession: ManagedLocalAgentSession, @unchecked Sendable {
+    struct Configuration: Sendable {}
+    let configuration = Configuration()
+    let workspace: URL
+    private let gate: SessionExecutionGate?
+    private let lock = NSLock()
+    private var clearCount = 0
+    private var purgeCount = 0
+    var executionMetadata: [AgenticExecutionMetadata] { [] }
+    var clears: Int { lock.withLock { clearCount } }
+    var purges: Int { lock.withLock { purgeCount } }
+    init(workspace: URL, gate: SessionExecutionGate?) { self.workspace = workspace; self.gate = gate }
+    func respond(to input: String, instructions: String, schema: JSONString, for operation: ObjectIdentifier) async -> Result<String, AgenticError> {
+        await gate?.enter()
+        return .success("{\"ok\":true}")
+    }
+    func clearMemory() { lock.withLock { clearCount += 1 } }
+    func purgeMemory() { lock.withLock { purgeCount += 1 } }
+}
+
+private actor SessionExecutionGate {
+    let started: XCTestExpectation
+    let concurrent: XCTestExpectation
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private var active = 0
+    private var released = false
+    private var hasStarted = false
+    private(set) var maximumConcurrent = 0
+    init(started: XCTestExpectation, concurrent: XCTestExpectation) {
+        self.started = started; self.concurrent = concurrent
+    }
+    func enter() async {
+        active += 1
+        maximumConcurrent = max(maximumConcurrent, active)
+        if !hasStarted { hasStarted = true; started.fulfill() }
+        if active > 1 { concurrent.fulfill() }
+        if !released {
+            await withCheckedContinuation { continuations.append($0) }
+        }
+        active -= 1
+    }
+    func releaseAll() {
+        released = true
+        for continuation in continuations { continuation.resume() }
+        continuations.removeAll()
+    }
+}

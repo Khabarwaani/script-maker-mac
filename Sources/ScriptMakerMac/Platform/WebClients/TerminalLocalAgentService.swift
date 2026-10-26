@@ -11,7 +11,7 @@ struct TerminalLocalAgentService: LocalAgentRunning {
     private let removeWorkspace: @Sendable (URL) throws -> Void
     private let readDiagnostics: @Sendable (URL) -> String?
     private let providerAvailability: @Sendable () -> [LocalAgentProvider: LocalAgentAvailability]
-    private let launchWorkspace = AppLaunchWorkspace()
+    private let sessions = AgentSessionPool()
 
     init(entries: [AgentCatalogEntry]? = nil,
          makeSession: @escaping SessionFactory,
@@ -28,18 +28,28 @@ struct TerminalLocalAgentService: LocalAgentRunning {
     }
     func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { providerAvailability() }
     func prewarm(sessionID: String, request: LocalAgentRequest) async {
+        guard request.session.persistence != .ephemeral else { return }
         do {
-            let workspace = try launchWorkspace.getOrCreateWorkspace(make: makeWorkspace)
-            if launchWorkspace.session(for: request.provider, model: request.model) == nil {
-                let session = try makeSession(request, workspace)
-                launchWorkspace.setSession(session, for: request.provider, model: request.model)
+            try await sessions.acquire(owner: sessionID)
+            do {
+                _ = try await sessions.prepare(owner: sessionID, request: request,
+                    makeSession: makeSession, makeWorkspace: makeWorkspace, removeWorkspace: removeWorkspace)
+                await sessions.release(owner: sessionID)
+            } catch {
+                await sessions.release(owner: sessionID)
+                throw error
             }
         } catch {
             AppLog.debug("LocalAgent prewarm: \(error.localizedDescription)")
         }
     }
     func closeSession(id: String) async {
-        launchWorkspace.clearMemory()
+        do {
+            try await sessions.acquire(owner: id, cancellable: false)
+            await sessions.release(owner: id, discard: true)
+        } catch {
+            AppLog.debug("LocalAgent close: \(error.localizedDescription)")
+        }
     }
     private func entries() throws -> [AgentCatalogEntry] {
         if let registeredEntries { return registeredEntries }
@@ -67,31 +77,31 @@ struct TerminalLocalAgentService: LocalAgentRunning {
         try schema.validate(JSONDecoder().decode(AgentJSON.self, from: data))
         try entry.validateInput(data)
         try Task.checkCancellation()
-        let isPersistent = request.sessionID != nil && request.session.persistence != .ephemeral
-        let workspace: URL
-        let session: any ManagedLocalAgentSession
-        if isPersistent {
-            workspace = try launchWorkspace.getOrCreateWorkspace(make: makeWorkspace)
-            if let cached = launchWorkspace.session(for: request.provider, model: request.model) {
-                session = cached
-            } else {
-                session = try makeSession(request, workspace)
-                launchWorkspace.setSession(session, for: request.provider, model: request.model)
-            }
-        } else {
-            workspace = try makeWorkspace()
-            session = try makeSession(request, workspace)
+        let persistent = request.sessionID != nil && request.session.persistence != .ephemeral
+        let owner = persistent ? request.sessionID! : UUID().uuidString
+        try await sessions.acquire(owner: owner)
+        do {
+            let resource = try await sessions.prepare(owner: owner, request: request,
+                makeSession: makeSession, makeWorkspace: makeWorkspace, removeWorkspace: removeWorkspace)
+            let result = try await execute(request, entry: entry, data: data, resource: resource)
+            await sessions.release(owner: owner, discard: !persistent)
+            return result
+        } catch {
+            await sessions.release(owner: owner, discard: !persistent)
+            throw error
         }
+    }
+
+    private func execute(_ request: LocalAgentRequest, entry: AgentCatalogEntry, data: Data,
+                         resource: AgentSessionResource) async throws -> LocalAgentResult {
+        let session = resource.session
+        let workspace = resource.workspace
         if !request.session.keepMemory {
             session.clearMemory()
         }
         defer {
             if !request.session.keepMemory {
                 session.clearMemory()
-            }
-            if !isPersistent {
-                session.purgeMemory()
-                do { try removeWorkspace(workspace) } catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
             }
         }
         var result: LocalAgentResult
@@ -133,42 +143,110 @@ struct TerminalLocalAgentService: LocalAgentRunning {
     }
 }
 
-private final class AppLaunchWorkspace: @unchecked Sendable {
-    struct CachedSession {
-        let session: any ManagedLocalAgentSession
+private struct AgentSessionResource: Sendable {
+    let session: any ManagedLocalAgentSession
+    let workspace: URL
+    let signature: Signature
+    let removeWorkspace: @Sendable (URL) throws -> Void
+
+    struct Signature: Equatable, Sendable {
+        let provider: LocalAgentProvider
+        let executable: String
         let model: String?
-    }
-    private let lock = NSLock()
-    private var workspaceURL: URL?
-    private var sessions: [LocalAgentProvider: CachedSession] = [:]
+        let settings: LocalAgentSessionSettings
+        let responseInstructions: String
 
-    func getOrCreateWorkspace(make: () throws -> URL) throws -> URL {
-        lock.lock()
-        defer { lock.unlock() }
-        if let existing = workspaceURL { return existing }
-        let url = try make()
-        workspaceURL = url
-        return url
+        init(_ request: LocalAgentRequest) {
+            provider = request.provider
+            executable = request.executable
+            model = request.model
+            settings = request.session
+            responseInstructions = request.responseInstructions
+        }
     }
 
-    func session(for provider: LocalAgentProvider, model: String?) -> (any ManagedLocalAgentSession)? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let cached = sessions[provider], cached.model == model else { return nil }
-        return cached.session
+    func dispose() {
+        session.clearMemory()
+        session.purgeMemory()
+        do { try removeWorkspace(workspace) }
+        catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+    }
+}
+
+/// A lease covers execution as well as lookup; actor reentrancy cannot share a running session.
+private actor AgentSessionPool {
+    private struct Waiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Void, Error>
+    }
+    private var resources: [String: AgentSessionResource] = [:]
+    private var busy: Set<String> = []
+    private var waiters: [String: [Waiter]] = [:]
+
+    deinit {
+        for resource in resources.values { resource.dispose() }
     }
 
-    func setSession(_ session: any ManagedLocalAgentSession, for provider: LocalAgentProvider, model: String?) {
-        lock.lock()
-        defer { lock.unlock() }
-        sessions[provider] = CachedSession(session: session, model: model)
+    func acquire(owner: String, cancellable: Bool = true) async throws {
+        if cancellable { try Task.checkCancellation() }
+        if busy.insert(owner).inserted { return }
+        if !cancellable {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                waiters[owner, default: []].append(Waiter(id: UUID(), continuation: continuation))
+            }
+            return
+        }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                waiters[owner, default: []].append(Waiter(id: id, continuation: continuation))
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(owner: owner, id: id) }
+        }
+        if Task.isCancelled {
+            release(owner: owner)
+            throw CancellationError()
+        }
     }
 
-    func clearMemory() {
-        lock.lock()
-        defer { lock.unlock() }
-        for cached in sessions.values {
-            cached.session.clearMemory()
+    private func cancelWaiter(owner: String, id: UUID) {
+        guard let index = waiters[owner]?.firstIndex(where: { $0.id == id }) else { return }
+        let waiter = waiters[owner]!.remove(at: index)
+        waiter.continuation.resume(throwing: CancellationError())
+    }
+
+    func prepare(owner: String, request: LocalAgentRequest,
+                 makeSession: TerminalLocalAgentService.SessionFactory,
+                 makeWorkspace: @Sendable () throws -> URL,
+                 removeWorkspace: @escaping @Sendable (URL) throws -> Void) throws -> AgentSessionResource {
+        try Task.checkCancellation()
+        let signature = AgentSessionResource.Signature(request)
+        if let resource = resources[owner], resource.signature == signature { return resource }
+        resources.removeValue(forKey: owner)?.dispose()
+        let workspace = try makeWorkspace()
+        do {
+            let session = try makeSession(request, workspace)
+            let resource = AgentSessionResource(session: session, workspace: workspace,
+                signature: signature, removeWorkspace: removeWorkspace)
+            resources[owner] = resource
+            return resource
+        } catch {
+            do { try removeWorkspace(workspace) }
+            catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+            throw error
+        }
+    }
+
+    func release(owner: String, discard: Bool = false) {
+        if discard { resources.removeValue(forKey: owner)?.dispose() }
+        if var queue = waiters[owner], !queue.isEmpty {
+            let next = queue.removeFirst()
+            waiters[owner] = queue.isEmpty ? nil : queue
+            next.continuation.resume()
+        } else {
+            waiters.removeValue(forKey: owner)
+            busy.remove(owner)
         }
     }
 }

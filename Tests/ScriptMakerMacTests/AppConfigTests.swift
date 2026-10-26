@@ -4,13 +4,10 @@ import XCTest
 final class AppConfigTests: XCTestCase {
     @MainActor
     func testNewsSettingsPersistAndInvalidEditsPreserveSavedSettings() {
-        struct Checker: ServerConnectionChecking {
-            func isReachable(at url: URL) async -> Bool { false }
-        }
         let defaults = makeIsolatedDefaults()
         let config = AppConfig(defaults: defaults)
         XCTAssertEqual(config.newsSettings, NewsDiscoverySettings())
-        let vm = PreferencesViewModel(config: config, connectionChecker: Checker())
+        let vm = PreferencesViewModel(config: config)
         vm.newsSearchHours = 12
         vm.newsCacheHours = 2
         vm.draftNewsSettings.providerOrder = .bingThenGoogle
@@ -145,20 +142,19 @@ final class AppConfigTests: XCTestCase {
     }
 
     @MainActor
-    func testPreferencesViewModelPreservesServerDataSourceOnApply() async {
-        struct MockChecker: ServerConnectionChecking {
-            let reachable: Bool
-            func isReachable(at url: URL) async -> Bool { reachable }
-        }
+    func testPreferencesModelEditorIgnoresRetiredSourceSettings() async {
         let defaults = makeIsolatedDefaults()
+        defaults.set("server", forKey: "dataSource")
+        defaults.set("not a valid server address", forKey: "serverURL")
+        defaults.set(60.0, forKey: "localJSONDelay")
         let config = AppConfig(defaults: defaults)
-        let vm = PreferencesViewModel(config: config, connectionChecker: MockChecker(reachable: false))
-        vm.dataSource = .server
-        vm.draftURL = "http://localhost:8000"
-        await vm.save()
-        XCTAssertEqual(config.dataSource, .server)
-        XCTAssertEqual(vm.dataSource, .server)
-        XCTAssertTrue(vm.noticeMessage?.contains("Warning: server is currently unreachable") == true)
+        let vm = PreferencesViewModel(config: config,
+            modelCatalogProvider: BundledAIModelCatalog(bundled: BundledStudioCatalog()))
+        await vm.editModel()
+        XCTAssertNil(vm.modelError)
+        XCTAssertTrue(vm.providerOptions.contains("Codex"))
+        XCTAssertEqual(defaults.string(forKey: "serverURL"), "not a valid server address")
+        XCTAssertEqual(defaults.double(forKey: "localJSONDelay"), 60)
     }
 
     func testNewsPageSizeDefaultAndPersistence() {
