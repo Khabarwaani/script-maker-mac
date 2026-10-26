@@ -344,7 +344,7 @@ private struct StoryImagesSection: View {
                                 }
                             }
                             if value.hasPrefix("sample:") {
-                                Text("Local JSON · sample image").font(.caption)
+                                Text("Historical example image is unavailable. Fetch images to replace it.").font(.caption)
                             } else if let url = URL(string: value), ["https", "http"].contains(url.scheme?.lowercased() ?? "") {
                                 Link("Open image", destination: url)
                             }

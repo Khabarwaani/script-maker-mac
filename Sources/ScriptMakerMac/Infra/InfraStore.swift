@@ -72,42 +72,26 @@ struct HTTPClient: Sendable {
 }
 
 /// Generic key-value store (UserDefaults wrapper).
-struct KeyValueStore: Sendable {
+/// Serializes access to the framework object across actor boundaries.
+final class KeyValueStore: @unchecked Sendable {
     private let defaults: UserDefaults
-    private let suite: String?
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        self.suite = nil
-    }
-
-    func data(forKey key: String) -> Data? {
-        defaults.data(forKey: key)
-    }
-
-    func set(_ data: Data, forKey key: String) {
-        defaults.set(data, forKey: key)
-    }
-
-    func object(forKey key: String) -> Any? { defaults.object(forKey: key) }
-    func string(forKey key: String) -> String? { defaults.string(forKey: key) }
-    func stringArray(forKey key: String) -> [String]? { defaults.stringArray(forKey: key) }
-    func integer(forKey key: String) -> Int { defaults.integer(forKey: key) }
-    func set(_ value: Any, forKey key: String) { defaults.set(value, forKey: key) }
-
-    func remove(forKey key: String) {
-
-        defaults.removeObject(forKey: key)
-    }
+    private let lock = NSLock()
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    func data(forKey key: String) -> Data? { lock.withLock { defaults.data(forKey: key) } }
+    func object(forKey key: String) -> Any? { lock.withLock { defaults.object(forKey: key) } }
+    func string(forKey key: String) -> String? { lock.withLock { defaults.string(forKey: key) } }
+    func stringArray(forKey key: String) -> [String]? { lock.withLock { defaults.stringArray(forKey: key) } }
+    func integer(forKey key: String) -> Int { lock.withLock { defaults.integer(forKey: key) } }
+    func set(_ value: Any, forKey key: String) { lock.withLock { defaults.set(value, forKey: key) } }
+    func remove(forKey key: String) { lock.withLock { defaults.removeObject(forKey: key) } }
 }
 
 /// Generic file store (FileManager wrapper).
 struct FileStore: Sendable {
-    private let fileManager: FileManager
+    private var fileManager: FileManager { .default }
     private let mediaNamespace: String
 
-    init(fileManager: FileManager = .default, mediaNamespace: String = "ScriptMakerMac") {
-        self.fileManager = fileManager
+    init(mediaNamespace: String = "ScriptMakerMac") {
         self.mediaNamespace = mediaNamespace
     }
 
@@ -116,7 +100,7 @@ struct FileStore: Sendable {
     }
 
     func write(_ data: Data, to url: URL) throws {
-        try data.write(to: url)
+        try data.write(to: url, options: .atomic)
     }
 
     func exists(at url: URL) -> Bool {
@@ -134,7 +118,15 @@ struct FileStore: Sendable {
         return destination
     }
 
+    func applicationSupportFile(namespace: String, name: String) throws -> URL {
+        let directory = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent(namespace, isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(name)
+    }
+
     func makeTemporaryDirectory() throws -> URL {
+
         let url = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         return url

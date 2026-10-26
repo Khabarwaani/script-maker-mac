@@ -1,219 +1,73 @@
 # Script Maker for Mac
 
-Native macOS thin client for Script Maker. **No Python** — pure Swift/SwiftUI,
-MVVM, async/await throughout.
+Native SwiftUI macOS app for local KhabarwaaniAgent workflows. Requires macOS 27+
+and Xcode 27+. Generation runs through installed Codex, Claude, Antigravity or Grok
+CLIs, or compatible Apple Intelligence agents. Terminal providers use their existing
+sign-in. Internet is needed for news discovery, research and uploads.
 
-Requires **macOS 27+ and Xcode 27+**. Studio uses the pipeline server configured in Preferences (Cmd+,).
-Library saves and enriches stories locally with direct HTTP requests. The **LocalAgent** tab runs
-KhabarwaaniAgent through an installed terminal AI provider.
+## Workspaces
 
-- **Server URL** defaults to `http://localhost:8000`.
-- **Server URL** is a top-level setting (IPv6-aware) — point it at a remote server anytime.
-- **Long generations** stream progress via Server-Sent Events; the UI never blocks.
-- **Failures** offer the same four options as the classic app: retry stage, retry fresh, skip, dismiss.
+- **Researcher:** browse NewsSearch categories/headlines and TrendingHashtag topics;
+  run NewsResearcher with a terminal provider supporting web research.
+- **Library:** save stories, scripts, media and refinement history; enrich news,
+  images and hashtags directly on the Mac. Share/export or explicitly upload to
+  Telegram and Google Drive/Sheets. Failed enrichment keeps the saved story.
+- **LocalAgent:** package-discovered agents/versions with schema-generated inputs,
+  advanced per-provider session settings and inspectable raw output.
+- **Pipeline:** Preset or Configurable agent workflows with continuous or step-wise
+  execution, editable outputs, explicit transitions and Library export.
+- **Script Detail:** independently saved scenes and iterative visual detailing.
+- **Agents & Instructions:** inspect package agent metadata, instructions and schemas.
 
----
+Settings (Cmd+,) defines a shared default provider and optional model override.
+Each workspace can use that default or override it. An empty model uses the
+provider's default; the app does not invent model or reasoning capabilities.
+Unavailable/incompatible selections block Run with a reason; they are never silently
+replaced. Existing configured pipeline steps retain their provider selections.
 
-## LocalAgent
+Agent versions are package metadata. A historical version without its own executor
+cannot run the current executor under an old version number. Retained sessions are
+isolated by owner and effective execution settings; requests for one owner serialize.
+Cancelling or closing one session does not clear other workspaces' memory.
 
-Keep the local KhabarwaaniAgent checkout beside this repository. AgentAtom and
-TerminalAgentSession resolve from GitHub release ranges; KhabarwaaniAgent stays
-a local path dependency.
+## Storage and upgrades
 
-Validated with KhabarwaaniAgent 1.4.2, including ThreeSceneStoryCreator 2.2.1
-and its progressive Inquire → Clarify → Payoff instructions. Agent versions come
-from discovery metadata; the app does not pin or relabel them.
+The Library and Script Detail use separate persisted collections and actor-backed
+repositories with atomic JSON files. Existing UserDefaults collections are read until\nthe first successful file save; compatibility keys stay updated for rollback. Failed reads\npreserve original bytes and surface an error. Failed writes
+preserve the last successful cache and editable drafts. No sample stories are inserted.
+Existing stories, media paths, upload receipts, generation metadata and chat histories
+remain readable, including legacy story dictionaries.
 
-The Agent dropdown and its Version dropdown share one row. Both come from the
-package's `KhabarwaaniAgent.agents` discovery descriptors and executable hooks.
-The app has no agent enum or per-agent form switch. Register a new
-`DiscoverableAgentSpec` in the package, rebuild, and its form appears automatically.
+The revamp migrates recognized legacy provider/model settings once, then retires the
+server/sample settings. Unknown legacy providers initialize the Codex default. News,
+trending, appearance and upload credentials remain independent of generation routing.
+Server generation, demo mode and server-only closing-clip merging have been removed.
 
-Input controls come from JSON Schema: strings, numbers, integers, booleans,
-enums, optional and nullable values, nested objects, and arrays. Defaults are
-preserved. Invalid edits remain visible and prevent Run. **Input JSON** shows
-the same payload validated and sent to the package executor. Drafts are retained
-separately per agent/version while the app is open. Changing agents selects the
-latest executable stable version.
+Media imports copy user-selected files into Application Support. Upload credentials
+are stored in Keychain. Separate candidate bundle identifiers use independent
+preferences, media namespaces and Keychain services. Production retains its existing
+storage paths and Keychain service for compatibility.
 
-Historical versions listed only as discovery metadata remain unavailable until
-the package supplies their executor. Selecting an older version never executes
-the current spec under that version number.
+## Development
 
-Unavailable providers are disabled. Research agents require a terminal provider;
-Apple Intelligence runs compatible agents on-device. Runtime settings remain
-separate per provider. Codex, Claude, Antigravity and Grok use installed CLI
-accounts. Each Run uses a temporary workspace with cleanup and cooperative
-cancellation. Raw JSON and typed decoding errors remain available for inspection.
+Open `ScriptMakerMac.xcworkspace` or `ScriptMakerMac.xcodeproj`. The local package
+reference expects a sibling `KhabarwaaniAgent` checkout. CI checks out tag 2.0.2 and
+resolves AgentAtom, TerminalAgentSession, NewsSearch and TrendingHashtag dependencies.
 
-Script refinement is an ordinary catalog agent. The dedicated Script Refine tab,
-its server integration, settings, and Library fine-tuning flow have been removed.
-There is no automatic import of agent results into Studio or Library. Humans
-review content quality.
+Presentation depends on Domain protocols; Platform implements them using Infra
+primitives. Domain imports Foundation only. `App/CompositionRoot.swift` creates and
+wires services and stable workspace view models. Views display state and forward actions.
+Stateful settings/persistence belong in Platform; raw framework execution belongs in Infra.
 
-The CLI launcher supplies EOF on stdin, adds executable search paths, captures
-stdout for failure details, and closes strict object schemas. It translates
-Grok's schema option and omits permission-bypass flags from provider defaults.
+Run architecture checks with `bash scripts/check-architecture.sh`. GitHub Actions is
+the automated test gate; unit tests use mocks and never invoke live agents or uploads.
+Local tests are for diagnosing CI failures. Local builds use default Xcode DerivedData.
 
-This integration currently uses the package discovery-hook branch in CI, pending
-its dependency PR. Production release checkouts continue to use package main.
-CI needs the existing read-only `KHABARWAANI_AGENT_READ_KEY` for that private
-checkout. The xcode-27 runner supplies macOS/Xcode 27.
+## 2.0 integration gate
 
-## Library
-
-Use **Add** with just a title/headline. Script, generation metadata and media are
-optional. The Mac searches news feeds (Bing, then Google News), reads publisher
-Open Graph / Twitter images and checks image availability. Hashtags are derived
-from the title locally. No AI, Python or ScriptMakerServer is used. Internet is
-needed for search and uploads. Search failures keep the saved story and show the
-cause; refresh related content to retry. Editing a title saves a new copy and
-refreshes its related content while preserving the original and imported images.
-
-**Share → Upload to Telegram** sends the title/hashtags, optional local video,
-then source links. It reads the same `~/Documents/telegrambot/bot_token.txt` and
-`~/.cache/telegram_bot_chat_id.json` as ScriptMaker. Enter a chat ID or tap Start
-in the bot to establish your destination. Group sending is opt-in and uses
-`~/Documents/telegrambot/group_ids.txt` plus discovered groups. The sheet also
-accepts a temporary token/chat override. Upload errors report partial delivery;
-retrying may resend messages that already arrived.
-
-**Share → Upload to Google Drive / Sheets** ports ScriptMaker’s Kops reel upload.
-Attach a local MP4, MOV or WebM video first; only this upload endpoint requires
-video. Authentication uses `GOOGLE_ACCESS_TOKEN`, then `~/.clasprc.json` (run
-`npx clasp login`), then an optional temporary access token. The default Apps
-Script deployment matches ScriptMaker and can be overridden in the upload sheet.
-The returned Drive preview, sheet row and timestamp are saved with the story.
-The existing Drive text export remains available separately.
-
-## Architecture
-
-Clean 4-layer architecture (inspired by `abhi266raj/Camera`):
-
-```
-Presentation → Domain → Platform → Infra
-```
-
-### Layer Descriptions
-
-**1. Presentation** (`Views/`, `ViewModels/`)
-- SwiftUI views (dumb — no business logic, no service calls)
-- ViewModels (`@Observable`, `@MainActor`) — UI state, calls Domain services
-- Depends on: Domain
-
-### Observation Framework
-
-ViewModels use the modern Observation framework (`@Observable`), not the legacy `ObservableObject`/`@Published`:
-
-```swift
-@Observable
-@MainActor
-final class LibraryViewModel {
-    var stories: [Story] = []   // plain var — no @Published needed
-    ...
-}
-```
-
-Views hold models with `@State` (owner) and `@Bindable` (needs `$` bindings):
-
-```swift
-struct ContentView: View {
-    @State private var libraryViewModel: LibraryViewModel  // created once, stays in memory
-    ...
-}
-struct StoryListView: View {
-    @Bindable var viewModel: LibraryViewModel  // $viewModel.selectedStoryID bindings
-    ...
-}
-```
-
-Rules: ViewModels are created once (in `ContentView`) and passed down — never recreated on tab switch. Each section is its own `View` struct for stable identity.
-
-**2. Domain** (`Services/`: PipelineService, StoryRepository protocol, Models)
-- Business logic, entities, repository interfaces
-- `PipelineService`: orchestrates pipeline via WebClient
-- `StoryRepository` protocol: defines persistence contract
-- Depends on: Platform (via protocols only)
-
-**3. Platform** (`Services/`: LocalStoryRepository, StoryDataSourceProtocol, WebClients)
-- Repository implementations, DataSource protocols, DTOs, mappers
-- `LocalStoryRepository`: implements Domain's protocol using DataSources
-- `NetworkWebClient` / `OfflineWebClient`: implement `WebClient` protocol
-- Depends on: Infra (via protocols/wrappers)
-
-**4. Infra** (`Services/`: InfraStore.swift)
-- Dumb framework wrappers — no business logic, no app types
-- `HTTPClient`: URLSession wrapper
-- `KeyValueStore`: UserDefaults wrapper
-- `FileStore`: FileManager wrapper
-- Depends on: nothing (dependency-free)
-
-### Layered Interaction Model
-
-- **View** displays ViewModel state and forwards user actions
-- **ViewModel** prepares data for UI and delegates to Domain services
-- **Domain** performs business logic using Platform abstractions
-- **Platform** implements persistence/network using Infra wrappers
-- **Infra** provides raw framework access with no app knowledge
-
-### Responsibility Matrix
-
-| Layer        | Responsibilities                              | Depends On     |
-|--------------|-----------------------------------------------|----------------|
-| Presentation | UI rendering, state management                | Domain         |
-| Domain       | Business logic, entities, repository contracts| Platform       |
-| Platform     | Repo impls, DataSources, WebClients, DTOs      | Infra          |
-| Infra        | URLSession, UserDefaults, FileManager wrappers| None           |
-
-### Rules
-
-1. **Dependencies point inward**: Infra knows nothing about Platform; Platform knows nothing about Domain.
-2. **Protocols at boundaries**: Domain defines `StoryRepository`; Platform defines `StoryDataSourceProtocol`; Infra provides concrete wrappers.
-3. **No framework in Domain**: Domain never imports SwiftUI or touches UserDefaults/URLSession directly.
-4. **Testable**: Every layer can be mocked via protocols.
-
----
-
-## Open in Xcode
-
-Open `ScriptMakerMac.xcworkspace` (or `ScriptMakerMac.xcodeproj`) at the repo root.
-
-## Build the DMG (on a Mac)
-
-```bash
-packaging/mac/build_dmg.sh 1.1.0
-```
-
-## CI
-
-`.github/workflows/ci.yml` — `xcodebuild` Debug build on every push/PR (public repo: free).
-
-Studio news discovery runs locally in Swift using the public personal packages
-[NewsSearch](https://github.com/abhi266raj/NewsSearch) and
-[TrendingHashtag](https://github.com/abhi266raj/TrendingHashtag). Local categories
-remain fixed; only selected headlines or hashtag details refresh. Internet is required.
-Bundled sample mode remains available. Script generation still uses the configured
-pipeline server. Both packages offer source and XCFramework products at the same
-version; this app consumes the framework products.
-
-Settings contains app-wide News Discovery and Trending Hashtags options, initialized
-to the frameworks' defaults. Configure search/trend windows, cache durations,
-providers, region, language, and result limits there. Hashtag selection shows feed
-details; **Load full title and description** looks up additional topic context.
-
-In Library, open a story with a screenplay and choose **Refine with Script Chat**.
-Choose an available local provider, enter a refinement instruction, and review the
-updated draft. Each turn keeps the original script and carries the latest draft
-and consolidated instructions forward. **Save as new script** creates a separate
-Library entry with version history and a link to the source story. Closing or
-cancelling does not save or change the original. This uses KhabarwaaniAgent 1.3.0;
-installed CLI providers require their existing sign-in, or use available Apple
-Intelligence. Generated video and upload receipts are cleared on the refined copy.
-
-Script Chat shows the read-only original script beside the current script and
-editable consolidated instructions. Original instructions are kept internally as
-conversation context. Refine applies consolidated-instruction edits; discard them
-to restore the last successful instructions before saving. Refinement history instructions are
-editable: **Apply history edits** regenerates from the first changed turn through
-later turns. A failed or cancelled replay preserves the last successful draft.
-Apply or discard history edits before refining again or saving a new entry.
+[Issue #147](https://github.com/Khabarwaani/script-maker-mac/issues/147) tracks the full
+revamp. Implementation stays on `revamp/2.0` and its PR branches. `develop` and `main`
+receive no partial revamp integrations. Finish the whole implementation, pass automated
+and acceptance testing, and obtain user approval before integrating. No new version,
+preview or release is created before the whole revamp is tested. The checked-in version
+remains unchanged until release preparation.

@@ -159,7 +159,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         XCTAssertEqual(story.hashtags, ["#LocalNews"])
         XCTAssertEqual(story.sourceLinks?.first?.source, "Publisher")
         XCTAssertEqual(story.imageURLs, ["https://publisher.test/photo.jpg"])
-        let persisted = try await repository.all()
+        let persisted = await repository.all()
         XCTAssertEqual(persisted, [story])
     }
 
@@ -188,7 +188,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
         let repository = LocalLibraryRepository()
         let updater = LocalLibraryUpdaterStub()
         let original = Story(title: "Old title", imageURLs: ["file:///tmp/imported.jpg", "https://old.test/old.jpg"])
-        try await repository.save(original)
+        await repository.save(original)
         let vm = LibraryViewModel( repository: repository, updater: updater)
         await vm.refresh()
         vm.prepareEdits(original)
@@ -209,7 +209,7 @@ final class LocalLibraryWorkflowTests: XCTestCase {
     func testUploadReceiptPersistsOnOriginalStory() async throws {
         let repository = LocalLibraryRepository()
         let story = Story(title: "Upload target")
-        try await repository.save(story)
+        await repository.save(story)
         let vm = LibraryViewModel( repository: repository, uploader: LocalUploaderStub())
         await vm.refresh()
         await vm.upload(story, to: .googleSheets)
@@ -466,7 +466,7 @@ final class LibraryImageAppendTests: XCTestCase {
     func testRepeatedImageFetchPreservesExistingImagesAndDeduplicatesNewResults() async throws {
         let repository = LocalLibraryRepository()
         let story = Story(title: "Image test", imageURLs: ["file:///tmp/imported.jpg", "https://existing.test/photo.jpg"])
-        try await repository.save(story)
+        await repository.save(story)
         let vm = LibraryViewModel( repository: repository, updater: LocalLibraryUpdaterStub())
         await vm.refresh()
         vm.selectedStoryID = story.id

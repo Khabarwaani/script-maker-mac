@@ -5,6 +5,11 @@
 	};
 	objectVersion = 56;
 	objects = {
+ RVFIXREF = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
+ RVFIXBUILD = {isa = PBXBuildFile; fileRef = RVFIXREF; };
+ RVTESTRES = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (RVFIXBUILD,); runOnlyForDeploymentPostprocessing = 0; };
+ RVNEWSREF = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsDiscoveryTests.swift; sourceTree = "<group>"; };
+ RVNEWSBUILD = {isa = PBXBuildFile; fileRef = RVNEWSREF; };
 		FA44C891DBA164E8E2653F95 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevampTests.swift; sourceTree = "<group>"; };
 		5595EE01D8B100FB4E4C6F52 = {isa = PBXBuildFile; fileRef = FA44C891DBA164E8E2653F95; };
 		7303D5CB95ADEB6928E996F8 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionRoot.swift; sourceTree = "<group>"; };
@@ -200,10 +205,6 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G002 /* ScriptMakerMac */ = {
 			isa = PBXGroup;
 			children = (
-                FA44C891DBA164E8E2653F95,
-                107F2F33C2A5BD57B7C45573,
-                0C7D4DE6D4FAA3B5067FF876,
-                EB72FC5A82496CD3ECB76FD9,
 				G004 /* App */,
 				G011 /* Core */,
 				G024 /* Domain */,
@@ -218,13 +219,14 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-                7303D5CB95ADEB6928E996F8, R013 /* ScriptMakerMac.app */, );
+                 R013 /* ScriptMakerMac.app */, );
 			name = Products;
 			sourceTree = "<group>";
 		};
 		G004 /* App */ = {
 			isa = PBXGroup;
-			children = ( R001 /* ScriptMakerMacApp.swift */, );
+			children = (
+                7303D5CB95ADEB6928E996F8, R001 /* ScriptMakerMacApp.swift */, );
 			path = App;
 			sourceTree = "<group>";
 		};
@@ -240,7 +242,6 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G013 /* Entities */ = {
 			isa = PBXGroup;
 			children = (
-                2C6D72F24476807BF1F10692,
                 07DCCA1D292BAFBD0BB8AD61,
                 8E27856C9CBAA136E075060B,
 				AC101 /* AgentInspectionModels.swift */,
@@ -257,6 +258,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G014 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+                2C6D72F24476807BF1F10692,
 				AC102 /* AgentInspectionProviding.swift */,
 				PL102 /* PipelineFlowResolving.swift */,
 				L102 /* LocalAgentRunning.swift */,
@@ -287,6 +289,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G016 /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
+                EB72FC5A82496CD3ECB76FD9,
 				R036 /* LocalStoryRepository.swift */, SD108,
 			);
 			path = Repositories;
@@ -342,6 +345,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G022 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+                107F2F33C2A5BD57B7C45573,
 				AC105 /* AndroidBotIcon.swift */,
 				AC106 /* AgentCatalogView.swift */,
 				PL105 /* PipelineTabView.swift */,
@@ -362,6 +366,7 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G023 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+                0C7D4DE6D4FAA3B5067FF876,
 				AC104 /* AgentCatalogViewModel.swift */,
 				PL104 /* PipelineTabViewModel.swift */,
 				L104 /* LocalAgentViewModel.swift */,
@@ -405,6 +410,9 @@ LB009 = {isa = PBXBuildFile; productRef = LD005; };
 		G012 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+ RVFIXREF,
+ RVNEWSREF,
+                FA44C891DBA164E8E2653F95,
 				AC107 /* AgentInspectionTests.swift */,
 				PL106 /* PipelineFlowTests.swift */,
 				L106 /* LocalAgentTests.swift */,
@@ -449,6 +457,7 @@ LB005 = {isa = PBXBuildFile; productRef = LD002; };
 			isa = PBXNativeTarget;
 			buildConfigurationList = C003 /* Build configuration list for PBXNativeTarget "ScriptMakerMacTests" */;
 			buildPhases = (
+ RVTESTRES,
 				P004 /* Sources */,
 				P005 /* Frameworks */,
 			);
@@ -556,6 +565,8 @@ P006 /* Build revision */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+ RVNEWSBUILD,
+                5595EE01D8B100FB4E4C6F52,
 				AC007 /* AgentInspectionTests.swift in Sources */,
 				PL006 /* PipelineFlowTests.swift in Sources */,
 				L006 /* LocalAgentTests.swift in Sources */,

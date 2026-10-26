@@ -76,11 +76,11 @@ final class StoryRepositoryTests: XCTestCase {
     }
 }
 
-/// Unit tests for UserDefaultsStoryDataSource (infra layer).
+/// Unit tests for SavedStoryDataSource (infra layer).
 final class StoryDataSourceTests: XCTestCase {
     func testSaveAndLoad() throws {
         let store = isolatedStoryStore()
-        let ds = UserDefaultsStoryDataSource(store: store)
+        let ds = SavedStoryDataSource(store: store)
         let original = try ds.load()
         try ds.save([Story(id: "ds-ut", title: "DS Test")])
         XCTAssertTrue(try ds.load().contains { $0.id == "ds-ut" })
@@ -89,14 +89,14 @@ final class StoryDataSourceTests: XCTestCase {
 
     func testLoadReturnsArray() throws {
         let store = isolatedStoryStore()
-        let ds = UserDefaultsStoryDataSource(store: store)
+        let ds = SavedStoryDataSource(store: store)
         let result = try ds.load()
         XCTAssertTrue(result is [Story])
     }
 
     func testLegacyDictionaryMigration() throws {
         let store = isolatedStoryStore()
-        let ds = UserDefaultsStoryDataSource(store: store)
+        let ds = SavedStoryDataSource(store: store)
         let original = try ds.load()
         // Simulate legacy storage: raw JSON dictionaries.
         let legacy: [[String: Any]] = [
@@ -134,13 +134,9 @@ final class StoryMapperTests: XCTestCase {
 
     func testRoundTrip() throws {
         let original = Story(id: "rt-1", title: "Round Trip", videoURL: "http://x/v.mp4")
-        let restored = StoryMapper.from(StoryMapper.toDict(original))
+        let restored = try JSONDecoder().decode(Story.self, from: JSONEncoder().encode(original))
         XCTAssertEqual(restored.id, original.id)
         XCTAssertEqual(restored.title, original.title)
         XCTAssertEqual(restored.videoURL, original.videoURL)
     }
 }
-
-
-
-/// Unit tests for WebClient selection (service layer).

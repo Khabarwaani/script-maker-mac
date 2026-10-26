@@ -105,8 +105,8 @@ final class AppConfigTests: XCTestCase {
     }
 
     func testAPIErrorLocalization() throws {
-        let err = APIError.unreachable(url: "http://localhost:8000", detail: "The request timed out.")
-        XCTAssertEqual(err.errorDescription, "Could Not Connect to Server")
+        let err = APIError.transport("The request timed out.")
+        XCTAssertEqual(err.errorDescription, "Network Connection Failed")
         XCTAssertEqual(err.failureReason, "The request timed out.")
     }
 

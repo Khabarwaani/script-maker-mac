@@ -138,7 +138,7 @@ private struct AddLibraryStoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Add story").font(.title2.weight(.semibold))
-            Text("Enter a news title. Related news, images and hashtags are fetched directly from the web; no AI or Script Maker server is needed.")
+            Text("Enter a news title. Related news, images and hashtags are fetched directly from the web.")
                 .font(.callout).foregroundStyle(AppTheme.secondaryInk)
             VStack(alignment: .leading, spacing: 8) {
                 Text("Title / headline").font(.headline)

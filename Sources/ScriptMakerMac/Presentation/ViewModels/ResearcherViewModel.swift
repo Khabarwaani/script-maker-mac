@@ -191,7 +191,7 @@ final class ResearcherViewModel {
         defer { isRefreshingHashtags = false }
 
         do {
-            let resp = try await newsProvider.hashtags(limit: 20, forceFresh: forceFresh)
+            let resp = try await newsProvider.hashtags(limit: config.trendingSettings.resultLimit, forceFresh: forceFresh)
             trendingHashtags = resp.hashtags
             let tags = trendingHashtags.map(\.tag)
             if selectedHashtag.isEmpty || !tags.contains(selectedHashtag) {
@@ -225,12 +225,16 @@ final class ResearcherViewModel {
         guard !target.isEmpty else { return }
         do {
             let detail = try await newsProvider.hashtagDetail(for: target)
+            try Task.checkCancellation()
+            guard selectedHashtag == target, isHashtagSource else { return }
             selectedTagDetail = detail
             if let desc = detail.headline ?? detail.summary, !desc.isEmpty {
                 topic = desc
             }
         } catch {
-            // Keep existing topic on detail fetch error
+            if !Task.isCancelled, selectedHashtag == target, isHashtagSource {
+                hashtagsErrorMessage = StringFormatting.errorMessage(error)
+            }
         }
     }
 

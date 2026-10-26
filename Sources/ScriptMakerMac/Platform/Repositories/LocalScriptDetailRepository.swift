@@ -5,17 +5,20 @@ protocol ScriptDetailDataSourceProtocol: Sendable {
     func save(_ items: [ScriptDetailItem]) throws
 }
 
-struct UserDefaultsScriptDetailDataSource: ScriptDetailDataSourceProtocol {
+struct SavedScriptDetailDataSource: ScriptDetailDataSourceProtocol {
     private let store: KeyValueStore
+    private let storage: (any CollectionDataStoring)?
     private let key: String
-    init(store: KeyValueStore, key: String = "script_detail_items") { self.store = store; self.key = key }
+    init(store: KeyValueStore, key: String = "script_detail_items", storage: (any CollectionDataStoring)? = nil) { self.store = store; self.key = key; self.storage = storage }
     func load() throws -> [ScriptDetailItem] {
-        guard let data = store.data(forKey: key) else { return [] }
+        guard let data = try storage?.read() ?? store.data(forKey: key) else { return [] }
         do { return try JSONDecoder().decode([ScriptDetailItem].self, from: data) }
         catch { throw PersistenceError.unreadable("Script Detail items") }
     }
     func save(_ items: [ScriptDetailItem]) throws {
-        store.set(try JSONEncoder().encode(items), forKey: key)
+        let data = try JSONEncoder().encode(items)
+        try storage?.write(data)
+        store.set(data, forKey: key)
     }
 }
 

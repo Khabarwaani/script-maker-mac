@@ -14,7 +14,6 @@ final class LocalAgentViewModel {
         didSet {
             if !version.isEmpty { selectedVersions[agentID] = version }
             prepareDraft()
-            selectCompatibleProvider()
         }
     }
     private var providerOverride: LocalAgentProvider = .codex
@@ -88,7 +87,6 @@ final class LocalAgentViewModel {
             definitions = loaded; providers = available; errorMessage = nil
             if agentID.isEmpty { agentID = agents.first?.agentID ?? "" }
             else { restoreVersion() }
-            selectCompatibleProvider()
         } catch {
             guard !Task.isCancelled else { return }
             definitions = []; providers = [:]
@@ -103,7 +101,6 @@ final class LocalAgentViewModel {
         guard !isRunning, isAvailable(selected) else { return }
         provider = selected
     }
-    private func selectCompatibleProvider() {}
     private func restoreVersion() {
         if let selected = selectedVersions[agentID] {
             version = versions.contains(selected) ? selected : ""

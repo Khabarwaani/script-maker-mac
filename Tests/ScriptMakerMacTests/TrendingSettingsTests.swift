@@ -131,3 +131,30 @@ final class TrendingSettingsTests: XCTestCase {
 
 
 }
+
+@MainActor
+private struct TrendClipboard: ClipboardWriting {
+    func write(_ text: String) -> Bool { false }
+    func writeImage(_ data: Data) -> Bool { false }
+}
+private struct TrendResearcher: NewsResearching {
+    func availability() async -> [LocalAgentProvider: LocalAgentAvailability] { [:] }
+    func research(_ request: NewsResearchRequest) async throws -> NewsResearchResult { throw CancellationError() }
+}
+extension TrendingSettingsTests {
+    @MainActor
+    func testLateTagDetailsCannotReplaceANewerSelection() async {
+        let provider = DeferredTagDetails()
+        let vm = ResearcherViewModel(newsProvider: provider, researchService: TrendResearcher(), clipboard: TrendClipboard(), config: makeTestConfig())
+        vm.selectedStorySource = ResearcherViewModel.hashtagSourceLabel
+        vm.selectedHashtag = "#ISRO"
+        let task = Task { await vm.loadHashtagDetail() }
+        await provider.waitUntilRequested()
+        vm.selectedHashtag = "#Other"
+        vm.topic = "New selection"
+        await provider.complete()
+        await task.value
+        XCTAssertEqual(vm.topic, "New selection")
+        XCTAssertNil(vm.selectedTagDetail)
+    }
+}

@@ -11,7 +11,9 @@ enum CompositionRoot {
         let storageNamespace = identifier == "ai.khabarwaani.scriptmaker.mac" ? "ScriptMakerMac" : identifier
         let config = AppConfig(store: KeyValueStore())
         let uploadSettings = MacUploadSettingsStore(credentials: CredentialStore(service: storageNamespace, account: "upload-settings"))
-        let repository = LocalStoryRepository(dataSource: UserDefaultsStoryDataSource(store: KeyValueStore()))
+        let files = FileStore(mediaNamespace: storageNamespace)
+        let repository = LocalStoryRepository(dataSource: SavedStoryDataSource(store: KeyValueStore(),
+            storage: FileCollectionStore(files: files, fileURL: { try files.applicationSupportFile(namespace: storageNamespace, name: "stories.json") })))
         let makeNews: @MainActor @Sendable (Bool) throws -> any NewsSearching = { forceFresh in
             NewsSearchClient(configuration: try config.newsSettings.frameworkConfiguration(forceFresh: forceFresh))
         }
@@ -19,7 +21,6 @@ enum CompositionRoot {
             TrendingHashtagClient(provider: try settings.frameworkProvider(), configuration: try settings.frameworkConfiguration())
         })
         let newsProvider = LocalStudioNewsProvider(news: makeNews, trends: { try trendClients.client() })
-        let files = FileStore(mediaNamespace: storageNamespace)
         let agentService = TerminalLocalAgentService(
             makeSession: { request, workspace in
                 let settings = request.session
@@ -96,7 +97,7 @@ enum CompositionRoot {
         let flowResolver = LocalPipelineFlowResolver()
         let pipeline = PipelineTabViewModel(service: agentService, executor: PipelineExecutionService(runner: agentService), storyMapper: PipelineStoryMapper(), flowResolver: flowResolver, storyRepository: repository, newsProvider: newsProvider, defaultLocation: config.newsSettings.location, agentSelection: WorkspaceAgentSelection(settings: config))
         let detailService = LocalScriptDetailService(runner: agentService)
-        let detailRepository = LocalScriptDetailRepository(dataSource: UserDefaultsScriptDetailDataSource(store: KeyValueStore()))
+        let detailRepository = LocalScriptDetailRepository(dataSource: SavedScriptDetailDataSource(store: KeyValueStore(), storage: FileCollectionStore(files: files, fileURL: { try files.applicationSupportFile(namespace: storageNamespace, name: "script-detail.json") })))
         let scriptDetail = ScriptDetailViewModel(service: detailService, repository: detailRepository, clipboard: clipboard, config: config, agentSelection: WorkspaceAgentSelection(settings: config))
         let agentCatalogService = KhabarwaaniAgentCatalogService()
         let agentCatalog = AgentCatalogViewModel(service: agentCatalogService, clipboard: clipboard)

@@ -93,7 +93,7 @@ final class ResearcherTests: XCTestCase {
             language: "English",
             sourceURL: "https://isro.gov.in",
             humanInstruction: "Verify launch timeline",
-            provider: .appleLocal,
+            provider: .codex,
             model: "on-device"
         )
 

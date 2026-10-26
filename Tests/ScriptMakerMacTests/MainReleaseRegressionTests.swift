@@ -83,7 +83,7 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
         XCTAssertEqual(story.title, "Manual story")
         XCTAssertEqual(story.scriptText, "Full pasted screenplay\nSpoken dialogue")
         XCTAssertEqual(story.status, "saved")
-        let persisted = try await repository.all()
+        let persisted = await repository.all()
         XCTAssertEqual(persisted.count, 1)
         XCTAssertEqual(persisted.first?.id, story.id)
         library.prepareNewStory()
@@ -112,10 +112,10 @@ final class MainReleaseLocalWorkflowTests: XCTestCase {
 
 @MainActor
 final class LibraryDetailTests: XCTestCase {
-    func testMultiSelectionDeletionKeepsUnselectedStoriesAndRejectsServerBatch() async throws {
+    func testMultiSelectionDeletionKeepsUnselectedStoriesAndRejectsMissingStories() async throws {
         let repo = MainReleaseWorkflowStoryRepository()
         let stories = (1...4).map { Story(title: "Story \($0)", scriptText: "Script \($0)") }
-        for story in stories { try await repo.save(story) }
+        for story in stories { await repo.save(story) }
         let vm = LibraryViewModel( repository: repo)
         vm.stories = stories
         vm.selectAllStories()
@@ -126,7 +126,7 @@ final class LibraryDetailTests: XCTestCase {
         await vm.deleteStories(ids: vm.selectedStoryIDs)
         XCTAssertEqual(Set(vm.stories.map(\.id)), Set([stories[1].id, stories[3].id]))
         XCTAssertNotNil(vm.selectedStory)
-        let persisted = try await repo.all()
+        let persisted = await repo.all()
         XCTAssertEqual(persisted.count, 2)
         vm.selectStories([])
         XCTAssertNil(vm.selectedStoryID)
@@ -136,16 +136,16 @@ final class LibraryDetailTests: XCTestCase {
         vm.selectStories([stories[1].id, remote.id])
         await vm.deleteStories(ids: vm.selectedStoryIDs)
         XCTAssertEqual(vm.stories.count, 3)
-        let untouched = try await repo.all()
+        let untouched = await repo.all()
         XCTAssertEqual(untouched.count, 2)
-        XCTAssertTrue(vm.notice?.contains("No stories were deleted") ?? false)
+        XCTAssertTrue(vm.notice?.contains("Some selected stories") ?? false)
     }
 
     func testCrossRemovalAndUndoPreserveStoryAndOtherItems() async throws {
         let repo = MainReleaseWorkflowStoryRepository()
         let link = StorySourceLink(title: "Wire", url: "https://example.com/news", source: "Wire")
         let story = Story(title: "Removals", videoURL: "https://example.com/video.mp4", hashtags: ["#One", "#Two"], sourceLinks: [link], scriptText: "Keep script", imageURLs: ["sample://one", "sample://two"])
-        try await repo.save(story)
+        await repo.save(story)
         let vm = LibraryViewModel( repository: repo)
         vm.stories = [story]; vm.selectedStoryID = story.id
         await vm.remove(.hashtag("#One"), from: story.id)
@@ -172,7 +172,7 @@ final class LibraryDetailTests: XCTestCase {
     func testMediaImportPersistsAttachmentAndFailureKeepsStory() async throws {
         let repo = MainReleaseWorkflowStoryRepository()
         let story = Story(title: "Media", scriptText: "Keep script")
-        try await repo.save(story)
+        await repo.save(story)
         let imported = URL(fileURLWithPath: "/tmp/imported-image.png")
         let vm = LibraryViewModel( repository: repo, mediaImporter: TestMediaImporter(destination: imported))
         vm.stories = [story]; vm.selectedStoryID = story.id
@@ -194,7 +194,7 @@ final class LibraryDetailTests: XCTestCase {
         var story = Story(title: "Before", createdAt: "2020-01-01T00:00:00Z", scriptText: "Old script")
         story.hashtags = ["#News"]; story.imageURLs = ["https://example.com/image.jpg"]
         story.sourceLinks = [StorySourceLink(title: "News", url: "https://example.com/news", source: "Wire")]
-        try await repo.save(story)
+        await repo.save(story)
         let vm = LibraryViewModel( repository: repo)
         vm.stories = [story]; vm.selectedStoryID = story.id
         vm.prepareEdits(story); vm.editedScript = "Current script"
@@ -232,10 +232,10 @@ final class LibraryDetailTests: XCTestCase {
     }
 
     func testUpdatesPersistOnlyRequestedFields() async throws {
-        let config = releaseTestConfig()
+
         let repo = MainReleaseWorkflowStoryRepository()
         let story = Story(title: "Update target", scriptText: "Keep script")
-        try await repo.save(story)
+        await repo.save(story)
         let vm = LibraryViewModel( repository: repo, updater: ReleaseLibraryUpdateStub())
         await vm.refresh()
         await vm.update(.hashtags)
@@ -286,8 +286,8 @@ final class LibrarySharingTests: XCTestCase {
 
     func testShareRoutesFullStoryAndCancellationPreservesLibrary() async throws {
         let sharing = SharingSpy()
-        let config = releaseTestConfig()
-        let vm = LibraryViewModel( sharing: sharing)
+
+        let vm = LibraryViewModel(repository: MainReleaseWorkflowStoryRepository(), sharing: sharing)
         let story = Story(title: "Story", hashtags: ["#Tag"], sourceLinks: [.init(title: "Source", url: "https://example.com/news", source: "Wire")], scriptText: "Narrator: Full script")
         vm.stories = [story]; vm.selectedStoryID = story.id
         await vm.share(story, to: .googleDrive)
