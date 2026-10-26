@@ -41,7 +41,8 @@ private actor StubResearcherNewsProvider: StudioNewsProviding {
         try await categories()
     }
     func headlines(category: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
-        TopTitlesResponse(category: "national", label: "National", n: headlinesToReturn.count, mode: "fixture", titles: headlinesToReturn.map { NewsTitle(title: $0, link: "") })
+        let titles = category == "Technology" ? ["New chip announced", "Satellite software updated"] : headlinesToReturn
+        return TopTitlesResponse(category: category ?? "national", label: category ?? "National", n: titles.count, mode: "fixture", titles: titles.map { NewsTitle(title: $0, link: "") })
     }
     func headlines(category: String?, location: String?, limit: Int, forceFresh: Bool) async throws -> TopTitlesResponse {
         try await headlines(category: category, limit: limit, forceFresh: forceFresh)
@@ -153,7 +154,9 @@ final class ResearcherTests: XCTestCase {
 
         await vm.onCategoryChanged("Technology")
         XCTAssertEqual(vm.selectedCategory, "Technology")
-        XCTAssertEqual(vm.headlines.count, 2)
+        XCTAssertEqual(vm.headlines, ["New chip announced", "Satellite software updated"])
+        XCTAssertEqual(vm.selectedHeadline, "New chip announced")
+        XCTAssertEqual(vm.topic, "New chip announced")
     }
 
     func testViewModelTrendingHashtagsSync() async throws {
