@@ -109,7 +109,12 @@ enum CompositionRoot {
             })
         let localAgent = LocalAgentViewModel(service: agentService)
         let clipboard = MacClipboardWriter(store: PasteboardStore())
-        let library = LibraryViewModel(config: config, repository: repository, clipboard: clipboard, updater: LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (try makeNews(true), config.newsPageSize) }), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }), uploadSettings: uploadSettings, scriptChat: ScriptChatViewModel(service: LocalScriptChatService(runner: agentService), config: config))
+        let library = LibraryViewModel(config: config, repository: repository, clipboard: clipboard, updater: LocalLibraryUpdateClient(httpClient: HTTPClient(), news: { (try makeNews(true), config.newsPageSize) }, imageNews: {
+            var settings = try config.newsSettings.frameworkConfiguration(forceFresh: true)
+            settings.rssProviders = [.bing]
+            settings.searchDuration = 0
+            return (NewsSearchClient(configuration: settings), config.newsPageSize)
+        }), mediaImporter: LibraryMediaStore(files: FileStore(), httpClient: HTTPClient()), sharing: MacStorySharing(store: SharingStore()), uploader: LocalStoryUploadClient(httpClient: HTTPClient(), googleHTTPClient: HTTPClient.withoutRedirects(), files: files, home: files.homeDirectory, environmentToken: { files.environmentValue("GOOGLE_ACCESS_TOKEN") }), uploadSettings: uploadSettings, scriptChat: ScriptChatViewModel(service: LocalScriptChatService(runner: agentService), config: config))
         let researchService = LocalNewsResearcherService(runner: agentService)
         let researcher = ResearcherViewModel(newsProvider: newsProvider, researchService: researchService, clipboard: clipboard, config: config)
         let flowResolver = LocalPipelineFlowResolver()

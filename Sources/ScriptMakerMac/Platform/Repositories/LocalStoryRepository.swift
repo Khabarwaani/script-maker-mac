@@ -115,7 +115,10 @@ struct LibraryMediaStore: LibraryMediaImporting {
     func importFile(_ url: URL) async throws -> URL { try files.importMedia(url) }
     func imageData(at url: URL) async throws -> Data {
         if url.isFileURL { return try files.contents(of: url) }
-        let (data, response) = try await httpClient.data(for: URLRequest(url: url))
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("image/*", forHTTPHeaderField: "Accept")
+        let (data, response) = try await httpClient.data(for: request)
         guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
             throw APIError.transport("Image request failed")
         }
