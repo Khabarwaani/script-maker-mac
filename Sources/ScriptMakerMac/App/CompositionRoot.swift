@@ -47,7 +47,9 @@ enum CompositionRoot {
                 let persistence: TerminalAgentConfiguration.ProcessPersistenceMode
                 switch settings.persistence {
                 case .ephemeral: persistence = .ephemeral
-                case .persistentStdio: persistence = .persistentStdio(memory: memory)
+                case .persistentStdio:
+                    // Grok's --single accepts the prompt as an argument, not over stdin.
+                    persistence = request.provider == .grok ? .ephemeral : .persistentStdio(memory: memory)
                 case .daemon: persistence = .daemon(memory: memory)
                 }
                 let config = TerminalAgentConfiguration(
