@@ -143,6 +143,7 @@ final class PreferencesViewModel {
     var agentAvailability: [LocalAgentProvider: LocalAgentAvailability] = [:]
     var agentSelectionNotice: String?
     private let agentService: (any LocalAgentRunning)?
+    let modelCatalog: ProviderModelCatalogViewModel?
 
     func saveAgentSelection() {
         draftSelection.model = draftSelection.model.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -155,9 +156,10 @@ final class PreferencesViewModel {
         agentAvailability = await agentService?.availability() ?? [:]
     }
 
-    init(config: any ApplicationSettings, agentService: (any LocalAgentRunning)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil) {
+    init(config: any ApplicationSettings, agentService: (any LocalAgentRunning)? = nil, uploadSettings: (any UploadSettingsStoring)? = nil, modelCatalog: ProviderModelCatalogViewModel? = nil) {
         self.config = config
         self.agentService = agentService
+        self.modelCatalog = modelCatalog
         self.draftSelection = config.defaultAgentSelection
         self.uploadSettings = uploadSettings
         self.draftNewsSettings = config.newsSettings

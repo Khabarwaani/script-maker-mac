@@ -18,6 +18,7 @@ struct ScriptDetailRequest: Sendable {
     let userInstruction: String
     let provider: LocalAgentProvider
     let model: String
+    let thinkingEffort: String
     var sessionID: String?
     var mode: ScriptRefinementExecutionMode
 
@@ -27,6 +28,7 @@ struct ScriptDetailRequest: Sendable {
         userInstruction: String = "",
         provider: LocalAgentProvider,
         model: String,
+        thinkingEffort: String = "",
         sessionID: String? = nil,
         mode: ScriptRefinementExecutionMode = .fastClean
     ) {
@@ -35,6 +37,7 @@ struct ScriptDetailRequest: Sendable {
         self.userInstruction = userInstruction
         self.provider = provider
         self.model = model
+        self.thinkingEffort = thinkingEffort
         self.sessionID = sessionID
         self.mode = mode
     }

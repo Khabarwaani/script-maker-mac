@@ -229,14 +229,15 @@ private struct ScriptDetailOptions: View {
                             .disabled(viewModel.availableProviders[provider]?.isAvailable == false)
                     }
                 }
-                TextField("Model (provider default)", text: $viewModel.customModel)
-                    .textFieldStyle(.roundedBorder)
                 Picker("Mode", selection: $viewModel.executionMode) {
                     ForEach(ScriptRefinementExecutionMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }.help(viewModel.executionMode.summary)
             }.disabled(viewModel.isDetailing || viewModel.isSaving)
+            AgentModelControls(provider: viewModel.selectedProvider, model: $viewModel.customModel,
+                effort: $viewModel.thinkingEffort, catalog: viewModel.modelCatalog)
+                .disabled(viewModel.isDetailing || viewModel.isSaving)
             if let availability = viewModel.availableProviders[viewModel.selectedProvider], !availability.isAvailable {
                 Text(availability.reason).font(.caption).foregroundStyle(AppTheme.secondaryInk)
             }

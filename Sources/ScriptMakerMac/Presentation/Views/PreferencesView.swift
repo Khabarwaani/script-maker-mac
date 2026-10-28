@@ -13,8 +13,13 @@ struct PreferencesView: View {
                     Picker("Provider", selection: $viewModel.draftSelection.provider) {
                         ForEach(LocalAgentProvider.allCases) { provider in Text(provider.title).tag(provider) }
                     }
-                    TextField("Model (provider default)", text: $viewModel.draftSelection.model)
-                        .textFieldStyle(.roundedBorder)
+                    .onChange(of: viewModel.draftSelection.provider) { _, _ in
+                        viewModel.draftSelection.model = ""
+                        viewModel.draftSelection.thinkingEffort = ""
+                    }
+                    AgentModelControls(provider: viewModel.draftSelection.provider,
+                        model: $viewModel.draftSelection.model, effort: $viewModel.draftSelection.thinkingEffort,
+                        catalog: viewModel.modelCatalog)
                     Text("Workspaces can use this default or select their own provider and model. Installed providers use their existing sign-in.")
                         .font(.callout).foregroundStyle(AppTheme.secondaryInk)
                     if let availability = viewModel.agentAvailability[viewModel.draftSelection.provider] {

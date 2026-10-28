@@ -102,6 +102,7 @@ struct LocalAgentRequest: Sendable {
     let provider: LocalAgentProvider
     let executable: String
     var model: String? = nil
+    var thinkingEffort = ""
     var session = LocalAgentSessionSettings()
     var responseInstructions = ""
     var sessionID: String? = nil
@@ -111,7 +112,23 @@ struct LocalAgentRequest: Sendable {
         guard !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw LocalAgentError.invalidInput("A provider executable is required.") }
         guard case .object = try JSONDecoder().decode(AgentJSON.self, from: Data(inputJSON.utf8)) else { throw LocalAgentError.invalidInput("Agent input must be a JSON object.") }
         guard session.temperature.isFinite, (0...1).contains(session.temperature) else { throw LocalAgentError.invalidInput("Temperature must be between 0 and 1.") }
+        if !thinkingEffort.isEmpty {
+            let allowed = provider == .antigravity ? ["low", "medium", "high", "xhigh", "max"] :
+                provider == .codex ? ["low", "medium", "high", "xhigh", "max", "ultra"] : []
+            guard allowed.contains(thinkingEffort) else { throw LocalAgentError.invalidInput("This provider does not support the selected thinking effort.") }
+        }
     }
+}
+
+struct ProviderModel: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let efforts: [String]
+}
+
+protocol ProviderModelCataloging: Sendable {
+    func models(for provider: LocalAgentProvider) async throws -> [ProviderModel]
+    func test(provider: LocalAgentProvider, model: String, effort: String) async throws
 }
 
 struct LocalAgentResult: Sendable, Equatable {

@@ -8,6 +8,7 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 struct AgentSelection: Codable, Equatable, Sendable {
     var provider: LocalAgentProvider = .codex
     var model = ""
+    var thinkingEffort = ""
 }
 
 protocol AgentSettingsProviding: AnyObject {

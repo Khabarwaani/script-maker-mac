@@ -8,6 +8,7 @@ struct NewsResearchRequest: Sendable {
     let humanInstruction: String?
     let provider: LocalAgentProvider
     let model: String
+    let thinkingEffort: String
 
     init(
         topic: String,
@@ -15,7 +16,8 @@ struct NewsResearchRequest: Sendable {
         sourceURL: String? = nil,
         humanInstruction: String? = nil,
         provider: LocalAgentProvider = .codex,
-        model: String = ""
+        model: String = "",
+        thinkingEffort: String = ""
     ) {
         self.topic = topic
         self.language = language
@@ -23,6 +25,7 @@ struct NewsResearchRequest: Sendable {
         self.humanInstruction = humanInstruction
         self.provider = provider
         self.model = model
+        self.thinkingEffort = thinkingEffort
     }
 }
 

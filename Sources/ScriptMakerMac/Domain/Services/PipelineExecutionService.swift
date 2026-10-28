@@ -19,7 +19,7 @@ struct PipelineExecutionService: AgentPipelineExecuting {
         let override = model.trimmingCharacters(in: .whitespacesAndNewlines)
         return try await runner.run(LocalAgentRequest(agentID: step.agentID, version: step.version,
             inputJSON: value.json(), provider: step.provider, executable: step.provider.executable,
-            model: override.isEmpty ? nil : override))
+            model: override.isEmpty ? nil : override, thinkingEffort: step.thinkingEffort))
     }
 }
 

@@ -28,6 +28,7 @@ final class ScriptDetailViewModel {
 
     private var providerOverride: LocalAgentProvider = .codex
     private var modelOverrideValue = ""
+    private var effortOverrideValue = ""
     private let agentSelection: (any WorkspaceAgentSelecting)?
     var usesAppDefault: Bool {
         get { agentSelection?.usesAppDefault ?? false }
@@ -41,6 +42,11 @@ final class ScriptDetailViewModel {
         get { agentSelection?.model ?? modelOverrideValue }
         set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
     }
+    var thinkingEffort: String {
+        get { agentSelection?.thinkingEffort ?? effortOverrideValue }
+        set { if let agentSelection { agentSelection.thinkingEffort = newValue } else { effortOverrideValue = newValue } }
+    }
+    var modelCatalog: ProviderModelCatalogViewModel? { agentSelection?.modelCatalog }
     var executionMode: ScriptRefinementExecutionMode = .fastClean
     var availableProviders: [LocalAgentProvider: LocalAgentAvailability] = [:]
 
@@ -183,7 +189,7 @@ final class ScriptDetailViewModel {
             draft: ScriptDetailDraft(latestScript: editingDetailedScript, instruction: editingConsolidatedInstruction),
             userInstruction: instruction,
             provider: selectedProvider,
-            model: effectiveModel,
+            model: effectiveModel, thinkingEffort: thinkingEffort,
             sessionID: "script-detail-\(itemID)",
             mode: executionMode
         )

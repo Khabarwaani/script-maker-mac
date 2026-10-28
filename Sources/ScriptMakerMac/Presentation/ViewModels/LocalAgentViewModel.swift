@@ -17,7 +17,7 @@ final class LocalAgentViewModel {
         }
     }
     private var providerOverride: LocalAgentProvider = .codex
-    private var modelOverrideValue = ""
+    private var effortOverrideValue = ""
     private let agentSelection: (any WorkspaceAgentSelecting)?
     var usesAppDefault: Bool {
         get { agentSelection?.usesAppDefault ?? false }
@@ -62,7 +62,15 @@ final class LocalAgentViewModel {
         get { providerSettings[provider] ?? .init() }
         set { providerSettings[provider] = newValue }
     }
-    var model: String { get { usesAppDefault ? (agentSelection?.model ?? "") : sessionSettings.model } set { agentSelection?.model = newValue; sessionSettings.model = newValue } }
+    var model: String {
+        get { agentSelection?.model ?? sessionSettings.model }
+        set { if let agentSelection { agentSelection.model = newValue } else { sessionSettings.model = newValue } }
+    }
+    var thinkingEffort: String {
+        get { agentSelection?.thinkingEffort ?? effortOverrideValue }
+        set { if let agentSelection { agentSelection.thinkingEffort = newValue } else { effortOverrideValue = newValue } }
+    }
+    var modelCatalog: ProviderModelCatalogViewModel? { agentSelection?.modelCatalog }
     var executable: String { provider.executable }
     var inputJSON: String? { try? preparedInput() }
     var inputError: String? { do { _ = try preparedInput(); return nil } catch { return error.localizedDescription } }
@@ -123,7 +131,7 @@ final class LocalAgentViewModel {
     }
     private func makeRequest() throws -> LocalAgentRequest {
         let request = LocalAgentRequest(agentID: agentID, version: version, inputJSON: try preparedInput(),
-            provider: provider, executable: executable, model: model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : model.trimmingCharacters(in: .whitespacesAndNewlines), session: sessionSettings)
+            provider: provider, executable: executable, model: model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : model.trimmingCharacters(in: .whitespacesAndNewlines), thinkingEffort: thinkingEffort, session: sessionSettings)
         try request.validate()
         return request
     }

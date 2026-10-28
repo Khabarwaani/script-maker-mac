@@ -37,9 +37,8 @@ private struct LocalAgentInputForm: View {
                 } label: {
                     Text("Refresh agents and providers")
                 }
-                if viewModel.provider != .appleLocal {
-                    TextField("Model (provider default)", text: $viewModel.model).accessibilityLabel("Model override")
-                }
+                AgentModelControls(provider: viewModel.provider, model: $viewModel.model,
+                    effort: $viewModel.thinkingEffort, catalog: viewModel.modelCatalog)
                 LocalAgentSessionSettingsView(viewModel: viewModel)
                 if let definition = viewModel.definition, definition.isExecutable, let snapshot = viewModel.draft(for: definition.id) {
                     DynamicAgentInputForm(draft: Binding(
