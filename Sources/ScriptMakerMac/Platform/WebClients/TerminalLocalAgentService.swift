@@ -153,6 +153,7 @@ private struct AgentSessionResource: Sendable {
         let provider: LocalAgentProvider
         let executable: String
         let model: String?
+        let thinkingEffort: String
         let settings: LocalAgentSessionSettings
         let responseInstructions: String
 
@@ -160,6 +161,7 @@ private struct AgentSessionResource: Sendable {
             provider = request.provider
             executable = request.executable
             model = request.model
+            thinkingEffort = request.thinkingEffort
             settings = request.session
             responseInstructions = request.responseInstructions
         }
@@ -170,6 +172,83 @@ private struct AgentSessionResource: Sendable {
         session.purgeMemory()
         do { try removeWorkspace(workspace) }
         catch { AppLog.debug("LocalAgent cleanup: \(error.localizedDescription)") }
+    }
+}
+
+struct LocalProviderModelCatalog: ProviderModelCataloging {
+    let executable: @Sendable (LocalAgentProvider) -> URL?
+    let run: @Sendable (URL, [String], String?, Duration, Int?) async throws -> String
+
+    func models(for provider: LocalAgentProvider) async throws -> [ProviderModel] {
+        guard let url = executable(provider) else { throw LocalAgentError.unavailable(provider.executable) }
+        switch provider {
+        case .codex:
+            var models: [ProviderModel] = []
+            var cursor: String?
+            repeat {
+                let params: [String: Any] = ["limit": 100, "includeHidden": false, "cursor": cursor as Any? ?? NSNull()]
+                let messages: [[String: Any]] = [
+                    ["method": "initialize", "id": 1, "params": ["clientInfo": ["name": "script_maker_mac", "title": "Script Maker", "version": "2.0"]]],
+                    ["method": "initialized", "params": [:]],
+                    ["method": "model/list", "id": 2, "params": params]
+                ]
+                let input = try messages.map { message in
+                    String(decoding: try JSONSerialization.data(withJSONObject: message), as: UTF8.self)
+                }.joined(separator: "\n") + "\n"
+                let output = try await run(url, ["app-server", "--listen", "stdio://"], input, .seconds(20), 2)
+                guard let response = output.split(separator: "\n").compactMap({ line -> [String: Any]? in
+                    try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                }).first(where: { ($0["id"] as? Int) == 2 }),
+                      let result = response["result"] as? [String: Any],
+                      let data = result["data"] as? [[String: Any]] else {
+                    throw LocalAgentError.invalidInput("Codex did not return a model catalog.")
+                }
+                models += data.compactMap { item in
+                    guard let id = item["model"] as? String ?? item["id"] as? String else { return nil }
+                    let levels = (item["supportedReasoningEfforts"] as? [[String: Any]] ?? [])
+                        .compactMap { $0["reasoningEffort"] as? String }
+                    return ProviderModel(id: id, name: item["displayName"] as? String ?? id, efforts: levels)
+                }
+                cursor = result["nextCursor"] as? String
+            } while cursor != nil
+            return models
+        case .antigravity:
+            let output = try await run(url, ["models"], nil, .seconds(20), nil)
+            let models = output.split(separator: "\n").compactMap { line -> ProviderModel? in
+                let parts = line.split(separator: "\t", maxSplits: 1).map(String.init)
+                guard parts.count == 2, !parts[0].isEmpty else { return nil }
+                return ProviderModel(id: parts[0], name: parts[1], efforts: ["low", "medium", "high", "xhigh", "max"])
+            }
+            guard !models.isEmpty else { throw LocalAgentError.invalidInput("Antigravity did not return any models.") }
+            return models
+        default:
+            return []
+        }
+    }
+
+    func test(provider: LocalAgentProvider, model: String, effort: String) async throws {
+        guard let url = executable(provider) else { throw LocalAgentError.unavailable(provider.executable) }
+        let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !model.isEmpty else { throw LocalAgentError.invalidInput("Enter a model to test.") }
+        let prompt = "Reply with exactly OK. Do not use tools or inspect files."
+        let arguments: [String]
+        switch provider {
+        case .codex:
+            arguments = ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "--model", model]
+                + (effort.isEmpty ? [] : ["--config", "model_reasoning_effort=\(effort)"]) + [prompt]
+        case .antigravity:
+            arguments = ["--new-project", "--sandbox", "--disable-slash-commands", "--model", model]
+                + (effort.isEmpty ? [] : ["--effort", effort]) + ["--print=\(prompt)"]
+        default:
+            throw LocalAgentError.invalidInput("Model testing is available for Codex and Antigravity.")
+        }
+        let output = try await run(url, arguments, nil, .seconds(45), nil)
+        let confirmed = output.split(whereSeparator: \.isNewline).contains {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare("OK") == .orderedSame
+        }
+        guard confirmed else {
+            throw LocalAgentError.invalidInput("The provider did not confirm this model. \(output.prefix(300))")
+        }
     }
 }
 

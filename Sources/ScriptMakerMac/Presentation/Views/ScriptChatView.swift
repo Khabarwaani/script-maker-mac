@@ -32,7 +32,6 @@ struct ScriptChatView: View {
                 .onChange(of: viewModel.provider) { _, _ in
                     Task { await viewModel.prewarm() }
                 }
-                TextField("Model (provider default if empty)", text: $viewModel.model)
                 Picker("Mode", selection: $viewModel.mode) {
                     ForEach(ScriptRefinementExecutionMode.allCases) { mode in
                         Text(mode.label).tag(mode)
@@ -44,6 +43,9 @@ struct ScriptChatView: View {
                 .help(viewModel.mode.summary)
             }
             .disabled(viewModel.isRefining || viewModel.isLoadingProviders || isSaving)
+            AgentModelControls(provider: viewModel.provider, model: $viewModel.model,
+                effort: $viewModel.thinkingEffort, catalog: viewModel.modelCatalog)
+                .disabled(viewModel.isRefining || isSaving)
             if let reason = viewModel.providers[viewModel.provider], !reason.isAvailable {
                 Text(reason.reason).font(.callout).foregroundStyle(.secondary)
             }

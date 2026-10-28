@@ -47,6 +47,7 @@ final class PipelineTabViewModel {
     private(set) var providers: [LocalAgentProvider: LocalAgentAvailability] = [:]
     private var providerOverride: LocalAgentProvider = .codex
     private var modelOverrideValue = ""
+    private var effortOverrideValue = ""
     private let agentSelection: (any WorkspaceAgentSelecting)?
     var usesAppDefault: Bool {
         get { agentSelection?.usesAppDefault ?? false }
@@ -57,9 +58,14 @@ final class PipelineTabViewModel {
         set { if let agentSelection { agentSelection.provider = newValue } else { providerOverride = newValue } }
     }
     var modelOverride: String {
-        get { agentSelection?.model ?? modelOverrideValue }
-        set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
+        get { activeStep?.model ?? agentSelection?.model ?? modelOverrideValue }
+        set { if steps.indices.contains(activeStepIndex) { steps[activeStepIndex].model = newValue } else { modelOverrideValue = newValue } }
     }
+    var thinkingEffort: String {
+        get { activeStep?.thinkingEffort ?? agentSelection?.thinkingEffort ?? effortOverrideValue }
+        set { if steps.indices.contains(activeStepIndex) { steps[activeStepIndex].thinkingEffort = newValue } else { effortOverrideValue = newValue } }
+    }
+    var modelCatalog: ProviderModelCatalogViewModel? { agentSelection?.modelCatalog }
 
     private(set) var isRefreshing = false
     private(set) var isRunning = false
@@ -70,7 +76,6 @@ final class PipelineTabViewModel {
 
     @ObservationIgnored private let executor: any AgentPipelineExecuting
     @ObservationIgnored private let storyMapper: any PipelineStoryMapping
-    private var executionModel = ""
     @ObservationIgnored private let service: any LocalAgentRunning
     @ObservationIgnored private let flowResolver: any PipelineFlowResolving
     @ObservationIgnored private let storyRepository: any StoryRepository
@@ -341,6 +346,8 @@ final class PipelineTabViewModel {
                 agentName: def.name,
                 version: def.version,
                 provider: provider,
+                model: agentSelection?.model ?? modelOverrideValue,
+                thinkingEffort: agentSelection?.thinkingEffort ?? effortOverrideValue,
                 draft: draft,
                 status: .pending,
                 sourceStepIndex: index > 0 ? index - 1 : nil
@@ -380,6 +387,8 @@ final class PipelineTabViewModel {
             agentName: def.name,
             version: def.version,
             provider: provider,
+            model: agentSelection?.model ?? modelOverrideValue,
+            thinkingEffort: agentSelection?.thinkingEffort ?? effortOverrideValue,
             draft: draft,
             status: .pending
         )
@@ -400,6 +409,8 @@ final class PipelineTabViewModel {
             agentName: def.name,
             version: def.version,
             provider: provider,
+            model: agentSelection?.model ?? modelOverrideValue,
+            thinkingEffort: agentSelection?.thinkingEffort ?? effortOverrideValue,
             draft: option.mappedDraft,
             status: .pending,
             sourceStepIndex: activeStepIndex
@@ -424,6 +435,8 @@ final class PipelineTabViewModel {
             agentName: targetDef.name,
             version: targetDef.version,
             provider: provider,
+            model: agentSelection?.model ?? modelOverrideValue,
+            thinkingEffort: agentSelection?.thinkingEffort ?? effortOverrideValue,
             draft: mappedDraft,
             status: .pending,
             sourceStepIndex: activeStepIndex
@@ -471,8 +484,12 @@ final class PipelineTabViewModel {
 
     func selectProvider(_ selected: LocalAgentProvider) {
         guard !isRunning else { return }
+        let changed = activeStep?.provider != selected
         provider = selected
-        if steps.indices.contains(activeStepIndex) { steps[activeStepIndex].provider = selected }
+        if steps.indices.contains(activeStepIndex) {
+            steps[activeStepIndex].provider = selected
+            if changed { steps[activeStepIndex].model = ""; steps[activeStepIndex].thinkingEffort = "" }
+        }
     }
 
     // MARK: - Execution
@@ -498,7 +515,6 @@ final class PipelineTabViewModel {
 
     private func startExecution(continuous: Bool, advanceFirst: Bool) {
         guard !isRunning, !hasOutputEdits, advanceFirst ? canContinue : canRunActiveStep else { return }
-        executionModel = modelOverride
         isRunning = true
         isCancelling = false
         isPauseRequested = false
@@ -566,7 +582,7 @@ final class PipelineTabViewModel {
         steps[index].errorMessage = nil
         editedOutput = ""
         statusMessage = "Running \(step.agentName)…"
-        let output = try await executor.execute(step: step, definition: definition, model: executionModel)
+        let output = try await executor.execute(step: step, definition: definition, model: step.model)
         try Task.checkCancellation()
         steps[index].status = .completed
         steps[index].completedAt = Date()
@@ -609,7 +625,9 @@ final class PipelineTabViewModel {
             }
             let previous = activeStepIndex
             steps.append(AgentPipelineStep(stepIndex: steps.count, agentID: definition.agentID,
-                agentName: definition.name, version: definition.version, provider: steps[previous].provider,
+                agentName: definition.name, version: definition.version, provider: provider,
+                model: agentSelection?.model ?? modelOverrideValue,
+                thinkingEffort: agentSelection?.thinkingEffort ?? effortOverrideValue,
                 draft: option.mappedDraft, sourceStepIndex: previous))
             activeStepIndex = steps.count - 1
             fillRefinementInstruction(at: activeStepIndex)

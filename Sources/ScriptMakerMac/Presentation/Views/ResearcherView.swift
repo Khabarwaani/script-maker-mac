@@ -258,9 +258,8 @@ struct ResearcherView: View {
             }
 
             Text(viewModel.providerNotice).font(.caption).foregroundStyle(AppTheme.secondaryInk)
-            StudioRow("Model Override") {
-                TextField("Default / Override (optional)", text: $viewModel.customModel)
-            }
+            AgentModelControls(provider: viewModel.selectedProvider, model: $viewModel.customModel,
+                effort: $viewModel.thinkingEffort, catalog: viewModel.modelCatalog)
 
             DisclosureGroup("Advanced options") {
                 VStack(alignment: .leading, spacing: 12) {

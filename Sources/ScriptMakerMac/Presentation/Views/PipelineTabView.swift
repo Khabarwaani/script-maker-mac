@@ -609,8 +609,9 @@ private struct StepWorkAreaView: View {
                     .pickerStyle(.menu)
                     .disabled(viewModel.isRunning)
                     Text(viewModel.availabilityReason(step.provider)).font(.caption2).foregroundStyle(.secondary)
-                    TextField("Workflow model (provider default)", text: $viewModel.modelOverride)
-                        .textFieldStyle(.roundedBorder).disabled(viewModel.isRunning)
+                    AgentModelControls(provider: step.provider, model: $viewModel.modelOverride,
+                        effort: $viewModel.thinkingEffort, catalog: viewModel.modelCatalog)
+                        .disabled(viewModel.isRunning)
                 }
 
                 if let def = viewModel.activeDefinition {

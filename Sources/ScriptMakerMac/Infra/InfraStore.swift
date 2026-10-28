@@ -3,6 +3,79 @@ import AppKit
 import UniformTypeIdentifiers
 import Security
 
+struct CLICommandRunner: Sendable {
+    func run(executable: URL, arguments: [String], input: String? = nil, timeout: Duration = .seconds(30), responseID: Int? = nil) async throws -> String {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.currentDirectoryURL = directory
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        let stdin = Pipe()
+        process.standardInput = stdin
+        let deadline = Task {
+            try? await Task.sleep(for: timeout)
+            if process.isRunning { process.terminate() }
+        }
+        defer { deadline.cancel() }
+        return try await withTaskCancellationHandler {
+            try process.run()
+            if responseID == nil {
+                if let input { stdin.fileHandleForWriting.write(Data(input.utf8)) }
+                try? stdin.fileHandleForWriting.close()
+            }
+            let data = await Task.detached { () -> Data in
+                guard let responseID else { return output.fileHandleForReading.readDataToEndOfFile() }
+                let messages = (input ?? "").split(separator: "\n", omittingEmptySubsequences: true)
+                guard let first = messages.first else { return Data() }
+                stdin.fileHandleForWriting.write(Data((String(first) + "\n").utf8))
+                var collected = Data()
+                var sentRequest = false
+                while true {
+                    let chunk = output.fileHandleForReading.availableData
+                    if chunk.isEmpty { break }
+                    collected.append(chunk)
+                    let lines = String(decoding: collected, as: UTF8.self).split(separator: "\n")
+                    let ids = lines.compactMap { line -> Int? in
+                        (try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])?["id"] as? Int
+                    }
+                    if !sentRequest && ids.contains(1) {
+                        let rest = messages.dropFirst().joined(separator: "\n") + "\n"
+                        stdin.fileHandleForWriting.write(Data(rest.utf8))
+                        sentRequest = true
+                    }
+                    if ids.contains(responseID) { break }
+                }
+                return collected
+            }.value
+            if responseID != nil {
+                try? stdin.fileHandleForWriting.close()
+                if process.isRunning { process.terminate() }
+            }
+            process.waitUntilExit()
+            try Task.checkCancellation()
+            let text = String(decoding: data, as: UTF8.self)
+            guard responseID != nil || process.terminationStatus == 0 else {
+                throw CLICommandError.failed(text.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            return text
+        } onCancel: {
+            if process.isRunning { process.terminate() }
+        }
+    }
+}
+
+enum CLICommandError: LocalizedError {
+    case failed(String)
+    var errorDescription: String? {
+        switch self { case .failed(let message): return message.isEmpty ? "Provider command failed." : message }
+    }
+}
+
 struct CredentialStore {
     let service: String
     let account: String

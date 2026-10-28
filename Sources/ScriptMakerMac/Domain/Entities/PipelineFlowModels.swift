@@ -93,6 +93,8 @@ struct AgentPipelineStep: Identifiable, Sendable {
     var agentName: String
     var version: String
     var provider: LocalAgentProvider
+    var model: String
+    var thinkingEffort: String
     var draft: AgentInputDraft
     var status: PipelineStepStatus
     var result: LocalAgentResult?
@@ -110,6 +112,8 @@ struct AgentPipelineStep: Identifiable, Sendable {
         agentName: String,
         version: String,
         provider: LocalAgentProvider = .codex,
+        model: String = "",
+        thinkingEffort: String = "",
         draft: AgentInputDraft,
         status: PipelineStepStatus = .pending,
         result: LocalAgentResult? = nil,
@@ -126,6 +130,8 @@ struct AgentPipelineStep: Identifiable, Sendable {
         self.agentName = agentName
         self.version = version
         self.provider = provider
+        self.model = model
+        self.thinkingEffort = thinkingEffort
         self.draft = draft
         self.status = status
         self.result = result

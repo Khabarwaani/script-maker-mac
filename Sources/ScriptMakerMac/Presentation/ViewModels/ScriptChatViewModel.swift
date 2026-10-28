@@ -21,6 +21,7 @@ final class ScriptChatViewModel {
     var userInstruction = ""
     private var providerOverride: LocalAgentProvider = .codex
     private var modelOverrideValue = ""
+    private var effortOverrideValue = ""
     private let agentSelection: (any WorkspaceAgentSelecting)?
     var usesAppDefault: Bool {
         get { agentSelection?.usesAppDefault ?? false }
@@ -34,6 +35,11 @@ final class ScriptChatViewModel {
         get { agentSelection?.model ?? modelOverrideValue }
         set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
     }
+    var thinkingEffort: String {
+        get { agentSelection?.thinkingEffort ?? effortOverrideValue }
+        set { if let agentSelection { agentSelection.thinkingEffort = newValue } else { effortOverrideValue = newValue } }
+    }
+    var modelCatalog: ProviderModelCatalogViewModel? { agentSelection?.modelCatalog }
     var mode: ScriptRefinementExecutionMode
     private let config: (any AgentSettingsProviding)?
 
@@ -238,6 +244,7 @@ final class ScriptChatViewModel {
         let original = originalScript
         let selectedProvider = provider
         let selectedModel = model
+        let selectedEffort = thinkingEffort
         let selectedMode = mode
         let id = UUID()
         operationID = id; isRefining = true; errorMessage = nil
@@ -250,7 +257,7 @@ final class ScriptChatViewModel {
                 }
                 let result = try await service.refine(ScriptChatRequest(originalScript: original, draft: working,
                     userInstruction: instruction, provider: selectedProvider, model: selectedModel,
-                    sessionID: sessionID, mode: selectedMode))
+                    sessionID: sessionID, mode: selectedMode, thinkingEffort: selectedEffort))
                 try Task.checkCancellation()
                 guard self?.operationID == id else { return }
                 guard !StringFormatting.isBlank(result.latestScript), !StringFormatting.isBlank(result.instruction) else {

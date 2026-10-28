@@ -13,6 +13,7 @@ struct ScriptChatRequest: Sendable {
     let model: String
     var sessionID: String? = nil
     var mode: ScriptRefinementExecutionMode = .fastClean
+    var thinkingEffort = ""
 }
 
 protocol ScriptChatRefining: Sendable {

@@ -4,6 +4,49 @@ import XCTest
 func isolatedStoryStoreForTests() -> KeyValueStore {
     KeyValueStore(defaults: UserDefaults(suiteName: "revamp.\(UUID().uuidString)")!)
 }
+
+private actor ModelProbeRecorder {
+    var arguments: [String] = []
+    func record(_ value: [String]) { arguments = value }
+}
+
+final class ProviderModelCatalogTests: XCTestCase {
+    func testCodexAndAntigravityCatalogsUseInstalledProviderResponses() async throws {
+        let catalog = LocalProviderModelCatalog(executable: { _ in URL(fileURLWithPath: "/usr/bin/true") },
+            run: { _, arguments, _, _, _ in
+                if arguments.first == "models" { return "Fetching available models...\nagy-model\tAgent Model\n" }
+                return #"{"id":2,"result":{"data":[{"model":"codex-model","displayName":"Codex Model","supportedReasoningEfforts":[{"reasoningEffort":"low"},{"reasoningEffort":"high"}]}],"nextCursor":null}}"#
+            })
+        let codex = try await catalog.models(for: .codex)
+        XCTAssertEqual(codex, [ProviderModel(id: "codex-model", name: "Codex Model", efforts: ["low", "high"])])
+        let antigravity = try await catalog.models(for: .antigravity)
+        XCTAssertEqual(antigravity.first?.id, "agy-model")
+        XCTAssertEqual(antigravity.first?.name, "Agent Model")
+        XCTAssertTrue(antigravity.first?.efforts.contains("max") == true)
+    }
+
+    func testCustomModelProbePassesEffortAndReportsProviderFailure() async throws {
+        let recorder = ModelProbeRecorder()
+        let catalog = LocalProviderModelCatalog(executable: { _ in URL(fileURLWithPath: "/usr/bin/true") },
+            run: { _, arguments, _, _, _ in await recorder.record(arguments); return "OK" })
+        try await catalog.test(provider: .codex, model: "custom", effort: "high")
+        let codexArguments = await recorder.arguments
+        XCTAssertTrue(codexArguments.contains("--model"))
+        XCTAssertTrue(codexArguments.contains("model_reasoning_effort=high"))
+        try await catalog.test(provider: .antigravity, model: "custom", effort: "xhigh")
+        let antigravityArguments = await recorder.arguments
+        XCTAssertTrue(antigravityArguments.contains("--effort"))
+        XCTAssertTrue(antigravityArguments.contains("xhigh"))
+        let failing = LocalProviderModelCatalog(executable: { _ in URL(fileURLWithPath: "/usr/bin/true") },
+            run: { _, _, _, _, _ in throw CLICommandError.failed("Unknown model") })
+        do { try await failing.test(provider: .codex, model: "bad", effort: "") ; XCTFail("Expected provider failure") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("Unknown model")) }
+        let echoedPrompt = LocalProviderModelCatalog(executable: { _ in URL(fileURLWithPath: "/usr/bin/true") },
+            run: { _, _, _, _, _ in "Reply with exactly OK. Do not use tools or inspect files.\nNo response" })
+        do { try await echoedPrompt.test(provider: .codex, model: "bad", effort: "") ; XCTFail("Expected missing response") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("did not confirm")) }
+    }
+}
 func makeTestConfig() -> AppConfig { AppConfig(store: isolatedStoryStoreForTests()) }
 
 final class RevampMigrationTests: XCTestCase {
@@ -22,6 +65,16 @@ final class RevampMigrationTests: XCTestCase {
         XCTAssertEqual(defaults.data(forKey: "savedStories"), Data([1, 2, 3]))
         config.defaultAgentSelection = AgentSelection(provider: .grok, model: "")
         XCTAssertEqual(AppConfig(store: KeyValueStore(defaults: defaults)).defaultAgentSelection.provider, .grok)
+    }
+    func testSavedModelAndThinkingEffortRoundTripWithoutLegacyEffort() {
+        let defaults = UserDefaults(suiteName: "effort.\(UUID().uuidString)")!
+        defaults.set("codex", forKey: "agent.default.provider")
+        defaults.set("existing-model", forKey: "agent.default.model")
+        let config = AppConfig(store: KeyValueStore(defaults: defaults))
+        XCTAssertEqual(config.defaultAgentSelection.model, "existing-model")
+        XCTAssertEqual(config.defaultAgentSelection.thinkingEffort, "")
+        config.defaultAgentSelection.thinkingEffort = "high"
+        XCTAssertEqual(AppConfig(store: KeyValueStore(defaults: defaults)).defaultAgentSelection.thinkingEffort, "high")
     }
     func testIdentifierAndStudioConfigMigrationsAndUnknownProviderDefault() throws {
         for source in ["identifier", "studio", "unknown"] {
@@ -54,6 +107,20 @@ final class WorkspaceSelectionTests: XCTestCase {
         XCTAssertEqual(second.model, "next")
         first.usesAppDefault = true
         XCTAssertEqual(first.model, "next")
+    }
+    func testThinkingEffortInheritsDefaultAndResetsWithProviderChange() {
+        let settings = makeTestConfig()
+        settings.defaultAgentSelection = AgentSelection(provider: .codex, model: "codex-model", thinkingEffort: "high")
+        let selection = WorkspaceAgentSelection(settings: settings)
+        XCTAssertEqual(selection.thinkingEffort, "high")
+        selection.provider = .antigravity
+        XCTAssertEqual(selection.model, "")
+        XCTAssertEqual(selection.thinkingEffort, "")
+        selection.thinkingEffort = "medium"
+        settings.defaultAgentSelection.thinkingEffort = "low"
+        XCTAssertEqual(selection.thinkingEffort, "medium")
+        selection.usesAppDefault = true
+        XCTAssertEqual(selection.thinkingEffort, "low")
     }
     func testDefaultUpdatesDoNotMutateCapturedRequests() {
         let settings = makeTestConfig()
@@ -249,6 +316,7 @@ extension WorkspaceSelectionTests {
     }
     func testExistingPipelineStepsAndRunningModelAreSnapshots() async {
         let settings = makeTestConfig()
+        settings.defaultAgentSelection = AgentSelection(provider: .codex, model: "initial", thinkingEffort: "high")
         let selection = WorkspaceAgentSelection(settings: settings)
         let runner = RevampRunner()
         let vm = PipelineTabViewModel(service: runner, executor: PipelineExecutionService(runner: runner), storyMapper: PipelineStoryMapper(),
@@ -260,12 +328,15 @@ extension WorkspaceSelectionTests {
         guard !vm.steps.isEmpty else { return XCTFail("Expected configured step") }
         settings.defaultAgentSelection = AgentSelection(provider: .claude, model: "next-run")
         XCTAssertEqual(vm.steps[0].provider, .codex)
+        XCTAssertEqual(vm.steps[0].model, "initial")
+        XCTAssertEqual(vm.steps[0].thinkingEffort, "high")
         vm.runActiveStep()
         settings.defaultAgentSelection = AgentSelection(provider: .grok, model: "later")
         await vm.waitForExecution()
         let request = await runner.requests.last
         XCTAssertEqual(request?.provider, .codex)
-        XCTAssertEqual(request?.model, "next-run")
+        XCTAssertEqual(request?.model, "initial")
+        XCTAssertEqual(request?.thinkingEffort, "high")
     }
 }
 

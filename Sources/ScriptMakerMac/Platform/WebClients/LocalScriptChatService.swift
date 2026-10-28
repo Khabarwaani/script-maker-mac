@@ -56,8 +56,8 @@ struct LocalScriptChatService: ScriptChatRefining {
         let result = try await runner.run(LocalAgentRequest(
             agentID: ScriptChat.Spec.identity.id, version: ScriptChat.Spec.identity.version,
             inputJSON: json, provider: request.provider, executable: request.provider.executable,
-            model: model.isEmpty ? nil : model, session: settings,
-            responseInstructions: Self.responseInstructions,
+            model: model.isEmpty ? nil : model, thinkingEffort: request.thinkingEffort,
+            session: settings, responseInstructions: Self.responseInstructions,
             sessionID: resolvedSessionID))
         try Task.checkCancellation()
         let output: ScriptChat.Output

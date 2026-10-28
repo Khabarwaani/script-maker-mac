@@ -48,6 +48,7 @@ final class ResearcherViewModel {
     // Agent Execution
     private var providerOverride: LocalAgentProvider = .codex
     private var modelOverrideValue = ""
+    private var effortOverrideValue = ""
     private let agentSelection: (any WorkspaceAgentSelecting)?
     var usesAppDefault: Bool {
         get { agentSelection?.usesAppDefault ?? false }
@@ -61,6 +62,11 @@ final class ResearcherViewModel {
         get { agentSelection?.model ?? modelOverrideValue }
         set { if let agentSelection { agentSelection.model = newValue } else { modelOverrideValue = newValue } }
     }
+    var thinkingEffort: String {
+        get { agentSelection?.thinkingEffort ?? effortOverrideValue }
+        set { if let agentSelection { agentSelection.thinkingEffort = newValue } else { effortOverrideValue = newValue } }
+    }
+    var modelCatalog: ProviderModelCatalogViewModel? { agentSelection?.modelCatalog }
     var availableProviders: [LocalAgentProvider: LocalAgentAvailability] = [:]
 
     var isResearching: Bool = false
@@ -263,7 +269,7 @@ final class ResearcherViewModel {
             sourceURL: sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : sourceURL,
             humanInstruction: humanInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : humanInstruction,
             provider: selectedProvider,
-            model: effectiveModel
+            model: effectiveModel, thinkingEffort: thinkingEffort
         )
 
         do {

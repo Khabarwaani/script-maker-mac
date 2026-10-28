@@ -41,7 +41,7 @@ actor LocalNewsResearcherService: NewsResearching {
             inputJSON: inputJSON,
             provider: request.provider,
             executable: request.provider.executable,
-            model: request.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : request.model.trimmingCharacters(in: .whitespacesAndNewlines)
+            model: request.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : request.model.trimmingCharacters(in: .whitespacesAndNewlines), thinkingEffort: request.thinkingEffort
         )
 
         let result = try await runner.run(agentRequest)

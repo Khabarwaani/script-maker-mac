@@ -48,6 +48,7 @@ final class AppConfig: ApplicationSettings {
         didSet {
             store.set(defaultAgentSelection.provider.rawValue, forKey: "agent.default.provider")
             store.set(defaultAgentSelection.model, forKey: "agent.default.model")
+            store.set(defaultAgentSelection.thinkingEffort, forKey: "agent.default.thinkingEffort")
         }
     }
 
@@ -80,7 +81,7 @@ final class AppConfig: ApplicationSettings {
             .flatMap(ScriptRefinementExecutionMode.init(rawValue:)) ?? .fastClean
         let provider = store.string(forKey: "agent.default.provider").flatMap(LocalAgentProvider.init(rawValue:))
         if let provider {
-            defaultAgentSelection = AgentSelection(provider: provider, model: store.string(forKey: "agent.default.model") ?? "")
+            defaultAgentSelection = AgentSelection(provider: provider, model: store.string(forKey: "agent.default.model") ?? "", thinkingEffort: store.string(forKey: "agent.default.thinkingEffort") ?? "")
         } else {
             defaultAgentSelection = Self.migratedSelection(store: store)
             store.set(defaultAgentSelection.provider.rawValue, forKey: "agent.default.provider")

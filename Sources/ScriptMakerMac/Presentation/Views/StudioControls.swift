@@ -1,5 +1,85 @@
 import SwiftUI
 
+struct AgentModelControls: View {
+    let provider: LocalAgentProvider
+    @Binding var model: String
+    @Binding var effort: String
+    let catalog: ProviderModelCatalogViewModel?
+    @State private var customMode = false
+    @State private var testing = false
+    @State private var testMessage: String?
+    @State private var probeTask: Task<Void, Never>?
+
+    private var choices: [ProviderModel] { catalog?.models[provider] ?? [] }
+    private var supportsCatalog: Bool { provider == .codex || provider == .antigravity }
+    private var effortChoices: [String] {
+        if provider == .antigravity { return ["low", "medium", "high", "xhigh", "max"] }
+        return choices.first(where: { $0.id == model })?.efforts ?? ["low", "medium", "high", "xhigh", "max", "ultra"]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if supportsCatalog {
+                HStack {
+                    Picker("Model", selection: Binding(
+                        get: { customMode ? "__custom__" : model },
+                        set: { choice in
+                            customMode = choice == "__custom__"
+                            model = customMode ? "" : choice
+                            effort = ""
+                            testMessage = nil
+                        })) {
+                        Text("Provider default").tag("")
+                        ForEach(choices) { item in Text(item.name).tag(item.id) }
+                        Text("Custom…").tag("__custom__")
+                    }
+                    .labelsHidden().accessibilityLabel("Model")
+                    Button { Task { await catalog?.load(provider, force: true) } } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }.help("Refresh models").disabled(catalog?.loading.contains(provider) == true)
+                }
+                if customMode {
+                    HStack {
+                        TextField("Custom model identifier", text: $model)
+                            .accessibilityLabel("Custom model")
+                        Button(testing ? "Testing…" : "Test") {
+                            testing = true; testMessage = nil
+                            let selectedModel = model
+                            let selectedEffort = effort
+                            probeTask = Task {
+                                do {
+                                    try await catalog?.test(provider, model: selectedModel, effort: selectedEffort)
+                                    try Task.checkCancellation()
+                                    testMessage = "Model responded successfully."
+                                } catch is CancellationError {
+                                    testMessage = "Test cancelled."
+                                } catch { testMessage = error.localizedDescription }
+                                testing = false
+                                probeTask = nil
+                            }
+                        }.disabled(testing || model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || catalog == nil)
+                        if testing { Button("Cancel") { probeTask?.cancel() } }
+                    }
+                }
+                Picker("Thinking", selection: $effort) {
+                    Text("Provider default").tag("")
+                    ForEach(effortChoices, id: \.self) { Text($0.capitalized).tag($0) }
+                }.accessibilityLabel("Thinking effort")
+                if let testMessage { Text(testMessage).font(.caption).foregroundStyle(.secondary) }
+                if let error = catalog?.errors[provider] { Text("Model list unavailable: \(error)").font(.caption).foregroundStyle(.secondary) }
+            } else if provider != .appleLocal {
+                TextField("Model (provider default)", text: $model).accessibilityLabel("Model override")
+            }
+        }
+        .task(id: provider) {
+            await catalog?.load(provider)
+            customMode = !model.isEmpty && !choices.contains(where: { $0.id == model })
+            testMessage = nil
+        }
+        .onDisappear { probeTask?.cancel() }
+    }
+}
+
 struct StudioNumberInput: View {
     let title: String
     @Binding var value: Int
