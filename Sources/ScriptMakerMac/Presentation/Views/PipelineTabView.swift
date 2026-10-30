@@ -552,6 +552,20 @@ private struct StepWorkAreaView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }.padding(.horizontal, 24).padding(.vertical, 10)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pipeline master instruction").font(.caption.weight(.semibold))
+                TextField("Characters, script format, and other directions for every compatible stage",
+                    text: Binding(get: { viewModel.masterInstruction }, set: { viewModel.updateMasterInstruction($0) }), axis: .vertical)
+                    .lineLimit(2...4).textFieldStyle(.roundedBorder)
+                    .disabled(viewModel.isRunning)
+                if !viewModel.effectiveInstruction.isEmpty {
+                    DisclosureGroup("Effective instruction for \(viewModel.activeStep?.agentName ?? "this stage")") {
+                        Text(viewModel.effectiveInstruction)
+                            .font(.callout).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }.padding(.horizontal, 24).padding(.bottom, 10)
             Divider()
             if viewModel.executionMode == .continuous && (viewModel.isRunning || viewModel.activeStep?.result != nil) {
                 ScrollView { stepOutputAndTransitionsSection.padding(24) }
@@ -617,6 +631,8 @@ private struct StepWorkAreaView: View {
                 if let def = viewModel.activeDefinition {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Input Parameters").font(.subheadline.weight(.semibold))
+                        Text("Instruction fields here apply only to this stage. Use the pipeline master instruction above for the full flow.")
+                            .font(.caption).foregroundStyle(.secondary)
                         DynamicAgentInputForm(
                             draft: Binding(
                                 get: { viewModel.steps[viewModel.activeStepIndex].draft },
@@ -634,7 +650,7 @@ private struct StepWorkAreaView: View {
                 }
 
                 if viewModel.executionMode == .continuous {
-                    TextField("Script polish instruction", text: $viewModel.refinementInstruction, axis: .vertical)
+                    TextField("Default script polish guidance", text: $viewModel.refinementInstruction, axis: .vertical)
                         .lineLimit(2...4).textFieldStyle(.roundedBorder)
                         .disabled(viewModel.isRunning)
                 }

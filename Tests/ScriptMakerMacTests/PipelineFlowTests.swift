@@ -48,10 +48,10 @@ private actor StubAgentService: LocalAgentRunning {
 }
 
 private func makeSampleDefinitions() throws -> [LocalAgentDefinition] {
-    let newsSchema = try AgentInputSchema(json: #"{"type":"object","required":["topic"],"properties":{"topic":{"type":"string"}}}"#)
-    let jokeSchema = try AgentInputSchema(json: #"{"type":"object","required":["topic","notes"],"properties":{"topic":{"type":"string"},"notes":{"type":"string"},"date":{"type":"string"},"location":{"type":"string"},"people":{"type":"array","items":{"type":"string"}},"hashtags":{"type":"array","items":{"type":"string"}},"concept_count":{"type":"integer","default":3},"target_durations":{"type":"array","items":{"type":"integer"}}}}"#)
-    let storySchema = try AgentInputSchema(json: #"{"type":"object","required":["news"],"properties":{"news":{"type":"string"},"user_joke":{"type":"string"},"output_count":{"type":"integer","default":1}}}"#)
-    let chatSchema = try AgentInputSchema(json: #"{"type":"object","required":["originalScript","userInstruction"],"properties":{"originalScript":{"type":"string"},"latestScript":{"type":"string"},"userInstruction":{"type":"string"}}}"#)
+    let newsSchema = try AgentInputSchema(json: #"{"type":"object","required":["topic"],"properties":{"topic":{"type":"string"},"human_instruction":{"type":"string"},"custom_instructions":{"type":"string"}}}"#)
+    let jokeSchema = try AgentInputSchema(json: #"{"type":"object","required":["topic","notes"],"properties":{"topic":{"type":"string"},"notes":{"type":"string"},"date":{"type":"string"},"location":{"type":"string"},"people":{"type":"array","items":{"type":"string"}},"hashtags":{"type":"array","items":{"type":"string"}},"concept_count":{"type":"integer","default":3},"target_durations":{"type":"array","items":{"type":"integer"}},"human_instruction":{"type":"string"},"custom_instructions":{"type":"string"}}}"#)
+    let storySchema = try AgentInputSchema(json: #"{"type":"object","required":["news"],"properties":{"news":{"type":"string"},"user_joke":{"type":"string"},"output_count":{"type":"integer","default":1},"human_instruction":{"type":"string"},"custom_instructions":{"type":"string"}}}"#)
+    let chatSchema = try AgentInputSchema(json: #"{"type":"object","required":["originalScript","userInstruction"],"properties":{"originalScript":{"type":"string"},"latestScript":{"type":"string"},"userInstruction":{"type":"string"},"instruction":{"type":"string"}}}"#)
 
     return [
         LocalAgentDefinition(agentID: "NewsResearcher", name: "News Researcher", version: "1.1.0", schema: newsSchema, requiresWebResearch: true, isExecutable: true),
@@ -563,6 +563,93 @@ extension PipelineFlowTests {
     }
 
     @MainActor
+    func testContinuousInstructionsReachEveryStageAndPreserveStageOverrides() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        vm.updateMasterInstruction("Use Asha and Ravi in screenplay format.")
+        vm.selectStep(at: 2)
+        var storyDraft = try XCTUnwrap(vm.activeStep?.draft)
+        storyDraft.fields["human_instruction"]?.text = "Use Asha as the narrator."
+        storyDraft.fields["human_instruction"]?.included = true
+        vm.updateActiveDraft(storyDraft)
+        vm.selectStep(at: 3)
+        var chatDraft = try XCTUnwrap(vm.activeStep?.draft)
+        chatDraft.fields["userInstruction"]?.text = "Keep scene headings in uppercase."
+        vm.updateActiveDraft(chatDraft)
+        vm.selectStep(at: 0)
+        vm.runPipeline()
+        await vm.waitForExecution()
+
+        let requests = await runner.requests
+        XCTAssertEqual(requests.count, 4)
+        for request in requests {
+            let input = try JSONDecoder().decode(AgentJSON.self, from: Data(request.inputJSON.utf8)).object
+            let instruction = input[request.agentID == "ScriptChat" ? "userInstruction" : "human_instruction"]?.string ?? ""
+            XCTAssertTrue(instruction.contains("Use Asha and Ravi in screenplay format."), request.agentID)
+            XCTAssertNil(input["custom_instructions"])
+            if request.agentID == "ThreeSceneStoryCreator" {
+                XCTAssertTrue(instruction.contains("Use Asha as the narrator."))
+                XCTAssertTrue(instruction.contains("Stage-specific instruction"))
+            }
+            if request.agentID == "ScriptChat" {
+                XCTAssertTrue(instruction.contains("Keep scene headings in uppercase."))
+                XCTAssertTrue(instruction.contains("Default script polish guidance"))
+            }
+        }
+    }
+
+    @MainActor
+    func testDirectNewsToStoryPreservesLegacyInstructionAlias() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        let preset = try XCTUnwrap(vm.presets.first { $0.id == "news-to-story" })
+        vm.selectPreset(preset)
+        vm.updateMasterInstruction("Use a two-column script format.")
+        vm.selectStep(at: 1)
+        var draft = try XCTUnwrap(vm.activeStep?.draft)
+        draft.fields["custom_instructions"]?.text = "Speakers are Asha and Ravi."
+        draft.fields["custom_instructions"]?.included = true
+        vm.updateActiveDraft(draft)
+        vm.selectStep(at: 0)
+        vm.runPipeline()
+        await vm.waitForExecution()
+        let requests = await runner.requests
+        let input = try JSONDecoder().decode(AgentJSON.self, from: Data(try XCTUnwrap(requests.last).inputJSON.utf8)).object
+        XCTAssertTrue(input["human_instruction"]?.string?.contains("Speakers are Asha and Ravi.") == true)
+        XCTAssertTrue(input["human_instruction"]?.string?.contains("two-column script format") == true)
+        XCTAssertNil(input["custom_instructions"])
+    }
+
+    func testRefinerAndDetailUseTheirOwnInstructionFields() async throws {
+        let resolver = LocalPipelineFlowResolver()
+        let storySchema = try AgentInputSchema(json: #"{"type":"object","properties":{"news":{"type":"string"}}}"#)
+        let refinerSchema = try AgentInputSchema(json: #"{"type":"object","required":["script"],"properties":{"script":{"type":"string"},"instruction":{"type":"string"}}}"#)
+        let detailSchema = try AgentInputSchema(json: #"{"type":"object","required":["originalScript"],"properties":{"originalScript":{"type":"string"},"userInstruction":{"type":"string"},"instruction":{"type":"string"}}}"#)
+        let output = #"{"items":[{"title":"Asha's story","scenes":[{"title":"Reveal","dialogues":[{"speaker":"Asha","dialogue":"Hello"}]}]}]}"#
+        let source = AgentPipelineStep(stepIndex: 0, agentID: "ThreeSceneStoryCreator", agentName: "Story", version: "1",
+            draft: AgentInputDraft(schema: storySchema, required: true), status: .completed,
+            result: LocalAgentResult(text: output, rawOutput: output))
+        let refiner = LocalAgentDefinition(agentID: "ScriptRefiner", name: "Refiner", version: "1", schema: refinerSchema)
+        var refinerStep = AgentPipelineStep(stepIndex: 1, agentID: refiner.agentID, agentName: refiner.name, version: refiner.version,
+            draft: await resolver.mapOutput(from: source, to: refiner, variationIndex: 0))
+        XCTAssertTrue(refinerStep.draft.fields["script"]?.text.contains("Asha: Hello") == true)
+        refinerStep.draft.fields["instruction"]?.text = "Keep the reveal short."
+        refinerStep.draft.fields["instruction"]?.included = true
+        let preparedRefiner = PipelineInstructionComposer.preparedStep(refinerStep, schema: refinerSchema,
+            master: "Use Asha and Ravi.", polish: "Polish dialogue.")
+        XCTAssertTrue(preparedRefiner.draft.fields["instruction"]?.text.contains("Keep the reveal short.") == true)
+        XCTAssertTrue(preparedRefiner.draft.fields["instruction"]?.text.contains("Use Asha and Ravi.") == true)
+
+        let detail = LocalAgentDefinition(agentID: "ScriptDetail", name: "Detail", version: "1", schema: detailSchema)
+        let detailStep = AgentPipelineStep(stepIndex: 1, agentID: detail.agentID, agentName: detail.name, version: detail.version,
+            draft: await resolver.mapOutput(from: source, to: detail, variationIndex: 0))
+        let preparedDetail = PipelineInstructionComposer.preparedStep(detailStep, schema: detailSchema,
+            master: "Use Asha and Ravi.", polish: "Polish dialogue.")
+        XCTAssertTrue(preparedDetail.draft.fields["userInstruction"]?.text.contains("Use Asha and Ravi.") == true)
+        XCTAssertFalse(preparedDetail.draft.fields["userInstruction"]?.text.contains("Polish dialogue.") == true)
+    }
+
+    @MainActor
     func testContinuousFinishesBothWorkflowModesWithoutRefinementLoop() async throws {
         for mode in PipelineMode.allCases {
             let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
@@ -577,7 +664,7 @@ extension PipelineFlowTests {
             XCTAssertEqual(vm.statusMessage, "Pipeline completed")
             XCTAssertFalse(vm.isRunning)
             let input = try JSONDecoder().decode(AgentJSON.self, from: Data(try XCTUnwrap(requests.last).inputJSON.utf8))
-            XCTAssertFalse(input.object["userInstruction"]?.string?.isEmpty ?? true)
+            XCTAssertTrue(input.object["userInstruction"]?.string?.contains("Default script polish guidance") == true)
         }
     }
 
