@@ -7,6 +7,7 @@ import Observation
 final class PipelineTabViewModel {
     var mode: PipelineMode = .preset
     var executionMode: PipelineExecutionMode = .continuous
+    private(set) var masterInstruction = ""
     var refinementInstruction = "Polish dialogue pacing and punchlines while preserving the facts, scene structure and script language. Preserve each scene's duration and word budget; do not increase its spoken word count."
     var editedOutput = ""
     private(set) var isPauseRequested = false
@@ -113,6 +114,27 @@ final class PipelineTabViewModel {
     var activeDefinition: LocalAgentDefinition? {
         guard let step = activeStep else { return nil }
         return catalog.first { $0.agentID == step.agentID && $0.version == step.version }
+    }
+
+    var effectiveInstruction: String {
+        guard let step = activeStep, let definition = activeDefinition else { return "" }
+        return PipelineInstructionComposer.effectiveInstruction(step, schema: definition.schema,
+            master: masterInstruction, polish: refinementInstruction)
+    }
+
+    func updateMasterInstruction(_ text: String) {
+        guard !isRunning, masterInstruction != text else { return }
+        masterInstruction = text
+        for index in steps.indices {
+            steps[index].status = .pending
+            steps[index].result = nil
+            steps[index].rawOutput = ""
+            steps[index].errorMessage = nil
+        }
+        activeStepIndex = 0
+        availableTransitions = []
+        editedOutput = ""
+        statusMessage = "Master instruction updated · ready to run"
     }
 
     var canRunActiveStep: Bool {
@@ -420,7 +442,6 @@ final class PipelineTabViewModel {
         availableTransitions = []
         savedStoryNotice = nil
         editedOutput = ""
-        fillRefinementInstruction(at: nextIndex)
     }
 
     func selectCustomNextAgent(_ agentID: String) async {
@@ -463,7 +484,7 @@ final class PipelineTabViewModel {
             if let nextDef = catalog.first(where: { $0.agentID == nextStep.agentID && $0.version == nextStep.version }) {
                 let currentStep = steps[activeStepIndex]
                 let remapped = await flowResolver.mapOutput(from: currentStep, to: nextDef, variationIndex: index)
-                steps[activeStepIndex + 1].draft = remapped
+                steps[activeStepIndex + 1].draft = preservingInstructions(from: nextStep.draft, in: remapped)
             }
         }
     }
@@ -565,7 +586,6 @@ final class PipelineTabViewModel {
     }
 
     private func executeStage() async throws {
-        fillRefinementInstruction(at: activeStepIndex)
         guard let step = activeStep, let definition = activeDefinition, definition.isExecutable else {
             throw LocalAgentError.invalidInput("This stage is not available locally.")
         }
@@ -582,7 +602,9 @@ final class PipelineTabViewModel {
         steps[index].errorMessage = nil
         editedOutput = ""
         statusMessage = "Running \(step.agentName)…"
-        let output = try await executor.execute(step: step, definition: definition, model: step.model)
+        let prepared = PipelineInstructionComposer.preparedStep(step, schema: definition.schema,
+            master: masterInstruction, polish: refinementInstruction)
+        let output = try await executor.execute(step: prepared, definition: definition, model: step.model)
         try Task.checkCancellation()
         steps[index].status = .completed
         steps[index].completedAt = Date()
@@ -602,8 +624,7 @@ final class PipelineTabViewModel {
             }
             let draft = await flowResolver.mapOutput(from: completed, to: definition, variationIndex: completed.selectedVariationIndex)
             try Task.checkCancellation()
-            steps[next].draft = draft
-            fillRefinementInstruction(at: next)
+            steps[next].draft = preservingInstructions(from: steps[next].draft, in: draft)
         } else {
             let options = await flowResolver.compatibleTransitions(from: completed, catalog: catalog)
             try Task.checkCancellation()
@@ -630,17 +651,20 @@ final class PipelineTabViewModel {
                 thinkingEffort: agentSelection?.thinkingEffort ?? effortOverrideValue,
                 draft: option.mappedDraft, sourceStepIndex: previous))
             activeStepIndex = steps.count - 1
-            fillRefinementInstruction(at: activeStepIndex)
         }
         editedOutput = activeStep?.result?.text ?? ""
         availableTransitions = []
         return true
     }
 
-    private func fillRefinementInstruction(at index: Int) {
-        guard steps[index].agentID == "ScriptChat" || steps[index].agentID == "ScriptRefiner",
-              StringFormatting.isBlank(steps[index].draft.fields["userInstruction"]?.text ?? "") else { return }
-        steps[index].draft.fields["userInstruction"]?.text = refinementInstruction
+    private func preservingInstructions(from existing: AgentInputDraft, in mapped: AgentInputDraft) -> AgentInputDraft {
+        var result = mapped
+        for key in PipelineInstructionComposer.instructionKeys {
+            guard let previous = existing.fields[key], previous.included,
+                  !StringFormatting.isBlank(previous.text), result.fields[key] != nil else { continue }
+            result.fields[key] = previous
+        }
+        return result
     }
 
     private func invalidateFollowingStages() {

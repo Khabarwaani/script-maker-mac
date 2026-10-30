@@ -1,5 +1,49 @@
 import Foundation
 
+enum PipelineInstructionComposer {
+    static let instructionKeys = ["human_instruction", "custom_instructions", "userInstruction", "instruction"]
+
+    static func preparedStep(_ step: AgentPipelineStep, schema: AgentInputSchema,
+                             master: String, polish: String) -> AgentPipelineStep {
+        var prepared = step
+        let key: String
+        if schema.properties["human_instruction"] != nil { key = "human_instruction" }
+        else if schema.properties["custom_instructions"] != nil { key = "custom_instructions" }
+        else if schema.properties["userInstruction"] != nil { key = "userInstruction" }
+        else if step.agentID == "ScriptRefiner", schema.properties["instruction"] != nil { key = "instruction" }
+        else { return prepared }
+
+        let stageKeys = key == "human_instruction" ? ["custom_instructions", "human_instruction"] : [key]
+        let stageParts = stageKeys.compactMap { candidate -> String? in
+            let field = step.draft.fields[candidate]
+            guard field?.included == true, let text = field?.text.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+            return text
+        }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        let stage = stageParts.joined(separator: "\n\n")
+        let sections = [
+            step.agentID == "ScriptChat" && !polish.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Default script polish guidance (lowest priority):\n\(polish)" : nil,
+            !master.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Pipeline master instruction:\n\(master)" : nil,
+            !stage.isEmpty ? "Stage-specific instruction (overrides conflicting master guidance):\n\(stage)" : nil
+        ].compactMap { $0 }
+        guard !sections.isEmpty else { return prepared }
+        prepared.draft.fields[key]?.text = sections.joined(separator: "\n\n")
+        prepared.draft.fields[key]?.included = true
+        if key == "human_instruction" { prepared.draft.fields["custom_instructions"]?.included = false }
+        return prepared
+    }
+
+    static func effectiveInstruction(_ step: AgentPipelineStep, schema: AgentInputSchema,
+                                     master: String, polish: String) -> String {
+        let prepared = preparedStep(step, schema: schema, master: master, polish: polish)
+        return instructionKeys.compactMap { key -> String? in
+            guard prepared.draft.fields[key]?.included == true else { return nil }
+            return prepared.draft.fields[key]?.text
+        }.first ?? ""
+    }
+}
+
 protocol AgentPipelineExecuting: Sendable {
     func execute(step: AgentPipelineStep, definition: LocalAgentDefinition, model: String) async throws -> LocalAgentResult
 }

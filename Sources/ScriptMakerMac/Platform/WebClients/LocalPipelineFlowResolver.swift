@@ -433,9 +433,13 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
             scriptText = parsed["script"] as? String ?? ""
         }
 
-        fields["originalScript"] = .string(scriptText)
-        fields["latestScript"] = .string(scriptText)
-        fields["userInstruction"] = .string("")
+        if target.agentID == "ScriptRefiner" {
+            fields["script"] = .string(scriptText)
+        } else {
+            fields["originalScript"] = .string(scriptText)
+            fields["latestScript"] = .string(scriptText)
+            fields["userInstruction"] = .string("")
+        }
 
         return AgentInputDraft(schema: target.schema, required: true, value: .object(fields))
     }
@@ -445,10 +449,16 @@ struct LocalPipelineFlowResolver: PipelineFlowResolving {
         target: LocalAgentDefinition
     ) async -> AgentInputDraft {
         var fields: [String: AgentJSON] = [:]
-        let latest = (parsed["latestScript"] as? String) ?? (parsed["script"] as? String) ?? ""
-        fields["originalScript"] = .string(latest)
-        fields["latestScript"] = .string(latest)
-        fields["userInstruction"] = .string("")
+        let refined = (parsed["refined_scripts"] as? [[String: Any]])?.first?["script"] as? String
+        let latest = (parsed["latestScript"] as? String) ?? refined ?? (parsed["script"] as? String) ?? ""
+        if target.agentID == "ScriptRefiner" {
+            fields["script"] = .string(latest)
+        } else {
+            fields["originalScript"] = .string(latest)
+            fields["latestScript"] = .string(latest)
+            fields["userInstruction"] = .string("")
+            if let saved = parsed["instruction"] as? String { fields["instruction"] = .string(saved) }
+        }
         return AgentInputDraft(schema: target.schema, required: true, value: .object(fields))
     }
 
