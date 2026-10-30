@@ -29,6 +29,11 @@ gh pr create --draft --base develop --title "feat: (#<issue>) <desc>"
     worktree. Do not discard unmerged work during cleanup.
 12. Local launch verification uses integrated `develop` and Xcode's default
     DerivedData location; no custom `-derivedDataPath` or repo-local build output.
+    Build with `xcodebuild -project ScriptMakerMac.xcodeproj -scheme
+    ScriptMakerMac -configuration Debug -destination 'platform=macOS' build`.
+    Launch with Xcode Product > Run. Confirm the running executable belongs to
+    that build and read its `Info.plist` version; app name and bundle ID alone
+    cannot distinguish older DerivedData copies.
 
 For #147, implementation PRs target revamp/2.0; its integration PR stays draft until the
 whole revamp is tested and approved. No partial develop merge or new version/preview.
