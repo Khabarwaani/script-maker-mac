@@ -74,9 +74,14 @@ Full spec: `docs/guidelines/architecture.md`. Layer rules: `docs/guidelines/laye
     Domain. UI state, ViewModel. Shared helper, Core.
 11. **Inject, don't create:** ViewModels/Services take `any Protocol` in
     `init`, never `ConcreteType()`. The Composition Root wires concretes.
-12. **Local builds:** use Xcode's default DerivedData location. Do not create
-    repo-local `build/` output or temporary custom build directories. When asked
-    to launch or verify, build and run the integrated `develop` checkout.
+12. **Local builds and launch:** use the integrated `develop` checkout and
+    Xcode's default DerivedData location. Build with `xcodebuild -project
+    ScriptMakerMac.xcodeproj -scheme ScriptMakerMac -configuration Debug
+    -destination 'platform=macOS' build`, then launch with Xcode's Product > Run.
+    Do not create repo-local `build/` output or custom DerivedData directories.
+    When verifying a launch, check the running executable's path and that app's
+    `Info.plist` version. Multiple DerivedData copies share the same app name and
+    bundle ID, so selecting an app by name alone can reopen a stale build.
 
 ## 2.0 revamp exception (#147)
 
