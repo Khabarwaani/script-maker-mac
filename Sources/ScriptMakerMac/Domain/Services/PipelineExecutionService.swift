@@ -4,7 +4,7 @@ enum PipelineInstructionComposer {
     static let instructionKeys = ["human_instruction", "custom_instructions", "userInstruction", "instruction"]
 
     static func preparedStep(_ step: AgentPipelineStep, schema: AgentInputSchema,
-                             master: String, polish: String) -> AgentPipelineStep {
+                             master: String, polish: String, stageInstruction: String = "") -> AgentPipelineStep {
         var prepared = step
         let key: String
         if schema.properties["human_instruction"] != nil { key = "human_instruction" }
@@ -19,8 +19,10 @@ enum PipelineInstructionComposer {
             guard field?.included == true, let text = field?.text.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
             return text
         }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        let stage = stageParts.joined(separator: "\n\n")
+        let stage = (stageParts + [stageInstruction.trimmingCharacters(in: .whitespacesAndNewlines)]).filter { !$0.isEmpty }.joined(separator: "\n\n")
         let sections = [
+            (!master.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !stage.isEmpty)
+                ? "Human instructions below are mandatory requirements. Apply every applicable requirement to each scene, including scene-specific directions. Stage-specific instructions override conflicting master instructions; both override default polish guidance. Check every scene against these requirements before returning output. Never silently omit a requirement; explain any conflict or inability to comply." : nil,
             step.agentID == "ScriptChat" && !polish.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? "Default script polish guidance (lowest priority):\n\(polish)" : nil,
             !master.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -35,8 +37,8 @@ enum PipelineInstructionComposer {
     }
 
     static func effectiveInstruction(_ step: AgentPipelineStep, schema: AgentInputSchema,
-                                     master: String, polish: String) -> String {
-        let prepared = preparedStep(step, schema: schema, master: master, polish: polish)
+                                     master: String, polish: String, stageInstruction: String = "") -> String {
+        let prepared = preparedStep(step, schema: schema, master: master, polish: polish, stageInstruction: stageInstruction)
         return instructionKeys.compactMap { key -> String? in
             guard prepared.draft.fields[key]?.included == true else { return nil }
             return prepared.draft.fields[key]?.text
