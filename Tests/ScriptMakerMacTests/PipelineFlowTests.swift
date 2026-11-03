@@ -599,6 +599,36 @@ extension PipelineFlowTests {
     }
 
     @MainActor
+    func testStageInstructionsReachContinuousRunAndRerun() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        vm.updateMasterInstruction("Use Asha in every scene.")
+        vm.updateStageInstruction("Scene 2 must have no narrator.", agentID: "ThreeSceneStoryCreator")
+        vm.selectStep(at: 0)
+        vm.runPipeline()
+        await vm.waitForExecution()
+        let initial = await runner.requests
+        let story = try XCTUnwrap(initial.first { $0.agentID == "ThreeSceneStoryCreator" })
+        XCTAssertTrue(story.inputJSON.contains("Scene 2 must have no narrator."))
+        XCTAssertTrue(story.inputJSON.contains("mandatory requirements"))
+        XCTAssertFalse(try XCTUnwrap(initial.first { $0.agentID == "NewsResearcher" }).inputJSON.contains("Scene 2 must have no narrator."))
+
+        vm.updateStageInstruction("Scene 3 must end with Asha's question.", agentID: "ThreeSceneStoryCreator")
+        XCTAssertEqual(vm.activeStep?.agentID, "ThreeSceneStoryCreator")
+        XCTAssertEqual(vm.steps[0].status, .completed)
+        XCTAssertNil(vm.steps[3].result)
+        vm.runActiveStep()
+        await vm.waitForExecution()
+        let reruns = await runner.requests
+        let rerun = try XCTUnwrap(reruns.last)
+        XCTAssertEqual(reruns.count, initial.count + 1)
+        XCTAssertEqual(rerun.agentID, "ThreeSceneStoryCreator")
+        XCTAssertTrue(rerun.inputJSON.contains("Scene 3 must end with Asha's question."))
+        XCTAssertTrue(rerun.inputJSON.contains("Use Asha in every scene."))
+        XCTAssertFalse(rerun.inputJSON.contains("Scene 2 must have no narrator."))
+    }
+
+    @MainActor
     func testDirectNewsToStoryPreservesLegacyInstructionAlias() async throws {
         let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
         let vm = await executionVM(runner, mode: .preset)

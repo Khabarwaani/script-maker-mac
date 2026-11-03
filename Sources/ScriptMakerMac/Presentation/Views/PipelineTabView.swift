@@ -533,11 +533,18 @@ private struct StepWorkAreaView: View {
                     Button("Continue", systemImage: "play.fill") { viewModel.continuePipeline() }
                         .buttonStyle(.borderedProminent)
                 } else {
-                    LoadingButton(isLoading: viewModel.isRunning) { viewModel.runPipeline() } label: {
+                    LoadingButton(isLoading: viewModel.isRunning) {
+                        if viewModel.activeStep?.status == .completed { viewModel.runActiveStep() }
+                        else { viewModel.runPipeline() }
+                    } label: {
                         Text(viewModel.runTitle)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!viewModel.canRunActiveStep || viewModel.hasOutputEdits)
+                }
+                if viewModel.canContinue {
+                    Button("Re-run Stage", systemImage: "arrow.clockwise") { viewModel.runActiveStep() }
+                        .disabled(!viewModel.canRunActiveStep || viewModel.hasOutputEdits)
                 }
                 if viewModel.isRunning {
                     if viewModel.executionMode == .continuous {
@@ -558,7 +565,26 @@ private struct StepWorkAreaView: View {
                     text: Binding(get: { viewModel.masterInstruction }, set: { viewModel.updateMasterInstruction($0) }), axis: .vertical)
                     .lineLimit(2...4).textFieldStyle(.roundedBorder)
                     .disabled(viewModel.isRunning)
+                DisclosureGroup("Instructions for specific stages") {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Human instructions are required. Stage instructions override conflicting master instructions. Include scene numbers for scene-specific requirements.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(viewModel.instructionStages) { definition in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(definition.name).font(.caption.weight(.semibold))
+                                    TextField("Requirements for this stage", text: Binding(
+                                        get: { viewModel.stageInstructions[definition.agentID, default: ""] },
+                                        set: { viewModel.updateStageInstruction($0, agentID: definition.agentID) }
+                                    ), axis: .vertical)
+                                    .lineLimit(2...4).textFieldStyle(.roundedBorder)
+                                }
+                            }
+                        }
+                    }.frame(maxHeight: 240)
+                }.disabled(viewModel.isRunning)
                 if !viewModel.effectiveInstruction.isEmpty {
+
                     DisclosureGroup("Effective instruction for \(viewModel.activeStep?.agentName ?? "this stage")") {
                         Text(viewModel.effectiveInstruction)
                             .font(.callout).textSelection(.enabled)

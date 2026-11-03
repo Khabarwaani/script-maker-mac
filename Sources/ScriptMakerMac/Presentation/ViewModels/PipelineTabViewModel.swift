@@ -116,15 +116,39 @@ final class PipelineTabViewModel {
         return catalog.first { $0.agentID == step.agentID && $0.version == step.version }
     }
 
+    private(set) var stageInstructions: [String: String] = [:]
+
+    var instructionStages: [LocalAgentDefinition] {
+        catalog.filter { definition in
+            definition.isExecutable && PipelineInstructionComposer.instructionKeys.contains {
+                definition.schema.properties[$0] != nil
+            }
+        }
+    }
+
+    func updateStageInstruction(_ text: String, agentID: String) {
+        guard !isRunning, stageInstructions[agentID, default: ""] != text else { return }
+        stageInstructions[agentID] = text
+        if let index = steps.firstIndex(where: { $0.agentID == agentID }) {
+            invalidateStage(at: index)
+        }
+        statusMessage = "Stage instruction updated · ready to run"
+    }
+
     var effectiveInstruction: String {
         guard let step = activeStep, let definition = activeDefinition else { return "" }
         return PipelineInstructionComposer.effectiveInstruction(step, schema: definition.schema,
-            master: masterInstruction, polish: refinementInstruction)
+            master: masterInstruction, polish: refinementInstruction, stageInstruction: stageInstructions[step.agentID, default: ""])
     }
 
     func updateMasterInstruction(_ text: String) {
         guard !isRunning, masterInstruction != text else { return }
         masterInstruction = text
+        resetInstructionResults()
+        statusMessage = "Master instruction updated · ready to run"
+    }
+
+    private func resetInstructionResults() {
         for index in steps.indices {
             steps[index].status = .pending
             steps[index].result = nil
@@ -134,7 +158,6 @@ final class PipelineTabViewModel {
         activeStepIndex = 0
         availableTransitions = []
         editedOutput = ""
-        statusMessage = "Master instruction updated · ready to run"
     }
 
     var canRunActiveStep: Bool {
@@ -603,7 +626,7 @@ final class PipelineTabViewModel {
         editedOutput = ""
         statusMessage = "Running \(step.agentName)…"
         let prepared = PipelineInstructionComposer.preparedStep(step, schema: definition.schema,
-            master: masterInstruction, polish: refinementInstruction)
+            master: masterInstruction, polish: refinementInstruction, stageInstruction: stageInstructions[step.agentID, default: ""])
         let output = try await executor.execute(step: prepared, definition: definition, model: step.model)
         try Task.checkCancellation()
         steps[index].status = .completed
