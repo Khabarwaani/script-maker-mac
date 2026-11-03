@@ -853,4 +853,30 @@ extension PipelineFlowTests {
         let savedStories = try await repo.all()
         XCTAssertEqual(savedStories.count, 1)
     }
+
+    @MainActor
+    func testInstructionStagesOnlyIncludesActivePipelineStagesInExecutionOrder() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        let preset = try XCTUnwrap(vm.presets.first { $0.id == "full-viral-story" })
+        vm.selectPreset(preset)
+
+        let stageIDs = vm.instructionStages.map(\.agentID)
+        XCTAssertEqual(stageIDs, ["NewsResearcher", "GroundedJokeGenerator", "ThreeSceneStoryCreator", "ScriptChat"])
+        XCTAssertFalse(stageIDs.contains("TwoSceneStoryCreator"))
+        XCTAssertFalse(stageIDs.contains("ScriptDetail"))
+    }
+
+    @MainActor
+    func testInstructionStagesUpdatesWhenPresetChanges() async throws {
+        let runner = ExecutionModeRunner(definitions: try makeSampleDefinitions())
+        let vm = await executionVM(runner, mode: .preset)
+        let twoScenePreset = try XCTUnwrap(vm.presets.first { $0.id == "fast-two-scene-story" })
+        vm.selectPreset(twoScenePreset)
+
+        let stageIDs = vm.instructionStages.map(\.agentID)
+        XCTAssertEqual(stageIDs, ["NewsResearcher", "GroundedJokeGenerator", "TwoSceneStoryCreator", "ScriptChat"])
+        XCTAssertFalse(stageIDs.contains("ThreeSceneStoryCreator"))
+        XCTAssertFalse(stageIDs.contains("ScriptDetail"))
+    }
 }

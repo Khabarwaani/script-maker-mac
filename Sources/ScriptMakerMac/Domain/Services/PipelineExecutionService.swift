@@ -3,6 +3,13 @@ import Foundation
 enum PipelineInstructionComposer {
     static let instructionKeys = ["human_instruction", "custom_instructions", "userInstruction", "instruction"]
 
+    static func canReceiveInstruction(agentID: String, schema: AgentInputSchema) -> Bool {
+        schema.properties["human_instruction"] != nil ||
+        schema.properties["custom_instructions"] != nil ||
+        schema.properties["userInstruction"] != nil ||
+        (agentID == "ScriptRefiner" && schema.properties["instruction"] != nil)
+    }
+
     static func preparedStep(_ step: AgentPipelineStep, schema: AgentInputSchema,
                              master: String, polish: String, stageInstruction: String = "") -> AgentPipelineStep {
         var prepared = step

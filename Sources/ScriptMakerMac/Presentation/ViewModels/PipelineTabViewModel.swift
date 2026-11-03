@@ -119,10 +119,13 @@ final class PipelineTabViewModel {
     private(set) var stageInstructions: [String: String] = [:]
 
     var instructionStages: [LocalAgentDefinition] {
-        catalog.filter { definition in
-            definition.isExecutable && PipelineInstructionComposer.instructionKeys.contains {
-                definition.schema.properties[$0] != nil
-            }
+        var seen = Set<String>()
+        return steps.compactMap { step in
+            guard !seen.contains(step.agentID) else { return nil }
+            seen.insert(step.agentID)
+            guard let definition = catalog.first(where: { $0.agentID == step.agentID && $0.isExecutable }) else { return nil }
+            guard PipelineInstructionComposer.canReceiveInstruction(agentID: step.agentID, schema: definition.schema) else { return nil }
+            return definition
         }
     }
 
